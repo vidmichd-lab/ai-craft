@@ -86,7 +86,6 @@
       overflow-x: hidden;
     }
 
-
     #previewCanvas {
       border-radius: 4px;
     }
@@ -358,11 +357,13 @@
       background: #242733;
       border-radius: 3px;
       outline: none;
+      appearance: none;
       -webkit-appearance: none;
     }
 
 
     input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
       -webkit-appearance: none;
       width: 16px;
       height: 16px;
@@ -544,6 +545,18 @@
                 <span>20%</span>
               </div>
             </div>
+            <div class="form-group">
+              <div class="checkbox-group">
+                <input type="checkbox" id="showBlocks" onchange="updateState('showBlocks', this.checked)">
+                <label for="showBlocks">Показывать блоки</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <div class="checkbox-group">
+                <input type="checkbox" id="showGuides" checked onchange="updateState('showGuides', this.checked)">
+                <label for="showGuides">Показывать направляющие</label>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -556,14 +569,17 @@
           <div class="section-content" id="content-title">
             <div class="form-group">
             <label>Текст</label>
-            <textarea id="title" oninput="updateState('title', this.value)">Your Headline</textarea>
+            <textarea id="title" oninput="updateState('title', this.value)">Курс «Frontend-разработчик» от Практикума</textarea>
           </div>
           <div class="form-group">
             <label>Цвет</label>
-            <input type="color" id="titleColor" value="#ffffff" onchange="updateState('titleColor', this.value)">
+            <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
+              <input type="color" id="titleColor" value="#ffffff" onchange="updateColorFromPicker('titleColor', this.value)" style="flex: 0 0 60px;">
+              <input type="text" id="titleColorHex" value="#ffffff" placeholder="#ffffff" onchange="updateColorFromHex('titleColor', this.value)" style="flex: 1;">
+            </div>
           </div>
           <div class="form-group">
-            <label>Горизонтальное выравнивание</label>
+            <label>Выключка текста</label>
             <div class="chips chips-3">
               <div class="chip active" data-group="title-align" data-value="left" onclick="selectTitleAlign('left')">Слева</div>
               <div class="chip" data-group="title-align" data-value="center" onclick="selectTitleAlign('center')">Центр</div>
@@ -579,8 +595,9 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Размер шрифта (px)</label>
-            <input type="number" id="titleSize" value="64" min="8" max="200" oninput="updateState('titleSize', parseInt(this.value))">
+            <label>Размер шрифта (% от макета)</label>
+            <input type="number" id="titleSize" value="7" min="1" max="20" step="0.1" oninput="updateState('titleSize', parseFloat(this.value))">
+            <div class="hint">Процент от минимального размера макета (подзаголовок автоматически масштабируется)</div>
           </div>
           <div class="form-group">
             <label>Начертание</label>
@@ -622,23 +639,28 @@
           </div>
           <div class="form-group">
             <label>Текст</label>
-            <textarea id="subtitle" oninput="updateState('subtitle', this.value)">Subtitle description</textarea>
+            <textarea id="subtitle" oninput="updateState('subtitle', this.value)">Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев</textarea>
           </div>
           <div class="form-group">
             <label>Цвет</label>
-            <input type="color" id="subtitleColor" value="#e0e0e0" onchange="updateState('subtitleColor', this.value)">
-          </div>
-          <div class="form-group">
-            <label>Горизонтальное выравнивание</label>
-            <div class="chips chips-3">
-              <div class="chip active" data-group="subtitle-align" data-value="left" onclick="selectSubtitleAlign('left')">Слева</div>
-              <div class="chip" data-group="subtitle-align" data-value="center" onclick="selectSubtitleAlign('center')">Центр</div>
-              <div class="chip" data-group="subtitle-align" data-value="right" onclick="selectSubtitleAlign('right')">Справа</div>
+            <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
+              <input type="color" id="subtitleColor" value="#e0e0e0" onchange="updateColorFromPicker('subtitleColor', this.value)" style="flex: 0 0 60px;">
+              <input type="text" id="subtitleColorHex" value="#e0e0e0" placeholder="#e0e0e0" onchange="updateColorFromHex('subtitleColor', this.value)" style="flex: 1;">
             </div>
           </div>
           <div class="form-group">
-            <label>Размер шрифта (px)</label>
-            <input type="number" id="subtitleSize" value="32" min="8" max="200" oninput="updateState('subtitleSize', parseInt(this.value))">
+            <label>Непрозрачность (%)</label>
+            <input type="range" id="subtitleOpacity" value="90" min="0" max="100" oninput="updateSubtitleOpacity(this.value)">
+            <div class="slider-value">
+              <span>0%</span>
+              <span id="subtitleOpacityValue">90%</span>
+              <span>100%</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Размер шрифта (% от макета)</label>
+            <input type="number" id="subtitleSize" value="4" min="0.5" max="15" step="0.1" oninput="updateState('subtitleSize', parseFloat(this.value))">
+            <div class="hint">Процент от минимального размера макета (заголовок автоматически масштабируется)</div>
           </div>
           <div class="form-group">
             <label>Начертание</label>
@@ -688,25 +710,24 @@
           </div>
           <div class="form-group">
             <label>Цвет</label>
-            <input type="color" id="legalColor" value="#ffffff" onchange="updateState('legalColor', this.value)">
+            <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
+              <input type="color" id="legalColor" value="#ffffff" onchange="updateColorFromPicker('legalColor', this.value)" style="flex: 0 0 60px;">
+              <input type="text" id="legalColorHex" value="#ffffff" placeholder="#ffffff" onchange="updateColorFromHex('legalColor', this.value)" style="flex: 1;">
+            </div>
           </div>
           <div class="form-group">
             <label>Непрозрачность (%)</label>
-            <input type="range" id="legalOpacity" value="70" min="0" max="100" oninput="updateLegalOpacity(this.value)">
+            <input type="range" id="legalOpacity" value="60" min="0" max="100" oninput="updateLegalOpacity(this.value)">
             <div class="slider-value">
               <span>0%</span>
-              <span id="legalOpacityValue">70%</span>
+              <span id="legalOpacityValue">60%</span>
               <span>100%</span>
             </div>
           </div>
           <div class="form-group">
-            <label>Отступ сверху (%)</label>
-            <input type="number" id="legalTopOffset" value="0" min="0" max="50" step="1" oninput="updateState('legalTopOffset', parseFloat(this.value))">
-            <div class="hint">Расстояние от нижнего края</div>
-          </div>
-          <div class="form-group">
-            <label>Размер шрифта (px)</label>
-            <input type="number" id="legalSize" value="12" min="6" max="40" oninput="updateState('legalSize', parseInt(this.value))">
+            <label>Размер шрифта (% от макета)</label>
+            <input type="number" id="legalSize" value="2" min="0.3" max="5" step="0.1" oninput="updateState('legalSize', parseFloat(this.value))">
+            <div class="hint">Процент от минимального размера макета</div>
           </div>
           <div class="form-group">
             <label>Начертание</label>
@@ -728,7 +749,7 @@
           </div>
           <div class="form-group">
             <label>Межстрочный интервал</label>
-            <input type="number" id="legalLineHeight" value="1.3" min="1.0" max="3.0" step="0.1" oninput="updateState('legalLineHeight', parseFloat(this.value))">
+            <input type="number" id="legalLineHeight" value="1.4" min="1.0" max="3.0" step="0.1" oninput="updateState('legalLineHeight', parseFloat(this.value))">
           </div>
           </div>
         </div>
@@ -751,12 +772,13 @@
               <input type="text" id="age" value="18+" oninput="updateState('age', this.value)">
             </div>
             <div class="form-group">
-              <label>Размер шрифта (px)</label>
-              <input type="number" id="ageSize" value="12" min="6" max="40" oninput="updateState('ageSize', parseInt(this.value))">
+              <label>Размер шрифта (% от макета)</label>
+              <input type="number" id="ageSize" value="4" min="0.3" max="5" step="0.1" oninput="updateState('ageSize', parseFloat(this.value))">
+              <div class="hint">Процент от минимального размера макета</div>
             </div>
             <div class="form-group">
               <label>Отступ от юридического текста (%)</label>
-              <input type="number" id="ageGapPercent" value="2" min="0" max="20" step="0.5" oninput="updateState('ageGapPercent', parseFloat(this.value))">
+              <input type="number" id="ageGapPercent" value="1" min="0" max="20" step="0.5" oninput="updateState('ageGapPercent', parseFloat(this.value))">
               <div class="hint">Горизонтальный отступ в % от ширины холста</div>
             </div>
           </div>
@@ -803,11 +825,10 @@
           <div class="form-group">
             <label>Позиция логотипа</label>
             <div class="chips">
-              <div class="chip active" data-group="logo-pos" data-value="top-left" onclick="selectLogoPos('top-left')">Сверху-слева</div>
-              <div class="chip" data-group="logo-pos" data-value="center-top" onclick="selectLogoPos('center-top')">По центру-сверху</div>
-              <div class="chip" data-group="logo-pos" data-value="bottom-left" onclick="selectLogoPos('bottom-left')">Снизу-слева</div>
-              <div class="chip" data-group="logo-pos" data-value="center-bottom" onclick="selectLogoPos('center-bottom')">По центру-снизу</div>
+              <div class="chip active" data-group="logo-pos" data-value="left" onclick="selectLogoPos('left')">Слева</div>
+              <div class="chip" data-group="logo-pos" data-value="center" onclick="selectLogoPos('center')">По центру</div>
             </div>
+            <div class="hint">Горизонтальное расположение логотипа</div>
           </div>
           </div>
         </div>
@@ -841,29 +862,6 @@
               <button class="btn" onclick="clearKV()">Очистить</button>
             </div>
           </div>
-          <div class="form-group">
-            <label>Привязка KV</label>
-            <select id="kvAnchor" onchange="updateState('kvAnchor', this.value)">
-              <option value="center" selected>Центр</option>
-              <option value="top-left">Сверху-слева</option>
-              <option value="top-right">Сверху-справа</option>
-              <option value="bottom-left">Снизу-слева</option>
-              <option value="bottom-right">Снизу-справа</option>
-              <option value="left">Слева</option>
-              <option value="right">Справа</option>
-              <option value="top">Сверху</option>
-              <option value="bottom">Снизу</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Размер KV (% от холста)</label>
-            <input type="range" id="kvSizePercent" value="50" min="10" max="100" step="5" oninput="updateKVSizePercent(this.value)">
-            <div class="slider-value">
-              <span>10%</span>
-              <span id="kvSizeValue">50%</span>
-              <span>100%</span>
-            </div>
-          </div>
           </div>
         </div>
 
@@ -876,7 +874,10 @@
           <div class="section-content" id="content-background">
             <div class="form-group">
             <label>Цвет фона</label>
-            <input type="color" id="bgColor" value="#1e1e1e" onchange="updateState('bgColor', this.value)">
+            <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
+              <input type="color" id="bgColor" value="#1e1e1e" onchange="updateColorFromPicker('bgColor', this.value)" style="flex: 0 0 60px;">
+              <input type="text" id="bgColorHex" value="#1e1e1e" placeholder="#1e1e1e" onchange="updateColorFromHex('bgColor', this.value)" style="flex: 1;">
+            </div>
           </div>
           <div class="form-group" id="bgPreview" style="display: none;">
             <label>Текущий фон</label>
@@ -917,7 +918,9 @@
             </select>
           </div>
           <div style="background: #0a0d13; border: 1px solid #242733; border-radius: 8px; padding: 16px; display: flex; align-items: center; justify-content: center; min-height: 400px;">
-            <canvas id="previewCanvas" style="max-width: 100%; height: auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.3);"></canvas>
+            <div style="width: 100%;">
+              <canvas id="previewCanvas" style="max-width: 100%; height: auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.3);"></canvas>
+            </div>
           </div>
         </div>
       </div>
@@ -989,79 +992,6 @@
 
 
 
-      <script>
-        // ===== PERFORMANCE OPTIMIZATIONS =====
-        
-        // Debounce function to reduce unnecessary re-renders
-        function debounce(func, wait = 150) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func.apply(this, args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-        
-        // RequestAnimationFrame wrapper for smooth rendering
-        let rafId = null;
-        const originalRenderPreview = window.renderPreview;
-        
-        window.renderPreview = function() {
-            if (rafId) {
-                cancelAnimationFrame(rafId);
-            }
-            rafId = requestAnimationFrame(() => {
-                if (typeof originalRenderPreview === 'function') {
-                    originalRenderPreview.apply(this, arguments);
-                }
-            });
-        };
-        
-        // Offscreen canvas support for export
-        window.useOffscreenCanvas = 'OffscreenCanvas' in window;
-        
-        // Optimized export function with batch processing
-        window.optimizedExport = function(sizes, format = 'png') {
-            const quality = format === 'jpg' ? 0.95 : 1;
-            const batchSize = 3; // Process 3 at a time
-            
-            for (let i = 0; i < sizes.length; i += batchSize) {
-                setTimeout(() => {
-                    const batch = sizes.slice(i, i + batchSize);
-                    batch.forEach((size, index) => {
-                        const canvas = document.createElement('canvas');
-                        renderSingleExport(canvas, size.width, size.height);
-                        const link = document.createElement('a');
-                        link.download = `${state.namePrefix}-${i + index + 1}.${format}`;
-                        link.href = canvas.toDataURL(`image/${format}`, quality);
-                        link.click();
-                    });
-                }, (i / batchSize) * 100);
-            }
-        };
-        
-        // Memory optimization - clear canvas properly
-        window.clearCanvas = function(canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            canvas.width = canvas.width; // Reset canvas
-        };
-        
-        // Preload images optimization
-        window.preloadImage = function(src) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = reject;
-                img.src = src;
-            });
-        };
-        
-        console.log('🚀 Performance optimizations loaded');
-    </script>
-  <script src="app.js"></script>
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
