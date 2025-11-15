@@ -11,9 +11,11 @@ import {
   updateLogoSize,
   updateTitleSize,
   updateSubtitleSize,
+    updateTitleSubtitleRatio,
   updateLegalSize,
   updateAgeSize,
   updateKVBorderRadius,
+  selectKVPosition,
   updateTextGradientOpacity,
   selectPreloadedLogo,
   selectFontFamily,
@@ -32,8 +34,8 @@ import {
   selectLayoutMode,
   updateColorFromPicker,
   updateColorFromHex,
-  selectBgSize,
   selectBgPosition,
+  selectBgVPosition,
   applyPresetBgColor,
   handleLogoUpload,
   handlePartnerLogoUpload,
@@ -66,6 +68,9 @@ import {
   initializeLogoPosToggle,
   initializeTitleAlignToggle,
   initializeTitleVPosToggle,
+  initializeKVPositionToggle,
+  initializeBgPositionToggle,
+  initializeBgVPositionToggle,
   initializeExportScaleToggle,
   initializeFontDropdown,
   initializeFontDropdowns,
@@ -193,7 +198,7 @@ const exposeGlobals = () => {
     updateLogoSize,
     updateTitleSize,
     updateSubtitleSize,
-    updateLegalSize,
+    updateTitleSubtitleRatio,
     updateAgeSize,
     updateKVBorderRadius,
     updateTextGradientOpacity,
@@ -220,8 +225,9 @@ const exposeGlobals = () => {
     updateColorFromPicker,
     updateColorFromHex,
   applyPresetBgColor,
-  selectBgSize,
   selectBgPosition,
+  selectBgVPosition,
+  selectKVPosition,
   selectFontFamily,
     selectTitleFontFamily,
     selectSubtitleFontFamily,
@@ -267,7 +273,10 @@ const exposeGlobals = () => {
     clearAgeCustomFont,
     transformTitleText,
     transformSubtitleText,
-    transformLegalText
+    transformLegalText,
+    selectTitleTransform,
+    selectSubtitleTransform,
+    selectLegalTransform
   });
 };
 
@@ -398,6 +407,9 @@ const initialize = async () => {
     initializeLogoPosToggle();
     initializeTitleAlignToggle();
     initializeTitleVPosToggle();
+    initializeKVPositionToggle();
+    initializeBgPositionToggle();
+    initializeBgVPositionToggle();
     initializeExportScaleToggle();
     initializeTitleTransformToggle();
     initializeSubtitleTransformToggle();
@@ -457,18 +469,6 @@ const initialize = async () => {
     updatePartnerLogoUI();
     updateSizesSummary();
     initializeEventDelegation(dom);
-    
-    // Регистрируем обработчики для чипсов
-    registerHandler('chip[data-group="bg-size"]', (value) => {
-      if (typeof window.selectBgSize === 'function') {
-        window.selectBgSize(value);
-      }
-    });
-    registerHandler('chip[data-group="bg-position"]', (value) => {
-      if (typeof window.selectBgPosition === 'function') {
-        window.selectBgPosition(value);
-      }
-    });
     
     // Инициализируем систему делегирования событий
     initEventDelegation();

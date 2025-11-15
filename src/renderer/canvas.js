@@ -90,6 +90,13 @@ class CanvasManager {
    * Выполняет рендеринг всех canvas
    */
   doRender(getState, setKey) {
+    console.log('doRender вызван', {
+      indices: {
+        narrow: this.currentNarrowIndex,
+        wide: this.currentWideIndex,
+        square: this.currentSquareIndex
+      }
+    });
     try {
       const sizes = getSortedSizes();
       if (!sizes || !sizes.length) {
@@ -114,6 +121,11 @@ class CanvasManager {
       }
 
       const categorized = categorizeSizes(sizes);
+      console.log('Категоризированные размеры:', {
+        narrow: categorized.narrow.length,
+        wide: categorized.wide.length,
+        square: categorized.square.length
+      });
     
     // Отладочная информация
     if (categorized.narrow.length === 0 && categorized.wide.length === 0 && categorized.square.length === 0) {
@@ -142,10 +154,31 @@ class CanvasManager {
     // Рендерим узкий формат
     if (this.previewCanvasNarrow) {
       const narrowSize = getSizeForCategory(categorized.narrow, this.currentNarrowIndex);
-      console.log('Рендеринг narrow:', { index: this.currentNarrowIndex, size: narrowSize, total: categorized.narrow.length });
+      console.log('Рендеринг narrow:', { 
+        index: this.currentNarrowIndex, 
+        size: narrowSize, 
+        total: categorized.narrow.length,
+        sizes: categorized.narrow.map(s => `${s.width}x${s.height}`),
+        canvasBefore: { width: this.previewCanvasNarrow.width, height: this.previewCanvasNarrow.height }
+      });
       if (narrowSize) {
         try {
+          // Принудительно обновляем canvas, даже если размеры не изменились
+          const oldWidth = this.previewCanvasNarrow.width;
+          const oldHeight = this.previewCanvasNarrow.height;
+          // Принудительно очищаем canvas перед рендерингом
+          const ctx = this.previewCanvasNarrow.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, oldWidth, oldHeight);
+          }
           this.renderToCanvasFn(this.previewCanvasNarrow, narrowSize.width, narrowSize.height, state);
+          const newWidth = this.previewCanvasNarrow.width;
+          const newHeight = this.previewCanvasNarrow.height;
+          console.log('Canvas narrow обновлен:', { 
+            old: `${oldWidth}x${oldHeight}`, 
+            new: `${newWidth}x${newHeight}`,
+            target: `${narrowSize.width}x${narrowSize.height}`
+          });
           // Проверяем, что canvas действительно отрендерился
           if (this.previewCanvasNarrow.width === 0 || this.previewCanvasNarrow.height === 0) {
             console.warn('Canvas узкого формата имеет нулевой размер после рендеринга');
@@ -178,10 +211,31 @@ class CanvasManager {
     // Рендерим широкий формат
     if (this.previewCanvasWide) {
       const wideSize = getSizeForCategory(categorized.wide, this.currentWideIndex);
-      console.log('Рендеринг wide:', { index: this.currentWideIndex, size: wideSize, total: categorized.wide.length });
+      console.log('Рендеринг wide:', { 
+        index: this.currentWideIndex, 
+        size: wideSize, 
+        total: categorized.wide.length,
+        sizes: categorized.wide.map(s => `${s.width}x${s.height}`),
+        canvasBefore: { width: this.previewCanvasWide.width, height: this.previewCanvasWide.height }
+      });
       if (wideSize) {
         try {
+          // Принудительно обновляем canvas, даже если размеры не изменились
+          const oldWidth = this.previewCanvasWide.width;
+          const oldHeight = this.previewCanvasWide.height;
+          // Принудительно очищаем canvas перед рендерингом
+          const ctx = this.previewCanvasWide.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, oldWidth, oldHeight);
+          }
           this.lastRenderMeta = this.renderToCanvasFn(this.previewCanvasWide, wideSize.width, wideSize.height, state);
+          const newWidth = this.previewCanvasWide.width;
+          const newHeight = this.previewCanvasWide.height;
+          console.log('Canvas wide обновлен:', { 
+            old: `${oldWidth}x${oldHeight}`, 
+            new: `${newWidth}x${newHeight}`,
+            target: `${wideSize.width}x${wideSize.height}`
+          });
           // Используем размер широкого формата для kvCanvas (для совместимости)
           setKey('kvCanvasWidth', wideSize.width);
           setKey('kvCanvasHeight', wideSize.height);
@@ -202,10 +256,31 @@ class CanvasManager {
     // Рендерим квадратный формат
     if (this.previewCanvasSquare) {
       const squareSize = getSizeForCategory(categorized.square, this.currentSquareIndex);
-      console.log('Рендеринг square:', { index: this.currentSquareIndex, size: squareSize, total: categorized.square.length });
+      console.log('Рендеринг square:', { 
+        index: this.currentSquareIndex, 
+        size: squareSize, 
+        total: categorized.square.length,
+        sizes: categorized.square.map(s => `${s.width}x${s.height}`),
+        canvasBefore: { width: this.previewCanvasSquare.width, height: this.previewCanvasSquare.height }
+      });
       if (squareSize) {
         try {
+          // Принудительно обновляем canvas, даже если размеры не изменились
+          const oldWidth = this.previewCanvasSquare.width;
+          const oldHeight = this.previewCanvasSquare.height;
+          // Принудительно очищаем canvas перед рендерингом
+          const ctx = this.previewCanvasSquare.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, oldWidth, oldHeight);
+          }
           this.renderToCanvasFn(this.previewCanvasSquare, squareSize.width, squareSize.height, state);
+          const newWidth = this.previewCanvasSquare.width;
+          const newHeight = this.previewCanvasSquare.height;
+          console.log('Canvas square обновлен:', { 
+            old: `${oldWidth}x${oldHeight}`, 
+            new: `${newWidth}x${newHeight}`,
+            target: `${squareSize.width}x${squareSize.height}`
+          });
           // Проверяем, что canvas действительно отрендерился
           if (this.previewCanvasSquare.width === 0 || this.previewCanvasSquare.height === 0) {
             console.warn('Canvas квадратного формата имеет нулевой размер после рендеринга');
@@ -262,11 +337,21 @@ class CanvasManager {
    * Выполнить рендеринг синхронно
    */
   renderSync(getState, setKey) {
+    console.log('renderSync вызван', { 
+      hasGetState: !!getState, 
+      hasSetKey: !!setKey,
+      indices: {
+        narrow: this.currentNarrowIndex,
+        wide: this.currentWideIndex,
+        square: this.currentSquareIndex
+      }
+    });
     if (this.rafId) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
     this.doRender(getState, setKey);
+    console.log('renderSync завершен');
   }
 
   /**
@@ -297,16 +382,43 @@ class CanvasManager {
       this.currentSquareIndex = idx;
     }
     
-    console.log('setCategoryIndex:', { category, index: idx, shouldRender, hasGetState: !!getState, hasSetKey: !!setKey, indices: {
-      narrow: this.currentNarrowIndex,
-      wide: this.currentWideIndex,
-      square: this.currentSquareIndex
-    }});
+    // Получаем категоризированные размеры для проверки валидности индекса
+    const categorized = this.getCategorizedSizes();
+    const categorySizes = categorized[category] || [];
+    
+    // Проверяем валидность индекса
+    if (idx < 0 || idx >= categorySizes.length) {
+      console.warn(`Индекс ${idx} выходит за границы категории ${category} (размер: ${categorySizes.length})`);
+      // Устанавливаем валидный индекс
+      if (category === 'narrow') {
+        this.currentNarrowIndex = categorySizes.length > 0 ? 0 : -1;
+      } else if (category === 'wide') {
+        this.currentWideIndex = categorySizes.length > 0 ? 0 : -1;
+      } else if (category === 'square') {
+        this.currentSquareIndex = categorySizes.length > 0 ? 0 : -1;
+      }
+    }
+    
+    console.log('setCategoryIndex:', { 
+      category, 
+      index: idx, 
+      shouldRender, 
+      hasGetState: !!getState, 
+      hasSetKey: !!setKey, 
+      categorySize: categorySizes.length,
+      selectedSize: categorySizes[idx] ? `${categorySizes[idx].width}x${categorySizes[idx].height}` : 'none',
+      indices: {
+        narrow: this.currentNarrowIndex,
+        wide: this.currentWideIndex,
+        square: this.currentSquareIndex
+      }
+    });
     
     if (shouldRender) {
       if (getState && setKey) {
         // Используем renderSync для немедленного обновления при выборе размера
         console.log('Вызываем renderSync для категории:', category);
+        // Принудительно обновляем канвас, даже если размеры не изменились
         this.renderSync(getState, setKey);
       } else {
         console.warn('getState или setKey не переданы в setCategoryIndex');

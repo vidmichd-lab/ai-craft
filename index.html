@@ -98,41 +98,42 @@
               <button class="btn" data-function="applyPresetBgColor" data-params='["#FFFFFF"]' style="background: #FFFFFF; width: 32px; height: 32px; padding: 0; border-radius: 6px; border: none;" title="#FFFFFF"></button>
             </div>
           </div>
-          <div class="form-group" id="bgPreview" style="display: none;">
-            <label>Текущий фон</label>
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div id="bgThumb" style="width: 48px; height: 48px; border: none; border-radius: 4px; background-size: cover; background-position: center;"></div>
-            </div>
-          </div>
           <div class="form-group">
-            <button class="btn btn-full" data-action="trigger-file-input" data-input-id="bgUpload">Загрузить изображение</button>
+            <label>Фоновое изображение</label>
+            <div id="bgPreviewContainer" class="preview-container">
+              <img id="bgPreviewImg" src="" class="preview-img" style="display: none;">
+              <span id="bgPreviewPlaceholder" class="preview-placeholder">— Нет —</span>
+            </div>
+            <div style="display: flex; gap: 8px; width: 100%; margin-top: 8px;">
+              <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" style="flex: 1;" id="bgUploadBtn"><span class="material-icons" style="font-size: 18px; margin-right: 4px;">image</span>Загрузить</button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" id="bgReplaceBtn" style="display: none; flex: 1;" title="Заменить"><span class="material-icons" style="font-size: 18px; margin-right: 4px;">refresh</span>Заменить</button>
+              <button class="btn" data-function="clearBg" id="bgDeleteBtn" style="display: none; flex: 1;" title="Удалить"><span class="material-icons" style="font-size: 18px;">delete</span></button>
+            </div>
             <input type="file" id="bgUpload" accept="image/*" style="display: none;" data-handler="handleBgUpload">
           </div>
-          <div class="form-group" id="bgActions" style="display: none;">
-            <div class="input-group">
-              <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" title="Заменить"><span class="material-icons">swap_horiz</span></button>
-              <button class="btn" data-function="clearBg" title="Очистить"><span class="material-icons">clear</span></button>
-            </div>
-          </div>
           <div class="form-group" id="bgImageOptions" style="display: none;">
-            <label>Стиль размещения</label>
-            <div class="chips chips-3" style="margin-bottom: 12px;">
-              <div class="chip active" data-group="bg-size" data-value="cover">Cover</div>
-              <div class="chip" data-group="bg-size" data-value="contain">Contain</div>
-              <div class="chip" data-group="bg-size" data-value="repeat">Repeat</div>
+            <label>Горизонтальное расположение</label>
+            <div class="toggle-switch" id="bgPositionToggle" data-value="center" data-options="3">
+              <div class="toggle-switch-slider"></div>
+              <div class="toggle-switch-track">
+                <div class="toggle-switch-option" data-value="left" title="Слева"><span class="material-icons" style="font-size: 18px;">align_horizontal_left</span></div>
+                <div class="toggle-switch-option active" data-value="center" title="По центру"><span class="material-icons" style="font-size: 18px;">align_horizontal_center</span></div>
+                <div class="toggle-switch-option" data-value="right" title="Справа"><span class="material-icons" style="font-size: 18px;">align_horizontal_right</span></div>
+              </div>
             </div>
-            <label>Позиция</label>
-            <div class="chips chips-3" style="margin-top: 8px;">
-              <div class="chip active" data-group="bg-position" data-value="center">Центр</div>
-              <div class="chip" data-group="bg-position" data-value="top">Верх</div>
-              <div class="chip" data-group="bg-position" data-value="bottom">Низ</div>
-              <div class="chip" data-group="bg-position" data-value="left">Слева</div>
-              <div class="chip" data-group="bg-position" data-value="right">Справа</div>
+            <label style="margin-top: 16px;">Вертикальное выравнивание</label>
+            <div class="toggle-switch" id="bgVPositionToggle" data-value="center" data-options="3">
+              <div class="toggle-switch-slider"></div>
+              <div class="toggle-switch-track">
+                <div class="toggle-switch-option" data-value="top" title="Сверху"><span class="material-icons" style="font-size: 18px;">vertical_align_top</span></div>
+                <div class="toggle-switch-option active" data-value="center" title="По центру"><span class="material-icons" style="font-size: 18px;">vertical_align_center</span></div>
+                <div class="toggle-switch-option" data-value="bottom" title="Снизу"><span class="material-icons" style="font-size: 18px;">vertical_align_bottom</span></div>
+              </div>
             </div>
             <label style="margin-top: 16px;">Прозрачность подложки под текстом</label>
-            <input type="range" id="textGradientOpacity" value="40" min="0" max="100" step="1" data-state-key="textGradientOpacity" data-update-handler="updateTextGradientOpacity">
+            <input type="range" id="textGradientOpacity" value="100" min="0" max="100" step="1" data-state-key="textGradientOpacity" data-update-handler="updateTextGradientOpacity">
             <div class="slider-value">
-              <span id="textGradientOpacityValue">40%</span>
+              <span id="textGradientOpacityValue">100%</span>
             </div>
           </div>
         </div>
@@ -190,7 +191,8 @@
               <option value="" selected>— Нет —</option>
             </select>
             <div style="display: flex; gap: 8px; width: 100%;">
-              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" style="flex: 1;" title="Загрузить"><span class="material-icons">download</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" style="flex: 1;" id="logoUploadBtn" title="Загрузить"><span class="material-icons">upload</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" id="logoReplaceBtn" style="display: none; flex: 1;" title="Заменить"><span class="material-icons">refresh</span></button>
               <button class="btn btn-danger" id="logoRemoveBtn" data-function="clearLogo" style="flex: 1;" disabled title="Удалить"><span class="material-icons">delete</span></button>
               <input type="file" id="logoUpload" accept="image/*,.svg" style="display: none;" data-handler="handleLogoUpload">
             </div>
@@ -222,7 +224,7 @@
               <span id="partnerLogoPreviewPlaceholder" class="preview-placeholder">— Нет —</span>
             </div>
             <div style="display: flex; gap: 8px; width: 100%;">
-              <button class="btn" data-action="trigger-file-input" data-input-id="partnerLogoUpload" style="flex: 1;" title="Заменить"><span class="material-icons">swap_horiz</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="partnerLogoUpload" style="flex: 1;" title="Заменить"><span class="material-icons">refresh</span></button>
               <button class="btn btn-danger" id="partnerLogoRemoveBtn" data-function="clearPartnerLogo" style="flex: 1;" title="Удалить"><span class="material-icons">delete</span></button>
               <input type="file" id="partnerLogoUpload" accept="image/*,.svg" style="display: none;" data-handler="handlePartnerLogoUpload">
             </div>
@@ -287,7 +289,7 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Вертикальная позиция</label>
+            <label>Вертикальное выравнивание</label>
             <div class="toggle-switch" id="titleVPosToggle" data-value="top" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
@@ -431,6 +433,18 @@
             
           </div>
           <div class="form-group">
+            <label>Коэффициент зависимости от заголовка</label>
+            <input type="range" id="titleSubtitleRatio" value="0.5" min="0.1" max="1" step="0.01" data-state-key="titleSubtitleRatio" data-update-handler="updateTitleSubtitleRatio">
+            <div class="slider-value">
+              <span>0.1</span>
+              <span id="titleSubtitleRatioValue">0.5</span>
+              <span>1.0</span>
+            </div>
+            <div class="theme-text-muted" style="font-size: 12px; margin-top: 4px;">Коэффициент определяет, во сколько раз подзаголовок меньше заголовка (0.5 = в 2 раза меньше)</div>
+          </div>
+          <div class="form-group">
+          </div>
+          <div class="form-group">
             
             <div style="display: flex; gap: 8px;">
               <div class="custom-select-wrapper" style="flex: 1;">
@@ -478,7 +492,7 @@
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
             <label style="margin: 0; flex: 1;">Отступ от заголовка (%)</label>
-            <input type="number" id="subtitleGap" value="-1.5" min="-20" max="20" step="0.5" data-state-key="subtitleGap" style="width: 80px;">
+            <input type="number" id="subtitleGap" value="-1" min="-20" max="20" step="0.5" data-state-key="subtitleGap" style="width: 80px;">
           </div>
         </div>
         <!-- End Subtitle Section -->
@@ -640,12 +654,24 @@
           </div>
           <div class="form-group">
             <label>Скругление углов</label>
-            <input type="range" id="kvBorderRadius" value="0" min="0" max="20" step="1" data-state-key="kvBorderRadius" data-update-handler="updateKVBorderRadius">
+            <input type="range" id="kvBorderRadius" value="0" min="0" max="12" step="1" data-state-key="kvBorderRadius" data-update-handler="updateKVBorderRadius">
             <div class="slider-value">
               <span>0%</span>
               <span id="kvBorderRadiusValue">0%</span>
-              <span>20%</span>
+              <span>12%</span>
             </div>
+          </div>
+          <div class="form-group">
+            <label>Расположение KV</label>
+            <div class="toggle-switch" id="kvPositionToggle" data-value="center" data-options="3">
+              <div class="toggle-switch-slider"></div>
+              <div class="toggle-switch-track">
+                <div class="toggle-switch-option" data-value="left" title="Слева"><span class="material-icons" style="font-size: 18px;">align_horizontal_left</span></div>
+                <div class="toggle-switch-option active" data-value="center" title="По центру"><span class="material-icons" style="font-size: 18px;">align_horizontal_center</span></div>
+                <div class="toggle-switch-option" data-value="right" title="Справа"><span class="material-icons" style="font-size: 18px;">align_horizontal_right</span></div>
+              </div>
+            </div>
+           
           </div>
           <div class="form-group-section">
             <div class="form-group form-item">
@@ -681,7 +707,8 @@
                 <option value="" selected>— Нет —</option>
               </select>
               <div style="display: flex; gap: 8px; width: 100%;">
-                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" style="flex: 1; min-width: 0;" title="Загрузить"><span class="material-icons">download</span></button>
+                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" style="flex: 1; min-width: 0;" id="kvUploadBtn" title="Загрузить"><span class="material-icons">upload</span></button>
+                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" id="kvReplaceBtn" style="display: none; flex: 1; min-width: 0;" title="Заменить"><span class="material-icons">refresh</span></button>
                 <button class="btn btn-danger" id="kvRemoveBtn" data-function="clearKV" style="flex: 1; min-width: 0;" disabled title="Удалить"><span class="material-icons">delete</span></button>
                 <input type="file" id="kvUpload" accept="image/*" style="display: none;" data-handler="handleKVUpload">
               </div>

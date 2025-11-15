@@ -3,6 +3,7 @@
  */
 
 import { LAYOUT_CONSTANTS } from './constants.js';
+import { getState } from '../state/store.js';
 
 /**
  * Определяет тип макета на основе размеров
@@ -27,113 +28,135 @@ export const getLayoutType = (width, height, layoutMode = 'auto') => {
  */
 export const calculateSizeMultipliers = (width, height, layoutType) => {
   const { isUltraWide, isSuperWide } = layoutType;
+  const state = getState();
+  const customMultipliers = state.formatMultipliers;
+  
+  // Функция для получения множителя (кастомный или дефолтный)
+  const getMultiplier = (formatType, key, defaultValue) => {
+    return customMultipliers?.[formatType]?.[key] ?? defaultValue;
+  };
   
   let logoSizeMultiplier = 1;
   let titleSizeMultiplier = 1;
+  let subtitleSizeMultiplier = 1;
   let legalMultiplier = 1;
   let ageMultiplier = 1;
 
   if (height >= width * LAYOUT_CONSTANTS.VERTICAL_THRESHOLD) {
-    logoSizeMultiplier = LAYOUT_CONSTANTS.VERTICAL_LOGO_MULTIPLIER;
+    logoSizeMultiplier = getMultiplier('vertical', 'logo', LAYOUT_CONSTANTS.VERTICAL_LOGO_MULTIPLIER);
+    titleSizeMultiplier = getMultiplier('vertical', 'title', 1);
+    subtitleSizeMultiplier = getMultiplier('vertical', 'subtitle', 1);
+    legalMultiplier = getMultiplier('vertical', 'legal', 1);
+    ageMultiplier = getMultiplier('vertical', 'age', 1);
   } else if (isUltraWide) {
-    logoSizeMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_LOGO_MULTIPLIER;
+    logoSizeMultiplier = getMultiplier('ultraWide', 'logo', LAYOUT_CONSTANTS.ULTRA_WIDE_LOGO_MULTIPLIER);
     
     if (height < LAYOUT_CONSTANTS.SUPER_WIDE_HEIGHT) {
-      titleSizeMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_SMALL;
+      titleSizeMultiplier = getMultiplier('ultraWide', 'titleSmall', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_SMALL);
+      subtitleSizeMultiplier = getMultiplier('ultraWide', 'subtitleSmall', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_SMALL);
     } else if (height < 200) {
-      titleSizeMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_MEDIUM;
+      titleSizeMultiplier = getMultiplier('ultraWide', 'titleMedium', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_MEDIUM);
+      subtitleSizeMultiplier = getMultiplier('ultraWide', 'subtitleMedium', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_MEDIUM);
     } else {
-      titleSizeMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_LARGE;
+      titleSizeMultiplier = getMultiplier('ultraWide', 'titleLarge', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_LARGE);
+      subtitleSizeMultiplier = getMultiplier('ultraWide', 'subtitleLarge', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_LARGE);
     }
     
     if (height >= 250 && height <= 350) {
-      legalMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_LEGAL_MULTIPLIER_MEDIUM;
+      legalMultiplier = getMultiplier('ultraWide', 'legalMedium', LAYOUT_CONSTANTS.ULTRA_WIDE_LEGAL_MULTIPLIER_MEDIUM);
     } else {
-      legalMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_LEGAL_MULTIPLIER_NORMAL;
+      legalMultiplier = getMultiplier('ultraWide', 'legalNormal', LAYOUT_CONSTANTS.ULTRA_WIDE_LEGAL_MULTIPLIER_NORMAL);
     }
     
-    ageMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_AGE_MULTIPLIER;
+    ageMultiplier = getMultiplier('ultraWide', 'age', LAYOUT_CONSTANTS.ULTRA_WIDE_AGE_MULTIPLIER);
   } else if (width >= height * 4) {
-    logoSizeMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_LOGO_MULTIPLIER;
+    logoSizeMultiplier = getMultiplier('veryWide', 'logo', LAYOUT_CONSTANTS.ULTRA_WIDE_LOGO_MULTIPLIER);
     
     if (height < 200) {
-      titleSizeMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_MEDIUM;
+      titleSizeMultiplier = getMultiplier('veryWide', 'titleMedium', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_MEDIUM);
+      subtitleSizeMultiplier = getMultiplier('veryWide', 'subtitleMedium', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_MEDIUM);
     } else {
-      titleSizeMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_LARGE;
+      titleSizeMultiplier = getMultiplier('veryWide', 'titleLarge', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_LARGE);
+      subtitleSizeMultiplier = getMultiplier('veryWide', 'subtitleLarge', LAYOUT_CONSTANTS.ULTRA_WIDE_TITLE_MULTIPLIER_LARGE);
     }
     
     // Для больших форматов типа 2832x600 (большая ширина, средняя высота) увеличиваем заголовок
     if (width >= 2000 && height >= 400 && height <= 800) {
-      titleSizeMultiplier = 2; // Увеличиваем для больших форматов (был 2, стал 2.2)
-      // Также увеличиваем legal для больших форматов
-      legalMultiplier = 2.5; // Увеличиваем legal умеренно
+      titleSizeMultiplier = getMultiplier('veryWide', 'titleExtraLarge', 2);
+      subtitleSizeMultiplier = getMultiplier('veryWide', 'subtitleExtraLarge', 2);
+      legalMultiplier = getMultiplier('veryWide', 'legalExtraLarge', 2.5);
     } else if (height >= 250 && height <= 350) {
-      legalMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_LEGAL_MULTIPLIER_MEDIUM;
+      legalMultiplier = getMultiplier('veryWide', 'legalMedium', LAYOUT_CONSTANTS.ULTRA_WIDE_LEGAL_MULTIPLIER_MEDIUM);
     } else {
-      legalMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_LEGAL_MULTIPLIER_NORMAL;
+      legalMultiplier = getMultiplier('veryWide', 'legalNormal', LAYOUT_CONSTANTS.ULTRA_WIDE_LEGAL_MULTIPLIER_NORMAL);
     }
     
-    ageMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_AGE_MULTIPLIER;
+    ageMultiplier = getMultiplier('veryWide', 'age', LAYOUT_CONSTANTS.ULTRA_WIDE_AGE_MULTIPLIER);
   } else if (width >= height * LAYOUT_CONSTANTS.HORIZONTAL_THRESHOLD) {
-    logoSizeMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_LOGO_MULTIPLIER;
+    logoSizeMultiplier = getMultiplier('horizontal', 'logo', LAYOUT_CONSTANTS.ULTRA_WIDE_LOGO_MULTIPLIER);
     
     if (height < 200) {
-      titleSizeMultiplier = 1.8;
+      titleSizeMultiplier = getMultiplier('horizontal', 'titleSmall', 1.8);
+      subtitleSizeMultiplier = getMultiplier('horizontal', 'subtitleSmall', 1.8);
     } else {
-      titleSizeMultiplier = 1.6;
+      titleSizeMultiplier = getMultiplier('horizontal', 'titleLarge', 1.6);
+      subtitleSizeMultiplier = getMultiplier('horizontal', 'subtitleLarge', 1.6);
     }
     
     if (height >= 250 && height <= 350) {
-      legalMultiplier = 1.8;
+      legalMultiplier = getMultiplier('horizontal', 'legalSmall', 1.8);
     } else {
-      legalMultiplier = 2;
+      legalMultiplier = getMultiplier('horizontal', 'legalLarge', 2);
     }
     
-    ageMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_AGE_MULTIPLIER;
+    ageMultiplier = getMultiplier('horizontal', 'age', LAYOUT_CONSTANTS.ULTRA_WIDE_AGE_MULTIPLIER);
   }
 
-  // Для высоких макетов (height/width >= 2) заголовок масштабируется на 1.3
+  // Для высоких макетов (height/width >= 2) заголовок масштабируется
   const aspectRatio = height / width;
   if (aspectRatio >= 2) {
-    titleSizeMultiplier *= 1.3;
+    titleSizeMultiplier *= getMultiplier('tall', 'title', 1.3);
+    subtitleSizeMultiplier *= getMultiplier('tall', 'subtitle', 1.3);
   }
 
   // Для форматов типа 960x450 или 1920x1080 (широкие горизонтальные форматы с большой высотой)
-  // legal должен быть меньше, но не так сильно
-  // Исключаем большие форматы типа 2832x600 (width >= 2000)
   const isWideHorizontal = width >= height * LAYOUT_CONSTANTS.HORIZONTAL_THRESHOLD && !isUltraWide;
   if (isWideHorizontal && height >= 400 && height <= 1200 && width >= 800 && width < 2000) {
-    // Для форматов типа 960x450 или 1920x1080 уменьшаем legal умеренно
-    // Был 1.8-2, делаем 1.2-1.3 в зависимости от высоты
     const originalLegalMultiplier = (height >= 250 && height <= 350) ? 1.8 : 2;
     let newLegalMultiplier;
     if (height >= 450 && height <= 500) {
-      newLegalMultiplier = 1.2;
+      newLegalMultiplier = getMultiplier('horizontal', 'legalWide450', 1.2);
     } else if (height > 500 && height <= 1080) {
-      newLegalMultiplier = 1.1;
+      newLegalMultiplier = getMultiplier('horizontal', 'legalWide500', 1.1);
     } else {
-      newLegalMultiplier = 1.15;
+      newLegalMultiplier = getMultiplier('horizontal', 'legalWideOther', 1.15);
     }
     legalMultiplier = newLegalMultiplier;
     
-    // 18+ тоже уменьшаем пропорционально legal (был 2)
     const reductionFactor = newLegalMultiplier / originalLegalMultiplier;
-    ageMultiplier = LAYOUT_CONSTANTS.ULTRA_WIDE_AGE_MULTIPLIER * reductionFactor;
+    ageMultiplier = getMultiplier('horizontal', 'age', LAYOUT_CONSTANTS.ULTRA_WIDE_AGE_MULTIPLIER) * reductionFactor;
     
-    // Для больших форматов (1920x1080) уменьшаем заголовок
-    // Был 1.6, делаем меньше в зависимости от высоты
     if (height >= 800) {
-      // Для очень больших форматов (1920x1080) уменьшаем заголовок сильнее
-      titleSizeMultiplier = 1.2;
+      titleSizeMultiplier = getMultiplier('horizontal', 'titleWideSmall', 1.2);
+      subtitleSizeMultiplier = getMultiplier('horizontal', 'subtitleWideSmall', 1.2);
     } else if (height >= 500) {
-      // Для средних форматов (960x450) уменьшаем немного
-      titleSizeMultiplier = 1.4;
+      titleSizeMultiplier = getMultiplier('horizontal', 'titleWideMedium', 1.4);
+      subtitleSizeMultiplier = getMultiplier('horizontal', 'subtitleWideMedium', 1.4);
     }
+  }
+
+  // Для квадратных форматов уменьшаем заголовок
+  const isSquare = height < width * LAYOUT_CONSTANTS.VERTICAL_THRESHOLD && 
+                   width < height * LAYOUT_CONSTANTS.HORIZONTAL_THRESHOLD;
+  if (isSquare) {
+    titleSizeMultiplier *= getMultiplier('square', 'title', 0.9);
+    subtitleSizeMultiplier *= getMultiplier('square', 'subtitle', 0.9);
   }
 
   return {
     logoSizeMultiplier,
     titleSizeMultiplier,
+    subtitleSizeMultiplier,
     legalMultiplier,
     ageMultiplier
   };
@@ -234,7 +257,7 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
 
   // Учитываем партнерский логотип при расчете общей ширины
   const hasPartnerLogo = state.partnerLogo && state.showLogo;
-  const separatorWidth = hasPartnerLogo ? 12 : 0; // Ширина разделителя "|" (увеличена для большего отступа)
+  const separatorWidth = hasPartnerLogo ? 48 : 0; // Ширина разделителя "|" (24px до разделителя + 24px после)
   
   // Общая ширина для обоих логотипов
   let totalLogoWidth = (width * logoSizePercent) / 100;

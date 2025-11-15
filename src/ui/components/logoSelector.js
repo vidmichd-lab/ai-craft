@@ -85,6 +85,9 @@ export const updateLogoUI = () => {
   }
   
   // Обновляем состояние кнопки "Удалить"
+  const logoUploadBtn = document.getElementById('logoUploadBtn');
+  const logoReplaceBtn = document.getElementById('logoReplaceBtn');
+  
   if (logoRemoveBtn) {
     const hasLogo = !!(logo || logoSelected);
     logoRemoveBtn.disabled = !hasLogo;
@@ -95,6 +98,15 @@ export const updateLogoUI = () => {
       logoRemoveBtn.style.opacity = '0.5';
       logoRemoveBtn.style.cursor = 'not-allowed';
     }
+  }
+  
+  // Показываем/скрываем кнопки "Загрузить" и "Заменить"
+  const hasLogo = !!(logo || logoSelected);
+  if (logoUploadBtn) {
+    logoUploadBtn.style.display = hasLogo ? 'none' : 'flex';
+  }
+  if (logoReplaceBtn) {
+    logoReplaceBtn.style.display = hasLogo ? 'flex' : 'none';
   }
 };
 
@@ -140,15 +152,17 @@ export const selectPreloadedLogo = async (logoFile) => {
   // Закрываем модальное окно выбора
   closeLogoSelectModal();
   
-  setState({ logoSelected: logoFile || '' });
-  updateLogoTriggerText(logoFile || '');
-
   if (!logoFile) {
-    setState({ logo: null });
+    setState({ logo: null, logoSelected: '' });
+    updateLogoTriggerText('');
     updateLogoUI();
     renderer.render();
     return;
   }
+
+  // Сначала устанавливаем logoSelected, чтобы UI обновился
+  setState({ logoSelected: logoFile });
+  updateLogoTriggerText(logoFile);
 
   // Пробуем найти логотип в структуре или загрузить напрямую
   let logoInfo = null;
@@ -173,7 +187,8 @@ export const selectPreloadedLogo = async (logoFile) => {
     if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
       throw new Error(`Изображение не загружено: ${logoInfo.file}`);
     }
-    setState({ logo: img });
+    // Обновляем оба поля: logo и logoSelected
+    setState({ logo: img, logoSelected: logoFile });
     if (dom.logoSelect) dom.logoSelect.value = logoFile;
     updateLogoUI();
     renderer.render();
@@ -181,7 +196,7 @@ export const selectPreloadedLogo = async (logoFile) => {
     console.error('Ошибка загрузки логотипа:', error, 'Путь:', logoInfo.file);
     console.error(error);
     alert('Не удалось загрузить логотип.');
-    setState({ logo: null });
+    setState({ logo: null, logoSelected: '' });
     updateLogoUI();
     renderer.render();
   }

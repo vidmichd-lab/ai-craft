@@ -10,8 +10,8 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
   // Рисуем градиент только если есть фоновое изображение
   if (!state.bgImage) return;
   
-  // Получаем прозрачность градиента (по умолчанию 40%)
-  const opacity = Math.max(0, Math.min(100, state.textGradientOpacity || 40)) / 100;
+  // Получаем прозрачность градиента (по умолчанию 100%)
+  const opacity = Math.max(0, Math.min(100, state.textGradientOpacity || 100)) / 100;
   
   // Если прозрачность 0, не рисуем градиент
   if (opacity <= 0) return;
@@ -73,9 +73,11 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
     
     if (isWideFormat) {
       // Для широких форматов градиент идет слева направо
-      const gradientStartX = 0; // Начинаем от левого края
+      const textWidth = maxX - minX;
+      const padding = textWidth * 0.2; // Добавляем 20% отступ с обеих сторон
+      const gradientStartX = Math.max(0, minX - padding); // Начинаем немного левее текста
       // Увеличиваем длину градиента - заканчиваем чуть дальше конца текста
-      const gradientEndX = maxX + (maxX - minX) * 0.3; // Увеличиваем на 30% от ширины текста
+      const gradientEndX = Math.min(width, maxX + padding); // Заканчиваем немного правее текста
       const gradientWidth = Math.abs(gradientEndX - gradientStartX);
       
       // Создаем горизонтальный линейный градиент
@@ -91,10 +93,10 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
       gradient.addColorStop(0, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${startOpacity})`);
       gradient.addColorStop(1, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${endOpacity})`);
       
-      // Рисуем градиент на всю высоту canvas
+      // Рисуем градиент на всю высоту canvas, но с учетом расширенной области
       ctx.save();
       ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, gradientWidth, height);
+      ctx.fillRect(gradientStartX, 0, gradientWidth, height);
       ctx.restore();
     } else {
       // Для вертикальных форматов градиент идет сверху вниз или снизу вверх
@@ -102,10 +104,11 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
       const isTextAtTop = titleVPos === 'top' || (titleVPos === 'center' && (minY + maxY) / 2 < height / 2);
       
       // Создаем область подложки от самого края canvas до конца текста
-      // Увеличиваем длину градиента - заканчиваем чуть дальше конца текста
+      // Увеличиваем область градиента - добавляем отступ сверху и снизу от текста
       const textHeight = maxY - minY;
-      const gradientStartY = isTextAtTop ? 0 : maxY;
-      const gradientEndY = isTextAtTop ? maxY + textHeight * 0.3 : height; // Увеличиваем на 30% от высоты текста
+      const padding = textHeight * 0.2; // Добавляем 20% отступ сверху и снизу
+      const gradientStartY = isTextAtTop ? Math.max(0, minY - padding) : maxY; // Начинаем немного выше текста
+      const gradientEndY = isTextAtTop ? Math.min(height, maxY + padding) : height; // Заканчиваем немного ниже текста
       const gradientHeight = Math.abs(gradientEndY - gradientStartY);
       
       // Создаем вертикальный линейный градиент

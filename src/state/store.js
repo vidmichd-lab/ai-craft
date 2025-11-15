@@ -41,7 +41,8 @@ const createInitialState = () => {
     subtitleWeight: 'Regular', // Используем название начертания вместо цифр
     subtitleLetterSpacing: 0,
     subtitleLineHeight: 1.2,
-    subtitleGap: -1.5,
+    subtitleGap: -1,
+    titleSubtitleRatio: 0.5, // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
     subtitleFontFamily: 'YS Text',
     subtitleFontFamilyFile: null,
     subtitleCustomFont: null,
@@ -81,11 +82,13 @@ const createInitialState = () => {
     kv: null,
     kvSelected: 'assets/3d/sign/01.png',
     kvBorderRadius: 0,
+    kvPosition: 'center', // 'left', 'center', 'right' - позиция KV (не применяется к широким макетам)
     bgColor: '#1e1e1e',
     bgImage: null,
     bgSize: 'cover',
     bgPosition: 'center',
-    textGradientOpacity: 40, // Прозрачность градиентной подложки под текстом (0-100)
+    bgVPosition: 'center', // 'top', 'center', 'bottom' - вертикальная позиция фона
+    textGradientOpacity: 100, // Прозрачность градиентной подложки под текстом (0-100)
     logoPos: 'left',
     fontFamily: 'YS Text', // Общая гарнитура (для обратной совместимости)
     fontFamilyFile: null,
@@ -168,12 +171,15 @@ const applyDerivedState = (state, delta) => {
   if (!delta) return state;
   const next = { ...state };
 
+
+  // Используем коэффициент из состояния, если он задан, иначе используем значение по умолчанию
+  const ratio = state.titleSubtitleRatio !== undefined ? state.titleSubtitleRatio : TITLE_SUBTITLE_RATIO;
   if ('titleSize' in delta) {
-    next.subtitleSize = parseFloat((state.titleSize * TITLE_SUBTITLE_RATIO).toFixed(2));
+    next.subtitleSize = parseFloat((state.titleSize * ratio).toFixed(2));
   }
 
   if ('subtitleSize' in delta) {
-    next.titleSize = parseFloat((state.subtitleSize / TITLE_SUBTITLE_RATIO).toFixed(2));
+    next.titleSize = parseFloat((state.subtitleSize / ratio).toFixed(2));
   }
 
   // Синхронизируем активную пару с полями title/subtitle/kvSelected для обратной совместимости
@@ -374,6 +380,8 @@ export const saveSettingsSnapshot = () => {
   delete snapshot.kv;
   delete snapshot.bgImage;
   delete snapshot.customFont;
+  delete snapshot.partnerLogo;
+  delete snapshot.partnerLogoFile;
   return snapshot;
 };
 

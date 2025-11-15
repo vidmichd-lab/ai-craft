@@ -109,7 +109,7 @@ const renderToCanvas = (canvas, width, height, state) => {
   // Вычисляем множители размеров
   let logoSizePercent = state.logoSize;
   const multipliers = calculateSizeMultipliers(width, height, layoutType);
-  const { titleSizeMultiplier, legalMultiplier, ageMultiplier } = multipliers;
+  const { titleSizeMultiplier, subtitleSizeMultiplier, legalMultiplier, ageMultiplier } = multipliers;
   
   // Определяем, является ли формат квадратным
   const isSquare = height < width * LAYOUT_CONSTANTS.VERTICAL_THRESHOLD && 
@@ -386,10 +386,8 @@ const renderToCanvas = (canvas, width, height, state) => {
   const baseTitleSize = (state.titleSize / 100) * minDimension;
   const titleSize = baseTitleSize * titleSizeMultiplier;
   const baseSubtitleSize = (state.subtitleSize / 100) * minDimension;
-  // Подзаголовок всегда масштабируется пропорционально заголовку
-  // Используем то же соотношение, что и для базовых размеров, умноженное на titleSizeMultiplier
-  // Это гарантирует, что при изменении titleSizeMultiplier или state.titleSize подзаголовок будет масштабироваться вместе с заголовком
-  const subtitleSize = baseSubtitleSize * titleSizeMultiplier;
+  // Подзаголовок масштабируется с использованием отдельного множителя
+  const subtitleSize = baseSubtitleSize * subtitleSizeMultiplier;
   
   // Используем константу для соотношения заголовка и подзаголовка
   const TITLE_SUBTITLE_RATIO = LAYOUT_CONSTANTS.TITLE_SUBTITLE_RATIO;
@@ -435,48 +433,56 @@ const renderToCanvas = (canvas, width, height, state) => {
 
   let startY;
 
-  if (isSuperWide) {
-    // Для супер широких форматов позиция текста не меняется в зависимости от titleVPos
-    // Текст всегда остается вверху
-    startY = effectivePaddingPx + titleSize;
-    if (state.showLogo && state.logo && logoBounds) {
-      const logoBottom = logoBounds.y + logoBounds.height;
-      const logoStart = logoBottom + effectivePaddingPx + titleSize;
-      startY = Math.max(startY, logoStart);
+  if (isSuperWide || isUltraWide || isHorizontalLayout) {
+    // Для широких форматов учитываем titleVPos
+    const currentPadding = isSuperWide ? effectivePaddingPx : paddingPx;
+    
+    if (state.titleVPos === 'top') {
+      startY = currentPadding + titleSize;
+      if (state.showLogo && state.logo && logoBounds) {
+        const logoBottom = logoBounds.y + logoBounds.height;
+        const logoStart = logoBottom + currentPadding + titleSize;
+        startY = Math.max(startY, logoStart);
+      }
+      if (legalBlockHeight > 0) {
+        const bottomPadding = currentPadding + legalBlockHeight + currentPadding * 0.5;
+        startY = Math.min(startY, height - bottomPadding - totalTextHeight + titleSize);
+      }
+      startY = Math.max(currentPadding + titleSize, startY);
+    } else if (state.titleVPos === 'center') {
+      // При центрировании текста логотип остается вверху, центрируем только текст
+      const logoBottom = (state.showLogo && state.logo && logoBounds) 
+        ? logoBounds.y + logoBounds.height 
+        : currentPadding;
+      const topArea = Math.max(currentPadding, logoBottom + currentPadding);
+      const bottomArea = height - currentPadding - legalBlockHeight;
+      const availableHeight = Math.max(0, bottomArea - topArea);
+      if (availableHeight > 0 && totalTextHeight > 0) {
+        const centerY = topArea + availableHeight / 2;
+        startY = centerY - totalTextHeight / 2 + titleSize;
+        const minStart = topArea + titleSize;
+        startY = Math.max(minStart, startY);
+      } else {
+        startY = topArea + titleSize;
+      }
+      if (!isFinite(startY) || startY < currentPadding + titleSize) {
+        startY = Math.max(currentPadding + titleSize, topArea + titleSize);
+      }
+    } else {
+      // bottom
+      const legalTop = height - currentPadding - legalBlockHeight;
+      const effectiveSubtitleGap = isUltraWide ? state.subtitleGap - LAYOUT_CONSTANTS.SUBTITLE_GAP_REDUCTION_ULTRA_WIDE : state.subtitleGap;
+      const subtitleGapPx = (effectiveSubtitleGap / 100) * height;
+      const gapFromSubtitle = subtitleLines.length > 0 ? subtitleGapPx : titleSize * state.titleLineHeight * 0.3;
+      // Для широких форматов увеличиваем безопасную зону сверху от legal, чтобы подзаголовок не заезжал
+      const legalSafetyMultiplier = (isSuperWide || isUltraWide || isHorizontalLayout) ? 1.5 : 0.5;
+      const safetyGap = Math.max(currentPadding * 0.5, gapFromSubtitle, legalSize * state.legalLineHeight * legalSafetyMultiplier);
+      const textBottom = legalTop - safetyGap;
+      startY = textBottom - totalTextHeight + titleSize;
+      if (startY < currentPadding + titleSize) {
+        startY = currentPadding + titleSize;
+      }
     }
-    if (legalBlockHeight > 0) {
-      const bottomPadding = effectivePaddingPx + legalBlockHeight + effectivePaddingPx * 0.5;
-      startY = Math.min(startY, height - bottomPadding - totalTextHeight + titleSize);
-    }
-    startY = Math.max(effectivePaddingPx + titleSize, startY);
-  } else if (isUltraWide) {
-    // Для ультра широких форматов позиция текста не меняется в зависимости от titleVPos
-    // Текст всегда остается вверху
-    startY = effectivePaddingPx + titleSize;
-    if (state.showLogo && state.logo && logoBounds) {
-      const logoBottom = logoBounds.y + logoBounds.height;
-      const logoStart = logoBottom + effectivePaddingPx + titleSize;
-      startY = Math.max(startY, logoStart);
-    }
-    if (legalBlockHeight > 0) {
-      const bottomPadding = effectivePaddingPx + legalBlockHeight + effectivePaddingPx * 0.5;
-      startY = Math.min(startY, height - bottomPadding - totalTextHeight + titleSize);
-    }
-    startY = Math.max(effectivePaddingPx + titleSize, startY);
-  } else if (isHorizontalLayout) {
-    // Для горизонтальных форматов позиция текста не меняется в зависимости от titleVPos
-    // Текст всегда остается вверху
-    startY = paddingPx + titleSize;
-    if (legalBlockHeight > 0) {
-      const bottomPadding = paddingPx + legalBlockHeight + paddingPx * 0.5;
-      startY = Math.min(startY, height - bottomPadding - totalTextHeight + titleSize);
-    }
-    if (state.showLogo && state.logo && logoBounds) {
-      const logoBottom = logoBounds.y + logoBounds.height;
-      const logoStart = logoBottom + paddingPx + titleSize;
-      startY = Math.max(startY, logoStart);
-    }
-    startY = Math.max(paddingPx + titleSize, startY);
   } else {
     if (state.titleVPos === 'top') {
       if (state.showLogo && state.logo && logoBounds) {
@@ -766,8 +772,17 @@ const renderToCanvas = (canvas, width, height, state) => {
         // Используем более мягкую проверку: хотя бы одна сторона должна быть >= minKvSize
         if (kvW < minKvSize && kvH < minKvSize) return null;
         
-        // Центрируем KV в доступной области, используя всю доступную высоту
-        const kvX = paddingPx + (availableWidth - kvW) / 2;
+        // Применяем позицию KV (left, center, right) - только для нешироких макетов
+        const kvPosition = state.kvPosition || 'center';
+        let kvX;
+        if (kvPosition === 'left') {
+          kvX = paddingPx;
+        } else if (kvPosition === 'right') {
+          kvX = width - paddingPx - kvW;
+        } else {
+          // center (по умолчанию)
+          kvX = paddingPx + (availableWidth - kvW) / 2;
+        }
         // Размещаем KV так, чтобы максимально использовать доступное пространство
         const kvY = areaStart + (availHeight - kvH) / 2;
         return {
@@ -986,7 +1001,16 @@ const renderToCanvas = (canvas, width, height, state) => {
             kvPlannedMeta.kvW = kvWidth * newScale;
             kvPlannedMeta.kvH = kvHeight * newScale;
             kvPlannedMeta.kvScale = newScale;
-            kvPlannedMeta.kvX = paddingPx + Math.max(0, (availableWidthForKV - kvPlannedMeta.kvW) / 2);
+            // Сохраняем позицию KV при уменьшении размера
+            const kvPosition = state.kvPosition || 'center';
+            if (kvPosition === 'left') {
+              kvPlannedMeta.kvX = paddingPx;
+            } else if (kvPosition === 'right') {
+              kvPlannedMeta.kvX = width - paddingPx - kvPlannedMeta.kvW;
+            } else {
+              // center (по умолчанию)
+              kvPlannedMeta.kvX = paddingPx + Math.max(0, (availableWidthForKV - kvPlannedMeta.kvW) / 2);
+            }
             kvPlannedMeta.kvY = Math.max(paddingPx, maxAllowedBottom - kvPlannedMeta.kvH);
           }
         }
@@ -1060,19 +1084,24 @@ const renderToCanvas = (canvas, width, height, state) => {
           const separatorY = logoBounds.y;
           const separatorHeight = logoBounds.height;
           
-          // Рисуем разделитель "|" (чуть длиннее и с большими отступами)
+          // Отступ от основного логотипа до разделителя
+          const gapBeforeSeparator = 24;
+          // Отступ от разделителя до партнерского логотипа (одинаковое расстояние)
+          const gapAfterSeparator = 24;
+          
+          // Рисуем разделитель "|" с увеличенными отступами
           // Используем цвет текста для разделителя
           ctx.strokeStyle = state.titleColor || '#ffffff';
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(separatorX + 6, separatorY + separatorHeight * 0.15);
-          ctx.lineTo(separatorX + 6, separatorY + separatorHeight * 0.85);
+          ctx.moveTo(separatorX + gapBeforeSeparator, separatorY + separatorHeight * 0.15);
+          ctx.lineTo(separatorX + gapBeforeSeparator, separatorY + separatorHeight * 0.85);
           ctx.stroke();
           
           // Рассчитываем размеры партнерского логотипа
           const partnerLogoScale = logoBounds.height / state.partnerLogo.height;
           const partnerLogoWidth = state.partnerLogo.width * partnerLogoScale;
-          const partnerLogoX = separatorX + 12; // Отступ после разделителя (увеличен)
+          const partnerLogoX = separatorX + gapBeforeSeparator + gapAfterSeparator; // Отступ после разделителя
           
           // Рисуем партнерский логотип
           ctx.drawImage(

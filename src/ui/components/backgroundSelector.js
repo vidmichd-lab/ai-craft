@@ -69,16 +69,46 @@ export const updateBgUI = () => {
   const dom = getDom();
   const bgImageOptions = document.getElementById('bgImageOptions');
   
-  if (dom.bgThumb) {
-    if (bgImage) {
-      // Есть фоновое изображение
-      dom.bgThumb.style.backgroundImage = `url(${bgImage.src})`;
-      if (bgImageOptions) bgImageOptions.style.display = 'block';
-    } else {
-      // Нет фонового изображения
-      dom.bgThumb.style.backgroundImage = 'none';
-      if (bgImageOptions) bgImageOptions.style.display = 'none';
+  if (!dom.bgPreviewContainer || !dom.bgPreviewImg || !dom.bgPreviewPlaceholder) return;
+  
+  if (bgImage) {
+    // Есть фоновое изображение
+    if (dom.bgPreviewImg) {
+      dom.bgPreviewImg.src = bgImage.src;
+      dom.bgPreviewImg.style.display = 'block';
     }
+    if (dom.bgPreviewPlaceholder) {
+      dom.bgPreviewPlaceholder.style.display = 'none';
+    }
+    if (dom.bgUploadBtn) {
+      dom.bgUploadBtn.style.display = 'none';
+    }
+    if (dom.bgReplaceBtn) {
+      dom.bgReplaceBtn.style.display = 'flex';
+    }
+    if (dom.bgDeleteBtn) {
+      dom.bgDeleteBtn.style.display = 'flex';
+    }
+    if (bgImageOptions) bgImageOptions.style.display = 'block';
+  } else {
+    // Нет фонового изображения
+    if (dom.bgPreviewImg) {
+      dom.bgPreviewImg.src = '';
+      dom.bgPreviewImg.style.display = 'none';
+    }
+    if (dom.bgPreviewPlaceholder) {
+      dom.bgPreviewPlaceholder.style.display = 'block';
+    }
+    if (dom.bgUploadBtn) {
+      dom.bgUploadBtn.style.display = 'flex';
+    }
+    if (dom.bgReplaceBtn) {
+      dom.bgReplaceBtn.style.display = 'none';
+    }
+    if (dom.bgDeleteBtn) {
+      dom.bgDeleteBtn.style.display = 'none';
+    }
+    if (bgImageOptions) bgImageOptions.style.display = 'none';
   }
 };
 

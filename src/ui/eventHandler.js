@@ -341,6 +341,21 @@ export const initEventDelegation = () => {
           if (typeof window.selectLegalTransform === 'function') {
             window.selectLegalTransform(value);
           }
+        },
+        'kvPositionToggle': () => {
+          if (typeof window.selectKVPosition === 'function') {
+            window.selectKVPosition(value);
+          }
+        },
+        'bgPositionToggle': () => {
+          if (typeof window.selectBgPosition === 'function') {
+            window.selectBgPosition(value);
+          }
+        },
+        'bgVPositionToggle': () => {
+          if (typeof window.selectBgVPosition === 'function') {
+            window.selectBgVPosition(value);
+          }
         }
       };
       

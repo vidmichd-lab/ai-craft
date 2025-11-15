@@ -18,6 +18,19 @@ import { renderer } from '../../renderer.js';
 import { getDom } from '../domCache.js';
 
 /**
+ * Закрывает все дропдауны превью
+ */
+const closeAllPreviewDropdowns = () => {
+  [
+    document.getElementById('previewSizeSelectNarrowDropdown'),
+    document.getElementById('previewSizeSelectWideDropdown'),
+    document.getElementById('previewSizeSelectSquareDropdown')
+  ].forEach(dropdown => {
+    if (dropdown) dropdown.style.display = 'none';
+  });
+};
+
+/**
  * Обновляет сводку выбранных размеров
  */
 export const updateSizesSummary = () => {
@@ -305,13 +318,7 @@ export const updatePreviewSizeSelect = () => {
   }
   
   // Закрываем все дропдауны
-  [
-    document.getElementById('previewSizeSelectNarrowDropdown'),
-    document.getElementById('previewSizeSelectWideDropdown'),
-    document.getElementById('previewSizeSelectSquareDropdown')
-  ].forEach(dropdown => {
-    if (dropdown) dropdown.style.display = 'none';
-  });
+  closeAllPreviewDropdowns();
 };
 
 /**
@@ -382,15 +389,6 @@ export const changePreviewSizeCategory = (category, index) => {
               dropdown.style.display = 'none';
             }
             // Закрываем все дроплисты
-            const closeAllPreviewDropdowns = () => {
-              [
-                document.getElementById('previewSizeSelectNarrowDropdown'),
-                document.getElementById('previewSizeSelectWideDropdown'),
-                document.getElementById('previewSizeSelectSquareDropdown')
-              ].forEach(d => {
-                if (d) d.style.display = 'none';
-              });
-            };
             closeAllPreviewDropdowns();
             changePreviewSizeCategory(category, index.toString());
           };

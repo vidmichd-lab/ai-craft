@@ -81,8 +81,8 @@ import {
   clearBgImage,
   updateBgColor,
   applyPresetBgColor,
-  updateBgSize,
   updateBgPosition,
+  updateBgUI,
   initializeBackgroundUI
 } from './components/backgroundSelector.js';
 import {
@@ -130,10 +130,11 @@ const syncChips = (state) => {
   updateTitleAlignToggle(state.titleAlign || 'left');
   updateTitleVPosToggle(state.titleVPos || 'top');
   // Остальные чипсы
-  updateChipGroup('bg-size', state.bgSize || 'cover');
-  updateChipGroup('bg-position', state.bgPosition || 'center');
+  updateBgPositionToggle(state.bgPosition || 'center');
+  updateBgVPositionToggle(state.bgVPosition || 'center');
   updateLogoPosToggle(state.logoPos || 'left');
   updateChipGroup('logo-lang', state.logoLanguage || 'ru');
+  updateKVPositionToggle(state.kvPosition || 'center');
 };
 
 export const syncFormFields = () => {
@@ -217,6 +218,14 @@ export const syncFormFields = () => {
   if (dom.subtitleSizeValue) {
     const subtitleSizeNum = typeof subtitleSize === 'number' && !isNaN(subtitleSize) ? subtitleSize : 4;
     dom.subtitleSizeValue.textContent = `${subtitleSizeNum}%`;
+  }
+  const titleSubtitleRatio = state.titleSubtitleRatio ?? 0.5;
+  if (dom.titleSubtitleRatio) {
+    dom.titleSubtitleRatio.value = titleSubtitleRatio;
+  }
+  if (dom.titleSubtitleRatioValue) {
+    const ratioNum = typeof titleSubtitleRatio === 'number' && !isNaN(titleSubtitleRatio) ? titleSubtitleRatio : 0.5;
+    dom.titleSubtitleRatioValue.textContent = ratioNum.toFixed(2);
   }
   // Конвертируем вес из числа в название для обратной совместимости
   const subtitleWeight = typeof state.subtitleWeight === 'number' 
@@ -366,12 +375,12 @@ export const syncFormFields = () => {
   dom.bgColor.value = state.bgColor;
   if (dom.bgColorHex) dom.bgColorHex.value = state.bgColor;
   
-  const textGradientOpacity = state.textGradientOpacity ?? 40;
+  const textGradientOpacity = state.textGradientOpacity ?? 100;
   if (dom.textGradientOpacity) {
     dom.textGradientOpacity.value = textGradientOpacity;
   }
   if (dom.textGradientOpacityValue) {
-    const textGradientOpacityNum = typeof textGradientOpacity === 'number' && !isNaN(textGradientOpacity) ? textGradientOpacity : 40;
+    const textGradientOpacityNum = typeof textGradientOpacity === 'number' && !isNaN(textGradientOpacity) ? textGradientOpacity : 100;
     dom.textGradientOpacityValue.textContent = `${textGradientOpacityNum}%`;
   }
 
@@ -606,35 +615,21 @@ export const updatePreviewSizeSelectOld = () => {
 // Функция updateLogoUI теперь импортируется из ./components/logoSelector.js
 
 // updateKVUI теперь импортируется из ./components/kvSelector.js
-
-const updateBgUI = () => {
-  const dom = getDom();
-  const { bgImage } = getState();
-  const bgImageOptions = document.getElementById('bgImageOptions');
-  
-  if (!dom.bgPreview || !dom.bgActions || !dom.bgThumb) return;
-
-  if (bgImage) {
-    dom.bgPreview.style.display = 'block';
-    dom.bgActions.style.display = 'block';
-    dom.bgThumb.style.backgroundImage = `url(${bgImage.src})`;
-    if (bgImageOptions) bgImageOptions.style.display = 'block';
-  } else {
-    dom.bgPreview.style.display = 'none';
-    dom.bgActions.style.display = 'none';
-    dom.bgThumb.style.backgroundImage = 'none';
-    if (bgImageOptions) bgImageOptions.style.display = 'none';
-  }
-};
-
-export const selectBgSize = (size) => {
-  updateBgSize(size);
-  updateChipGroup('bg-size', size);
-};
+// updateBgUI теперь импортируется из ./components/backgroundSelector.js
 
 export const selectBgPosition = (position) => {
   updateBgPosition(position);
-  updateChipGroup('bg-position', position);
+  updateBgPositionToggle(position);
+};
+
+export const selectBgVPosition = (position) => {
+  if (!['top', 'center', 'bottom'].includes(position)) {
+    console.warn('Некорректное значение для bgVPosition:', position);
+    return;
+  }
+  setKey('bgVPosition', position);
+  updateBgVPositionToggle(position);
+  renderer.render();
 };
 
 export const updatePartnerLogoUI = () => {
@@ -782,14 +777,6 @@ const updateTitleAlignToggle = (align) => {
   const toggle = document.getElementById('titleAlignToggle');
   if (!toggle) return;
   
-  // Проверяем, видим ли раздел с этим тумблером
-  const panelSection = toggle.closest('.panel-section');
-  if (panelSection && !panelSection.classList.contains('active')) {
-    // Раздел скрыт, не обновляем визуально, только сохраняем значение
-    toggle.setAttribute('data-value', align);
-    return;
-  }
-  
   // Устанавливаем значение выключки
   toggle.setAttribute('data-value', align);
   
@@ -809,9 +796,9 @@ const updateTitleAlignToggle = (align) => {
   if (slider) {
     // Используем те же значения, что и в CSS
     if (align === 'center') {
-      slider.style.transform = 'translateX(calc(100% + 4px))';
-    } else if (align === 'right' || align === 'bottom') {
-      slider.style.transform = 'translateX(calc(200% + 8px))';
+      slider.style.transform = 'translateX(calc(100% - 2.666667px))';
+    } else if (align === 'right') {
+      slider.style.transform = 'translateX(calc(200% - 5.333334px))';
     } else {
       slider.style.transform = 'translateX(0)';
     }
@@ -821,14 +808,6 @@ const updateTitleAlignToggle = (align) => {
 const updateTitleVPosToggle = (vPos) => {
   const toggle = document.getElementById('titleVPosToggle');
   if (!toggle) return;
-  
-  // Проверяем, видим ли раздел с этим тумблером
-  const panelSection = toggle.closest('.panel-section');
-  if (panelSection && !panelSection.classList.contains('active')) {
-    // Раздел скрыт, не обновляем визуально, только сохраняем значение
-    toggle.setAttribute('data-value', vPos);
-    return;
-  }
   
   // Устанавливаем значение позиции
   toggle.setAttribute('data-value', vPos);
@@ -849,9 +828,9 @@ const updateTitleVPosToggle = (vPos) => {
   if (slider) {
     // Используем те же значения, что и в CSS
     if (vPos === 'center') {
-      slider.style.transform = 'translateX(calc(100% + 4px))';
+      slider.style.transform = 'translateX(calc(100% - 2.666667px))';
     } else if (vPos === 'bottom') {
-      slider.style.transform = 'translateX(calc(200% + 8px))';
+      slider.style.transform = 'translateX(calc(200% - 5.333334px))';
     } else {
       slider.style.transform = 'translateX(0)';
     }
@@ -922,6 +901,16 @@ export const selectLogoPos = (pos) => {
   renderer.render();
 };
 
+export const selectKVPosition = (position) => {
+  if (!['left', 'center', 'right'].includes(position)) {
+    console.warn('Некорректное значение для kvPosition:', position);
+    return;
+  }
+  setKey('kvPosition', position);
+  updateKVPositionToggle(position);
+  renderer.render();
+};
+
 const updateLogoToggle = (language) => {
   const toggle = document.getElementById('logoLangToggle');
   if (!toggle) return;
@@ -943,7 +932,7 @@ const updateLogoToggle = (language) => {
   const slider = toggle.querySelector('.toggle-switch-slider');
   if (slider) {
     if (language === 'kz') {
-      slider.style.transform = 'translateX(100%)';
+      slider.style.transform = 'translateX(calc(100% - 4px))';
     } else {
       slider.style.transform = 'translateX(0)';
     }
@@ -957,14 +946,6 @@ const updateLogoToggle = (language) => {
 const updateLogoPosToggle = (pos) => {
   const toggle = document.getElementById('logoPosToggle');
   if (!toggle) return;
-  
-  // Проверяем, видим ли раздел с этим тумблером
-  const panelSection = toggle.closest('.panel-section');
-  if (panelSection && !panelSection.classList.contains('active')) {
-    // Раздел скрыт, не обновляем визуально, только сохраняем значение
-    toggle.setAttribute('data-value', pos);
-    return;
-  }
   
   // Устанавливаем значение позиции
   toggle.setAttribute('data-value', pos);
@@ -983,7 +964,97 @@ const updateLogoPosToggle = (pos) => {
   const slider = toggle.querySelector('.toggle-switch-slider');
   if (slider) {
     if (pos === 'center') {
-      slider.style.transform = 'translateX(100%)';
+      slider.style.transform = 'translateX(calc(100% - 4px))';
+    } else {
+      slider.style.transform = 'translateX(0)';
+    }
+  }
+};
+
+const updateKVPositionToggle = (position) => {
+  const toggle = document.getElementById('kvPositionToggle');
+  if (!toggle) return;
+  
+  // Устанавливаем значение позиции
+  toggle.setAttribute('data-value', position);
+  
+  // Обновляем опции
+  const options = toggle.querySelectorAll('.toggle-switch-option');
+  options.forEach(option => {
+    if (option.dataset.value === position) {
+      option.classList.add('active');
+    } else {
+      option.classList.remove('active');
+    }
+  });
+  
+  // Принудительно обновляем CSS для слайдера (3 опции)
+  const slider = toggle.querySelector('.toggle-switch-slider');
+  if (slider) {
+    if (position === 'center') {
+      slider.style.transform = 'translateX(calc(100% - 2.666667px))';
+    } else if (position === 'right') {
+      slider.style.transform = 'translateX(calc(200% - 5.333334px))';
+    } else {
+      slider.style.transform = 'translateX(0)';
+    }
+  }
+};
+
+const updateBgPositionToggle = (position) => {
+  const toggle = document.getElementById('bgPositionToggle');
+  if (!toggle) return;
+  
+  // Устанавливаем значение позиции
+  toggle.setAttribute('data-value', position);
+  
+  // Обновляем опции
+  const options = toggle.querySelectorAll('.toggle-switch-option');
+  options.forEach(option => {
+    if (option.dataset.value === position) {
+      option.classList.add('active');
+    } else {
+      option.classList.remove('active');
+    }
+  });
+  
+  // Принудительно обновляем CSS для слайдера (3 опции)
+  const slider = toggle.querySelector('.toggle-switch-slider');
+  if (slider) {
+    if (position === 'center') {
+      slider.style.transform = 'translateX(calc(100% - 2.666667px))';
+    } else if (position === 'right') {
+      slider.style.transform = 'translateX(calc(200% - 5.333334px))';
+    } else {
+      slider.style.transform = 'translateX(0)';
+    }
+  }
+};
+
+const updateBgVPositionToggle = (position) => {
+  const toggle = document.getElementById('bgVPositionToggle');
+  if (!toggle) return;
+  
+  // Устанавливаем значение позиции
+  toggle.setAttribute('data-value', position);
+  
+  // Обновляем опции
+  const options = toggle.querySelectorAll('.toggle-switch-option');
+  options.forEach(option => {
+    if (option.dataset.value === position) {
+      option.classList.add('active');
+    } else {
+      option.classList.remove('active');
+    }
+  });
+  
+  // Принудительно обновляем CSS для слайдера (3 опции)
+  const slider = toggle.querySelector('.toggle-switch-slider');
+  if (slider) {
+    if (position === 'center') {
+      slider.style.transform = 'translateX(calc(33.333333% - 2.666667px))';
+    } else if (position === 'bottom') {
+      slider.style.transform = 'translateX(calc(66.666667% - 5.333334px))';
     } else {
       slider.style.transform = 'translateX(0)';
     }
@@ -1114,6 +1185,30 @@ export const updateSubtitleSize = (value) => {
   renderer.render();
 };
 
+export const updateTitleSubtitleRatio = (value) => {
+  const numeric = parseFloat(value);
+  if (isNaN(numeric)) {
+    console.warn("Некорректное значение для titleSubtitleRatio:", value);
+    return;
+  }
+  setKey("titleSubtitleRatio", numeric);
+  const dom = getDom();
+  if (dom.titleSubtitleRatioValue) {
+    dom.titleSubtitleRatioValue.textContent = numeric.toFixed(2);
+  }
+  // Пересчитываем размер подзаголовка на основе нового коэффициента
+  const state = getState();
+  const newSubtitleSize = parseFloat((state.titleSize * numeric).toFixed(2));
+  setKey("subtitleSize", newSubtitleSize);
+  if (dom.subtitleSizeValue) {
+    dom.subtitleSizeValue.textContent = `${newSubtitleSize}%`;
+  }
+  if (dom.subtitleSize) {
+    dom.subtitleSize.value = newSubtitleSize;
+  }
+  renderer.render();
+};
+
 export const updateTextGradientOpacity = (value) => {
   const numeric = parseInt(value, 10);
   if (isNaN(numeric)) {
@@ -1209,13 +1304,29 @@ export const showSection = (sectionId) => {
   
   // После переключения раздела обновляем тумблеры, если они теперь видимы
   const state = getState();
-  if (sectionId === 'title') {
     // Используем requestAnimationFrame для обновления после рендеринга
     requestAnimationFrame(() => {
+    if (sectionId === 'title') {
       updateTitleAlignToggle(state.titleAlign || 'left');
       updateTitleVPosToggle(state.titleVPos || 'top');
-    });
-  }
+      const transformType = state.titleTransform || 'none';
+      updateTitleTransformToggle(transformType);
+    } else if (sectionId === 'subtitle') {
+      const transformType = state.subtitleTransform || 'none';
+      updateSubtitleTransformToggle(transformType);
+    } else if (sectionId === 'legal') {
+      const transformType = state.legalTransform || 'none';
+      updateLegalTransformToggle(transformType);
+    } else if (sectionId === 'background') {
+      updateBgPositionToggle(state.bgPosition || 'center');
+      updateBgVPositionToggle(state.bgVPosition || 'center');
+    } else if (sectionId === 'logo') {
+      updateLogoPosToggle(state.logoPos || 'left');
+      updateLogoToggle(state.logoLanguage || 'ru');
+    } else if (sectionId === 'kv') {
+      updateKVPositionToggle(state.kvPosition || 'center');
+    }
+  });
 };
 
 export const initializeTabs = () => {
@@ -1547,13 +1658,8 @@ export const initializeLogoPosToggle = () => {
   const toggle = document.getElementById('logoPosToggle');
   if (!toggle) return;
   
-  // Добавляем обработчик клика
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleLogoPos();
-  });
-  
-  // Инициализируем состояние тумблера
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только инициализируем визуальное состояние
   const state = getState();
   updateLogoPosToggle(state.logoPos || 'left');
 };
@@ -1562,23 +1668,8 @@ export const initializeTitleAlignToggle = () => {
   const toggle = document.getElementById('titleAlignToggle');
   if (!toggle) return;
   
-  // Добавляем обработчик клика на тумблер
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleTitleAlign();
-  });
-  
-  // Добавляем обработчики клика на опции для прямого выбора
-  const options = toggle.querySelectorAll('.toggle-switch-option');
-  options.forEach(option => {
-    option.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const value = option.dataset.value;
-      selectTitleAlign(value);
-    });
-  });
-  
-  // Инициализируем состояние тумблера
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только инициализируем визуальное состояние
   const state = getState();
   updateTitleAlignToggle(state.titleAlign || 'left');
 };
@@ -1587,25 +1678,40 @@ export const initializeTitleVPosToggle = () => {
   const toggle = document.getElementById('titleVPosToggle');
   if (!toggle) return;
   
-  // Добавляем обработчик клика на тумблер
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleTitleVPos();
-  });
-  
-  // Добавляем обработчики клика на опции для прямого выбора
-  const options = toggle.querySelectorAll('.toggle-switch-option');
-  options.forEach(option => {
-    option.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const value = option.dataset.value;
-      selectTitleVPos(value);
-    });
-  });
-  
-  // Инициализируем состояние тумблера
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только инициализируем визуальное состояние
   const state = getState();
   updateTitleVPosToggle(state.titleVPos || 'top');
+};
+
+export const initializeKVPositionToggle = () => {
+  const toggle = document.getElementById('kvPositionToggle');
+  if (!toggle) return;
+  
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только инициализируем визуальное состояние
+  const state = getState();
+  updateKVPositionToggle(state.kvPosition || 'center');
+};
+
+export const initializeBgPositionToggle = () => {
+  const toggle = document.getElementById('bgPositionToggle');
+  if (!toggle) return;
+  
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только инициализируем визуальное состояние
+  const state = getState();
+  updateBgPositionToggle(state.bgPosition || 'center');
+};
+
+export const initializeBgVPositionToggle = () => {
+  const toggle = document.getElementById('bgVPositionToggle');
+  if (!toggle) return;
+  
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только инициализируем визуальное состояние
+  const state = getState();
+  updateBgVPositionToggle(state.bgVPosition || 'center');
 };
 
 const updateExportScaleToggle = (scale) => {
@@ -1631,11 +1737,11 @@ const updateExportScaleToggle = (scale) => {
   if (slider) {
     // Используем те же значения, что и в CSS
     if (scale === 2) {
-      slider.style.transform = 'translateX(calc(100% + 4px))';
+      slider.style.transform = 'translateX(calc(100% - 3px))';
     } else if (scale === 3) {
-      slider.style.transform = 'translateX(calc(200% + 8px))';
+      slider.style.transform = 'translateX(calc(200% - 6px))';
     } else if (scale === 4) {
-      slider.style.transform = 'translateX(calc(300% + 12px))';
+      slider.style.transform = 'translateX(calc(300% - 9px))';
     } else {
       slider.style.transform = 'translateX(0)';
     }
@@ -1646,17 +1752,8 @@ export const initializeExportScaleToggle = () => {
   const toggle = document.getElementById('exportScaleToggle');
   if (!toggle) return;
   
-  // Добавляем обработчики клика на опции для прямого выбора
-  const options = toggle.querySelectorAll('.toggle-switch-option');
-  options.forEach(option => {
-    option.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const value = parseInt(option.dataset.value, 10);
-      setKey('exportScale', value);
-    });
-  });
-  
-  // Инициализируем состояние тумблера
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только инициализируем визуальное состояние
   const state = getState();
   updateExportScaleToggle(state.exportScale || 1);
 };
@@ -1997,9 +2094,9 @@ const updateSingleTitleTransformToggle = (toggle, transformType) => {
     if (transformType === 'none') {
       slider.style.transform = 'translateX(0)';
     } else if (transformType === 'uppercase') {
-      slider.style.transform = 'translateX(calc(100% + 4px))';
+      slider.style.transform = 'translateX(calc(100% - 2.666667px))';
     } else if (transformType === 'lowercase') {
-      slider.style.transform = 'translateX(calc(200% + 8px))';
+      slider.style.transform = 'translateX(calc(200% - 5.333334px))';
     }
   }
 };
@@ -2034,9 +2131,9 @@ const updateSingleSubtitleTransformToggle = (toggle, transformType) => {
     if (transformType === 'none') {
       slider.style.transform = 'translateX(0)';
     } else if (transformType === 'uppercase') {
-      slider.style.transform = 'translateX(calc(100% + 4px))';
+      slider.style.transform = 'translateX(calc(100% - 2.666667px))';
     } else if (transformType === 'lowercase') {
-      slider.style.transform = 'translateX(calc(200% + 8px))';
+      slider.style.transform = 'translateX(calc(200% - 5.333334px))';
     }
   }
 };
@@ -2070,9 +2167,9 @@ export const updateLegalTransformToggle = (transformType) => {
     if (transformType === 'none') {
       slider.style.transform = 'translateX(0)';
     } else if (transformType === 'uppercase') {
-      slider.style.transform = 'translateX(calc(100% + 4px))';
+      slider.style.transform = 'translateX(calc(100% - 2.666667px))';
     } else if (transformType === 'lowercase') {
-      slider.style.transform = 'translateX(calc(200% + 8px))';
+      slider.style.transform = 'translateX(calc(200% - 5.333334px))';
     }
   }
 };
@@ -2082,15 +2179,8 @@ const initializeSingleTitleTransformToggle = (toggleId) => {
   const toggle = document.getElementById(toggleId);
   if (!toggle) return;
   
-  // Добавляем обработчики клика на опции
-  const options = toggle.querySelectorAll('.toggle-switch-option');
-  options.forEach(option => {
-    option.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const value = option.dataset.value;
-      selectTitleTransform(value);
-    });
-  });
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только проверяем наличие элемента
 };
 
 export const initializeTitleTransformToggle = () => {
@@ -2108,15 +2198,8 @@ const initializeSingleSubtitleTransformToggle = (toggleId) => {
   const toggle = document.getElementById(toggleId);
   if (!toggle) return;
   
-  // Добавляем обработчики клика на опции
-  const options = toggle.querySelectorAll('.toggle-switch-option');
-  options.forEach(option => {
-    option.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const value = option.dataset.value;
-      selectSubtitleTransform(value);
-    });
-  });
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только проверяем наличие элемента
 };
 
 export const initializeSubtitleTransformToggle = () => {
@@ -2133,17 +2216,8 @@ export const initializeLegalTransformToggle = () => {
   const toggle = document.getElementById('legalTransformToggle');
   if (!toggle) return;
   
-  // Добавляем обработчики клика на опции
-  const options = toggle.querySelectorAll('.toggle-switch-option');
-  options.forEach(option => {
-    option.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const value = option.dataset.value;
-      selectLegalTransform(value);
-    });
-  });
-  
-  // Инициализируем состояние
+  // Обработчики событий обрабатываются через делегирование в eventHandler.js
+  // Здесь только инициализируем визуальное состояние
   const state = getState();
   const transformType = state.legalTransform || 'none';
   updateLegalTransformToggle(transformType);
@@ -2646,7 +2720,7 @@ const renderTitleSubtitlePairs = () => {
         
         const tooltip = document.createElement('div');
         tooltip.className = 'tooltip';
-        tooltip.textContent = 'Добавьте вариант заголовка с подзаголовком и отдельным KV. Экспорт всех макетов за раз создаст три папки с ресайзами для разных заголовков и КВ';
+        tooltip.textContent = 'Добавьте еще варианы для заголовка и подзаголовка с отдельным KV. Экспорт всех макетов за раз создаст несколько папок с ресайзами для разных заголовков и КВ';
         
         // Позиционирование tooltip при наведении
         tooltipWrapper.addEventListener('mouseenter', () => {

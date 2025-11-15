@@ -432,10 +432,20 @@ body {
 
 .form-group {
   margin-bottom: var(--spacing-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
 }
 
 .form-group:last-child {
   margin-bottom: 0;
+}
+
+/* Для form-group с inline элементами (flex row) */
+.form-group[style*="display: flex"][style*="align-items: center"] {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--spacing-md);
 }
 
 #titlePairEditor {
@@ -470,6 +480,21 @@ label {
   font-weight: 500;
   letter-spacing: -0.1px;
   line-height: 1.4;
+}
+
+/* Для label внутри form-group с flex */
+.form-group > label {
+  margin-bottom: var(--spacing-sm);
+}
+
+/* Для label без margin (когда используется gap в form-group) */
+label[style*="margin: 0"] {
+  margin-bottom: 0 !important;
+}
+
+/* Отступ для label после toggle-switch или других элементов */
+.form-group > label:not(:first-child) {
+  margin-top: var(--spacing-lg);
 }
 
 
@@ -709,11 +734,21 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  margin-top: 0;
+  margin-bottom: 0;
+  width: 100%;
 }
 
 .checkbox-group label {
   margin: 0;
   cursor: pointer;
+  flex: 1;
+}
+
+/* Для checkbox-group внутри form-group */
+.form-group > .checkbox-group {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .toggle-switch {
@@ -725,6 +760,9 @@ input[type="checkbox"] {
   border-radius: 8px;
   padding: 4px;
   cursor: pointer;
+  margin-top: 0;
+  margin-bottom: 0;
+  flex-shrink: 0;
 }
 
 .toggle-switch-track {
@@ -762,7 +800,7 @@ input[type="checkbox"] {
   height: calc(100% - 8px);
   background: var(--border-color);
   border-radius: 6px;
-  transition: none;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 0;
 }
 
@@ -773,24 +811,23 @@ input[type="checkbox"] {
 
 .toggle-switch[data-options="2"][data-value="kz"] .toggle-switch-slider,
 .toggle-switch[data-options="2"].lang-kz .toggle-switch-slider {
-  transform: translateX(100%);
+  transform: translateX(calc(100% - 4px));
 }
 
 /* Для тумблера с 3 опциями (выключка текста, вертикальная позиция) */
 .toggle-switch[data-options="3"] .toggle-switch-slider {
-  width: calc(33.333% - 2.67px);
+  width: calc(33.333333% - 2.666667px);
 }
 
-.toggle-switch[data-options="3"][data-value="center"] .toggle-switch-slider {
-  /* translateX считается от ширины слайдера, слайдер = ~33.333% track */
-  /* Для сдвига на одну секцию (33.333% track) нужен translateX = 100% слайдера + компенсация gap */
-  transform: translateX(calc(100% + 4px));
+.toggle-switch[data-options="3"][data-value="center"] .toggle-switch-slider,
+.toggle-switch[data-options="3"][data-value="uppercase"] .toggle-switch-slider {
+  transform: translateX(calc(100% - 2.666667px));
 }
 
 .toggle-switch[data-options="3"][data-value="right"] .toggle-switch-slider,
-.toggle-switch[data-options="3"][data-value="bottom"] .toggle-switch-slider {
-  /* Для сдвига на две секции (66.666% track) нужен translateX = 200% слайдера + компенсация gap */
-  transform: translateX(calc(200% + 8px));
+.toggle-switch[data-options="3"][data-value="bottom"] .toggle-switch-slider,
+.toggle-switch[data-options="3"][data-value="lowercase"] .toggle-switch-slider {
+  transform: translateX(calc(200% - 5.333334px));
 }
 
 /* Для тумблера с 4 опциями (масштаб) */
@@ -799,15 +836,15 @@ input[type="checkbox"] {
 }
 
 .toggle-switch[data-options="4"][data-value="2"] .toggle-switch-slider {
-  transform: translateX(calc(100% + 4px));
+  transform: translateX(calc(100% - 3px));
 }
 
 .toggle-switch[data-options="4"][data-value="3"] .toggle-switch-slider {
-  transform: translateX(calc(200% + 8px));
+  transform: translateX(calc(200% - 6px));
 }
 
 .toggle-switch[data-options="4"][data-value="4"] .toggle-switch-slider {
-  transform: translateX(calc(300% + 12px));
+  transform: translateX(calc(300% - 9px));
 }
 
 .toggle-switch-option.active {
@@ -914,10 +951,18 @@ input[type="checkbox"] {
 
 .input-group {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
   align-items: center;
+  width: 100%;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
+/* Для input-group внутри form-group */
+.form-group > .input-group {
+  margin-top: 0;
+  margin-bottom: 0;
+}
 
 .input-group input {
   flex: 1;
@@ -1043,8 +1088,15 @@ input[type="range"]::-moz-range-thumb:hover {
   font-family: var(--font-family-base);
   color: var(--text-muted);
   margin-top: var(--spacing-sm);
+  margin-bottom: 0;
   font-weight: 500;
   line-height: 1.4;
+}
+
+/* Для slider-value внутри form-group */
+.form-group > .slider-value {
+  margin-top: var(--spacing-sm);
+  margin-bottom: 0;
 }
 
 .slider-value span:nth-child(2) {
@@ -1203,6 +1255,8 @@ input[type="range"]::-moz-range-thumb:hover {
     /* Custom select dropdown styles */
     .custom-select-wrapper {
         position: relative;
+        width: 100%;
+        flex-shrink: 0;
     }
     
     .custom-select-button {
@@ -1221,6 +1275,8 @@ input[type="range"]::-moz-range-thumb:hover {
         justify-content: space-between;
         transition: all 0.2s ease;
         line-height: 1.4;
+        min-height: 40px;
+        box-sizing: border-box;
     }
     
     .custom-select-button:hover {
@@ -1537,11 +1593,13 @@ input[type="range"]::-moz-range-thumb:hover {
         background: var(--bg-preview);
         border: none;
         border-radius: 10px;
+        margin-top: 0;
         margin-bottom: var(--spacing-sm);
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
+        flex-shrink: 0;
         cursor: pointer;
     }
     
@@ -1774,12 +1832,46 @@ input[type="range"]::-moz-range-thumb:hover {
         .form-header {
             display: flex;
             align-items: center;
-            gap: var(--spacing-sm);
+            gap: var(--spacing-md);
         }
         
         /* Улучшенные отступы для всех элементов форм */
         .form-group + .form-group {
             margin-top: 0;
+        }
+        
+        /* Убираем перекрытия для кнопок в группах */
+        .form-group > div[style*="display: flex"][style*="gap"] {
+            gap: var(--spacing-md) !important;
+            margin-top: var(--spacing-sm);
+            margin-bottom: 0;
+        }
+        
+        /* Правильные отступы для label после других элементов */
+        .form-group > label[style*="margin-top"] {
+            margin-top: var(--spacing-lg) !important;
+        }
+        
+        /* Убираем лишние отступы у элементов внутри form-group */
+        .form-group > * {
+            margin-left: 0;
+            margin-right: 0;
+        }
+        
+        /* Правильные отступы для кнопок */
+        .form-group > .btn,
+        .form-group > button {
+            margin-top: var(--spacing-sm);
+            margin-bottom: 0;
+        }
+        
+        /* Правильные отступы для textarea и input */
+        .form-group > textarea,
+        .form-group > input[type="text"],
+        .form-group > input[type="number"],
+        .form-group > input[type="range"] {
+            margin-top: 0;
+            margin-bottom: 0;
         }
         
         /* Улучшенное выравнивание текста */
@@ -1798,6 +1890,17 @@ input[type="range"]::-moz-range-thumb:hover {
         .input-group > * {
             flex-shrink: 0;
         }
+        
+        /* Убираем перекрытия для иконок в кнопках */
+        .btn .material-icons {
+            flex-shrink: 0;
+        }
+        
+        /* Правильные отступы для hint и других вспомогательных элементов */
+        .hint,
+        .hint-box {
+            margin-top: var(--spacing-sm);
+            margin-bottom: 0;
 }
 
 /* Стили для админки размеров */
@@ -1838,6 +1941,27 @@ input[type="range"]::-moz-range-thumb:hover {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   z-index: 2;
   overflow: hidden;
+}
+
+.sizes-admin-tab {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sizes-admin-tab:hover {
+  color: var(--text-primary);
+}
+
+.sizes-admin-tab.active {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
 }
 
 .sizes-admin-header {
@@ -1984,12 +2108,20 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 .btn-danger {
-  background: #e84033;
-  color: white;
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
 }
 
-.btn-danger:hover {
-  background: #d6362a;
+.btn-danger:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.25);
+  color: #ff5252;
+  border-color: rgba(255, 107, 107, 0.4);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-primary {

@@ -94,6 +94,9 @@ export const updateKVUI = () => {
   }
   
   // Обновляем состояние кнопки "Удалить"
+  const kvUploadBtn = document.getElementById('kvUploadBtn');
+  const kvReplaceBtn = document.getElementById('kvReplaceBtn');
+  
   if (kvRemoveBtn) {
     const hasKV = !!(kv || kvSelected);
     kvRemoveBtn.disabled = !hasKV;
@@ -104,6 +107,15 @@ export const updateKVUI = () => {
       kvRemoveBtn.style.opacity = '0.5';
       kvRemoveBtn.style.cursor = 'not-allowed';
     }
+  }
+  
+  // Показываем/скрываем кнопки "Загрузить" и "Заменить"
+  const hasKV = !!(kv || kvSelected);
+  if (kvUploadBtn) {
+    kvUploadBtn.style.display = hasKV ? 'none' : 'flex';
+  }
+  if (kvReplaceBtn) {
+    kvReplaceBtn.style.display = hasKV ? 'flex' : 'none';
   }
 };
 
@@ -126,7 +138,9 @@ export const handleKVUpload = (event) => {
       
       // Если это активная пара, обновляем глобальный KV
       if (activeIndex === (state.activePairIndex || 0)) {
-        setState({ kv: img, kvSelected: dataURL });
+        setState({ kv: img, kvSelected: dataURL, showKV: true });
+        const dom = getDom();
+        if (dom.showKV) dom.showKV.checked = true;
         updateKVUI();
         renderer.render();
       }
@@ -150,8 +164,10 @@ export const handlePairKVUpload = async (pairIndex, file) => {
     
     // Если это активная пара, обновляем глобальный KV
     const state = getState();
+    const dom = getDom();
     if (pairIndex === (state.activePairIndex || 0)) {
-      setState({ kv: img, kvSelected: dataURL });
+      setState({ kv: img, kvSelected: dataURL, showKV: true });
+      if (dom.showKV) dom.showKV.checked = true;
       updateKVUI();
     }
     
@@ -196,22 +212,32 @@ export const selectPreloadedKV = async (kvFile) => {
     return;
   }
   
-  // Иначе обновляем KV для активной пары (обычное поведение)
-  const activeIndex = state.activePairIndex || 0;
-  const pairs = state.titleSubtitlePairs || [];
-  if (pairs[activeIndex]) {
-    updatePairKV(activeIndex, kvFile || '');
-  }
-  
-  setState({ kvSelected: kvFile || '' });
-  updateKVTriggerText(kvFile || '');
-
   if (!kvFile) {
-    setState({ kv: null });
+    // Очищаем KV для активной пары
+    const activeIndex = state.activePairIndex || 0;
+    const pairs = state.titleSubtitlePairs || [];
+    if (pairs[activeIndex]) {
+      updatePairKV(activeIndex, '');
+    }
+    setState({ kv: null, kvSelected: '', showKV: false });
+    if (dom.showKV) dom.showKV.checked = false;
+    updateKVTriggerText('');
     updateKVUI();
     renderer.render();
     return;
   }
+  
+  // Иначе обновляем KV для активной пары (обычное поведение)
+  const activeIndex = state.activePairIndex || 0;
+  const pairs = state.titleSubtitlePairs || [];
+  if (pairs[activeIndex]) {
+    updatePairKV(activeIndex, kvFile);
+  }
+  
+  // Сначала устанавливаем kvSelected, чтобы UI обновился
+  setState({ kvSelected: kvFile, showKV: true });
+  if (dom.showKV) dom.showKV.checked = true;
+  updateKVTriggerText(kvFile);
 
   try {
     const img = await loadImage(kvFile);
@@ -219,8 +245,10 @@ export const selectPreloadedKV = async (kvFile) => {
     if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
       throw new Error(`Изображение не загружено: ${kvFile}`);
     }
-    setState({ kv: img });
+    // Обновляем оба поля: kv и kvSelected, и включаем показ KV
+    setState({ kv: img, kvSelected: kvFile, showKV: true });
     if (dom.kvSelect) dom.kvSelect.value = kvFile;
+    if (dom.showKV) dom.showKV.checked = true;
     updateKVUI();
     renderer.render();
   } catch (error) {
@@ -236,21 +264,25 @@ export const selectPreloadedKV = async (kvFile) => {
  */
 export const selectPairKV = async (pairIndex, kvFile) => {
   const state = getState();
+  const dom = getDom();
   updatePairKV(pairIndex, kvFile || '');
   
   // Если это активная пара, обновляем глобальный KV
   if (pairIndex === (state.activePairIndex || 0)) {
     if (!kvFile) {
-      setState({ kv: null, kvSelected: '' });
+      setState({ kv: null, kvSelected: '', showKV: false });
+      if (dom.showKV) dom.showKV.checked = false;
       updateKVUI();
     } else {
       try {
         const img = await loadImage(kvFile);
-        setState({ kv: img, kvSelected: kvFile });
+        setState({ kv: img, kvSelected: kvFile, showKV: true });
+        if (dom.showKV) dom.showKV.checked = true;
         updateKVUI();
       } catch (error) {
         console.error(error);
-        setState({ kv: null, kvSelected: '' });
+        setState({ kv: null, kvSelected: '', showKV: false });
+        if (dom.showKV) dom.showKV.checked = false;
         updateKVUI();
       }
     }
@@ -646,6 +678,16 @@ export const updateKVBorderRadius = (value) => {
     dom.kvBorderRadiusValue.textContent = `${numeric}%`;
   }
   renderer.render();
+};
+
+/**
+ * Выбирает позицию KV
+ * Эта функция перенаправляет вызов в ui.js, где находится основная логика
+ */
+export const selectKVPosition = (position) => {
+  if (typeof window.selectKVPosition === 'function') {
+    window.selectKVPosition(position);
+  }
 };
 
 // Экспортируем функции для использования в других модулях

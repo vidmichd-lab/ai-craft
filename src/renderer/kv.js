@@ -203,7 +203,17 @@ export const calculateVerticalKV = (state, width, height, paddingPx, titleBounds
     
     if (kvW < minKvSize && kvH < minKvSize) return null;
     
-    const kvX = paddingPx + (availableWidth - kvW) / 2;
+    // Применяем позицию KV (left, center, right)
+    const kvPosition = state.kvPosition || 'center';
+    let kvX;
+    if (kvPosition === 'left') {
+      kvX = paddingPx;
+    } else if (kvPosition === 'right') {
+      kvX = width - paddingPx - kvW;
+    } else {
+      // center (по умолчанию)
+      kvX = paddingPx + (availableWidth - kvW) / 2;
+    }
     const kvY = areaStart + (availHeight - kvH) / 2;
     return {
       kvW,
