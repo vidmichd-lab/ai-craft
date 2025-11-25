@@ -5,6 +5,14 @@
 import { LAYOUT_CONSTANTS } from './constants.js';
 
 /**
+ * Проверяет, является ли KV из папки photo
+ */
+const isPhotoKV = (state) => {
+  const kvPath = state.kvSelected || '';
+  return kvPath.includes('/photo/') || kvPath.startsWith('photo/');
+};
+
+/**
  * Вычисляет позицию и размер KV для супер-широких форматов
  */
 export const calculateSuperWideKV = (state, width, height, paddingPx, logoBounds, legalBlockHeight = 0) => {
@@ -14,16 +22,41 @@ export const calculateSuperWideKV = (state, width, height, paddingPx, logoBounds
   const legalReserved = (state.showLegal || state.showAge) ? legalBlockHeight : 0;
   const legalTop = height - paddingPx - legalReserved;
   const availableHeight = Math.max(0, legalTop - paddingPx);
+  const availableWidth = Math.max(0, width - paddingPx * 2);
   
   const logoRight = logoBounds ? logoBounds.x + logoBounds.width : paddingPx;
   const gap = Math.max(paddingPx * 0.5, width * 0.01);
   const minKvSize = LAYOUT_CONSTANTS.MIN_KV_SIZE;
+  const maxKvWidth = Math.max(minKvSize, width * LAYOUT_CONSTANTS.KV_MAX_WIDTH_RATIO);
   
-  // Используем максимально возможную высоту для KV с учетом legal
+  // Для KV из папки photo используем режим cover - заполняем все доступное пространство
+  if (isPhotoKV(state)) {
+    // Режим cover: заполняем всю доступную область с сохранением пропорций
+    const scaleByHeight = availableHeight > 0 ? availableHeight / state.kv.height : 0;
+    const scaleByWidth = maxKvWidth / state.kv.width;
+    let kvScale = Math.max(scaleByHeight, scaleByWidth); // Используем максимальный масштаб для cover
+    
+    let kvW = state.kv.width * kvScale;
+    let kvH = state.kv.height * kvScale;
+    
+    // Ограничиваем максимальной шириной
+    if (kvW > maxKvWidth) {
+      kvScale = maxKvWidth / state.kv.width;
+      kvW = maxKvWidth;
+      kvH = state.kv.height * kvScale;
+    }
+    
+    if (kvScale > 0) {
+      const kvX = width - paddingPx - kvW;
+      const kvY = legalTop - kvH;
+      return { kvX, kvY, kvW, kvH, kvScale, paddingPx };
+    }
+  }
+  
+  // Обычный режим: используем максимально возможную высоту для KV с учетом legal
   let kvScale = availableHeight > 0 ? availableHeight / state.kv.height : 0;
   let kvW = state.kv.width * kvScale;
   let kvH = state.kv.height * kvScale;
-  const maxKvWidth = Math.max(minKvSize, width * LAYOUT_CONSTANTS.KV_MAX_WIDTH_RATIO);
   
   if (kvW > maxKvWidth) {
     kvScale = maxKvWidth / state.kv.width;
@@ -79,14 +112,39 @@ export const calculateUltraWideKV = (state, width, height, paddingPx, legalBlock
   const legalReserved = (state.showLegal || state.showAge) ? legalBlockHeight : 0;
   const legalTop = height - paddingPx - legalReserved;
   const availableHeight = Math.max(0, legalTop - paddingPx);
+  const availableWidth = Math.max(0, width - paddingPx * 2);
   
   const minKvSize = LAYOUT_CONSTANTS.MIN_KV_SIZE;
+  const maxKvWidth = Math.max(minKvSize, width * LAYOUT_CONSTANTS.KV_MAX_WIDTH_RATIO);
   
-  // Используем максимально возможную высоту для KV с учетом legal
+  // Для KV из папки photo используем режим cover - заполняем все доступное пространство
+  if (isPhotoKV(state)) {
+    // Режим cover: заполняем всю доступную область с сохранением пропорций
+    const scaleByHeight = availableHeight > 0 ? availableHeight / state.kv.height : 0;
+    const scaleByWidth = maxKvWidth / state.kv.width;
+    let kvScale = Math.max(scaleByHeight, scaleByWidth); // Используем максимальный масштаб для cover
+    
+    let kvW = state.kv.width * kvScale;
+    let kvH = state.kv.height * kvScale;
+    
+    // Ограничиваем максимальной шириной
+    if (kvW > maxKvWidth) {
+      kvScale = maxKvWidth / state.kv.width;
+      kvW = maxKvWidth;
+      kvH = state.kv.height * kvScale;
+    }
+    
+    if (kvScale > 0) {
+      const kvX = width - paddingPx - kvW;
+      const kvY = legalTop - kvH;
+      return { kvX, kvY, kvW, kvH, kvScale, paddingPx };
+    }
+  }
+  
+  // Обычный режим: используем максимально возможную высоту для KV с учетом legal
   let kvScale = availableHeight > 0 ? availableHeight / state.kv.height : 0;
   let kvW = state.kv.width * kvScale;
   let kvH = state.kv.height * kvScale;
-  const maxKvWidth = Math.max(minKvSize, width * LAYOUT_CONSTANTS.KV_MAX_WIDTH_RATIO);
   
   if (kvW > maxKvWidth) {
     kvScale = maxKvWidth / state.kv.width;
@@ -153,25 +211,38 @@ export const calculateHorizontalKV = (state, width, height, paddingPx, legalBloc
 
   const maxKvWidth = Math.max(0, widthAfterPadding - minTextWidth - gap);
   if (maxKvWidth >= minKvSize) {
-    // Вычисляем масштаб с сохранением пропорций
-    // Используем минимальный масштаб из двух (по высоте и по ширине), чтобы KV поместилось
-    const scaleByHeight = availableHeight > 0 ? availableHeight / state.kv.height : 0;
-    const scaleByWidth = maxKvWidth / state.kv.width;
-    // Выбираем минимальный масштаб, чтобы KV поместилось в оба ограничения
-    const kvScale = Math.min(scaleByHeight, scaleByWidth);
-    
-    // Вычисляем размеры с сохранением пропорций
-    const kvW = state.kv.width * kvScale;
-    const kvH = state.kv.height * kvScale;
-    
-    // Проверяем минимальный размер KV
-    if (kvW >= minKvSize || kvH >= minKvSize) {
+    // Для KV из папки photo используем режим cover - заполняем все доступное пространство
+    if (isPhotoKV(state)) {
+      // Режим cover: заполняем всю доступную область с сохранением пропорций
+      const scaleByHeight = availableHeight > 0 ? availableHeight / state.kv.height : 0;
+      const scaleByWidth = maxKvWidth / state.kv.width;
+      const kvScale = Math.max(scaleByHeight, scaleByWidth); // Используем максимальный масштаб для cover
+      
+      const kvW = state.kv.width * kvScale;
+      const kvH = state.kv.height * kvScale;
+      
+      // Центрируем изображение в доступной области
       const kvX = width - paddingPx - kvW;
-      // Центрируем KV по вертикали в доступной области
       const kvY = paddingPx + (availableHeight - kvH) / 2;
       
       kvMeta = { kvX, kvY, kvW, kvH, kvScale, paddingPx };
       textWidth = Math.max(minTextWidth, widthAfterPadding - kvW - gap);
+    } else {
+      // Обычный режим: используем минимальный масштаб, чтобы KV поместилось
+      const scaleByHeight = availableHeight > 0 ? availableHeight / state.kv.height : 0;
+      const scaleByWidth = maxKvWidth / state.kv.width;
+      const kvScale = Math.min(scaleByHeight, scaleByWidth);
+      
+      const kvW = state.kv.width * kvScale;
+      const kvH = state.kv.height * kvScale;
+      
+      if (kvW >= minKvSize || kvH >= minKvSize) {
+        const kvX = width - paddingPx - kvW;
+        const kvY = paddingPx + (availableHeight - kvH) / 2;
+        
+        kvMeta = { kvX, kvY, kvW, kvH, kvScale, paddingPx };
+        textWidth = Math.max(minTextWidth, widthAfterPadding - kvW - gap);
+      }
     }
   }
 
@@ -184,25 +255,53 @@ export const calculateHorizontalKV = (state, width, height, paddingPx, legalBloc
 export const calculateVerticalKV = (state, width, height, paddingPx, titleBounds, subtitleBounds, logoBounds, legalBlockHeight) => {
   if (!state.showKV || !state.kv) return null;
   
-  const safeGapY = paddingPx * 0.5;
-  const availableWidth = Math.max(0, width - paddingPx * 2);
-  const textTop = titleBounds ? titleBounds.y : paddingPx;
-  const logoBottom = logoBounds ? logoBounds.y + logoBounds.height : paddingPx;
-  const topAreaStart = Math.max(paddingPx, logoBottom + safeGapY);
-  const topAreaEnd = Math.max(topAreaStart, textTop - safeGapY);
-  const topAreaHeight = Math.max(0, topAreaEnd - topAreaStart);
-
   const textBlockBottom = Math.max(
     titleBounds ? titleBounds.y + titleBounds.height : -Infinity,
     subtitleBounds ? subtitleBounds.y + subtitleBounds.height : -Infinity
   );
   
   const legalReserved = (state.showLegal || state.showAge) ? legalBlockHeight : 0;
-  const bottomAreaStart = textBlockBottom + safeGapY;
   const legalTop = height - paddingPx - legalReserved;
+  const safeGapY = paddingPx * 0.5;
+  const availableWidth = Math.max(0, width - paddingPx * 2);
+  const bottomAreaStart = textBlockBottom + safeGapY;
   const safeGapForLegal = Math.max(paddingPx * 0.5, 0);
   const bottomAreaEnd = Math.max(bottomAreaStart, legalTop - safeGapForLegal);
   const bottomAreaHeight = Math.max(0, bottomAreaEnd - bottomAreaStart);
+  
+  // Для KV из папки photo используем режим cover - заполняем все доступное пространство после текста
+  if (isPhotoKV(state) && bottomAreaHeight > 0 && availableWidth > 0) {
+    // Режим cover: заполняем всю доступную область с сохранением пропорций
+    const scaleByWidth = availableWidth / state.kv.width;
+    const scaleByHeight = bottomAreaHeight / state.kv.height;
+    const kvScale = Math.max(scaleByWidth, scaleByHeight); // Используем максимальный масштаб для cover
+    
+    const kvW = state.kv.width * kvScale;
+    const kvH = state.kv.height * kvScale;
+    
+    // Применяем позицию KV (left, center, right)
+    const kvPosition = state.kvPosition || 'center';
+    let kvX;
+    if (kvPosition === 'left') {
+      kvX = paddingPx;
+    } else if (kvPosition === 'right') {
+      kvX = width - paddingPx - kvW;
+    } else {
+      // center (по умолчанию)
+      kvX = paddingPx + (availableWidth - kvW) / 2;
+    }
+    
+    // Центрируем по вертикали в доступной области
+    const kvY = bottomAreaStart + (bottomAreaHeight - kvH) / 2;
+    
+    return { kvX, kvY, kvW, kvH, kvScale, paddingPx };
+  }
+  
+  const textTop = titleBounds ? titleBounds.y : paddingPx;
+  const logoBottom = logoBounds ? logoBounds.y + logoBounds.height : paddingPx;
+  const topAreaStart = Math.max(paddingPx, logoBottom + safeGapY);
+  const topAreaEnd = Math.max(topAreaStart, textTop - safeGapY);
+  const topAreaHeight = Math.max(0, topAreaEnd - topAreaStart);
 
   const minKvSize = LAYOUT_CONSTANTS.MIN_KV_SIZE;
   

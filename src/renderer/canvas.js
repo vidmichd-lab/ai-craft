@@ -171,7 +171,9 @@ class CanvasManager {
           if (ctx) {
             ctx.clearRect(0, 0, oldWidth, oldHeight);
           }
-          this.renderToCanvasFn(this.previewCanvasNarrow, narrowSize.width, narrowSize.height, state);
+          // Устанавливаем platform в state для правильной работы охранных полей
+          const renderState = { ...state, platform: narrowSize.platform || 'unknown' };
+          this.renderToCanvasFn(this.previewCanvasNarrow, narrowSize.width, narrowSize.height, renderState);
           const newWidth = this.previewCanvasNarrow.width;
           const newHeight = this.previewCanvasNarrow.height;
           console.log('Canvas narrow обновлен:', { 
@@ -228,7 +230,9 @@ class CanvasManager {
           if (ctx) {
             ctx.clearRect(0, 0, oldWidth, oldHeight);
           }
-          this.lastRenderMeta = this.renderToCanvasFn(this.previewCanvasWide, wideSize.width, wideSize.height, state);
+          // Устанавливаем platform в state для правильной работы охранных полей
+          const renderState = { ...state, platform: wideSize.platform || 'unknown' };
+          this.lastRenderMeta = this.renderToCanvasFn(this.previewCanvasWide, wideSize.width, wideSize.height, renderState);
           const newWidth = this.previewCanvasWide.width;
           const newHeight = this.previewCanvasWide.height;
           console.log('Canvas wide обновлен:', { 
@@ -273,7 +277,9 @@ class CanvasManager {
           if (ctx) {
             ctx.clearRect(0, 0, oldWidth, oldHeight);
           }
-          this.renderToCanvasFn(this.previewCanvasSquare, squareSize.width, squareSize.height, state);
+          // Устанавливаем platform в state для правильной работы охранных полей
+          const renderState = { ...state, platform: squareSize.platform || 'unknown' };
+          this.renderToCanvasFn(this.previewCanvasSquare, squareSize.width, squareSize.height, renderState);
           const newWidth = this.previewCanvasSquare.width;
           const newHeight = this.previewCanvasSquare.height;
           console.log('Canvas square обновлен:', { 
@@ -303,7 +309,9 @@ class CanvasManager {
       const size = sizes[this.currentPreviewIndex];
       if (size) {
         try {
-          this.lastRenderMeta = this.renderToCanvasFn(this.previewCanvas, size.width, size.height, state);
+          // Устанавливаем platform в state для правильной работы охранных полей
+          const renderState = { ...state, platform: size.platform || 'unknown' };
+          this.lastRenderMeta = this.renderToCanvasFn(this.previewCanvas, size.width, size.height, renderState);
           if (typeof setKey === 'function') {
             setKey('kvCanvasWidth', size.width);
             setKey('kvCanvasHeight', size.height);

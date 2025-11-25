@@ -7,6 +7,7 @@ import { AVAILABLE_FONTS, AVAILABLE_WEIGHTS, FONT_WEIGHT_TO_NAME, FONT_NAME_TO_W
 import { renderer } from '../../renderer.js';
 import { clearTextMeasurementCache } from '../../renderer/text.js';
 import { getDom } from '../domCache.js';
+import { withLoader } from '../../utils/loader.js';
 
 // Функция для получения доступных начертаний для конкретной гарнитуры
 export const getAvailableWeightsForFamily = (fontFamily) => {
@@ -55,15 +56,15 @@ export const updateWeightDropdown = (selectElement, fontFamily, currentWeight) =
   
   // Маппинг названий начертаний на русские описания
   const weightLabels = {
-    'Thin': 'Thin — Тонкий',
-    'ExtraLight': 'ExtraLight — Экстра-светлый',
-    'Light': 'Light — Светлый',
-    'Regular': 'Regular — Обычный',
-    'Medium': 'Medium — Средний',
-    'SemiBold': 'SemiBold — Полужирный',
-    'Bold': 'Bold — Жирный',
-    'Heavy': 'Heavy — Экстра-жирный',
-    'Black': 'Black — Чёрный'
+    'Thin': 'Thin',
+    'ExtraLight': 'ExtraLight',
+    'Light': 'Light',
+    'Regular': 'Regular',
+    'Medium': 'Medium',
+    'SemiBold': 'SemiBold',
+    'Bold': 'Bold',
+    'Heavy': 'Heavy',
+    'Black': 'Black'
   };
   
   // Добавляем только доступные начертания
@@ -109,15 +110,15 @@ export const updateCustomWeightDropdown = (dropdownElement, textElement, fontFam
   const selectedValue = shouldKeepCurrent ? currentValue : (availableWeights.includes('Regular') ? 'Regular' : availableWeights[0]);
   
   const weightLabels = {
-    'Thin': 'Thin — Тонкий',
-    'ExtraLight': 'ExtraLight — Экстра-светлый',
-    'Light': 'Light — Светлый',
-    'Regular': 'Regular — Обычный',
-    'Medium': 'Medium — Средний',
-    'SemiBold': 'SemiBold — Полужирный',
-    'Bold': 'Bold — Жирный',
-    'Heavy': 'Heavy — Экстра-жирный',
-    'Black': 'Black — Чёрный'
+    'Thin': 'Thin',
+    'ExtraLight': 'ExtraLight',
+    'Light': 'Light',
+    'Regular': 'Regular',
+    'Medium': 'Medium',
+    'SemiBold': 'SemiBold',
+    'Bold': 'Bold',
+    'Heavy': 'Heavy',
+    'Black': 'Black'
   };
   
   // Если в дропдауне уже есть опции (статические из HTML), обновляем их
@@ -135,10 +136,21 @@ export const updateCustomWeightDropdown = (dropdownElement, textElement, fontFam
         } else {
           option.classList.remove('selected');
         }
+        // Устанавливаем обработчик клика для каждой опции
+        option.onclick = () => {
+          textElement.textContent = option.textContent;
+          dropdownElement.querySelectorAll('.custom-select-option').forEach(opt => opt.classList.remove('selected'));
+          option.classList.add('selected');
+          dropdownElement.style.display = 'none';
+          closeAllFontDropdowns();
+          if (updateCallback) updateCallback(value);
+        };
       } else {
         // Скрываем недоступные опции
         option.style.display = 'none';
         option.classList.remove('selected');
+        // Удаляем обработчик для недоступных опций
+        option.onclick = null;
       }
     });
   } else {
@@ -292,46 +304,63 @@ export const updateCustomFontInfo = (fontType, fileName) => {
 const loadCustomFont = async (file, fontType) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const arrayBuffer = e.target.result;
-      const blob = new Blob([arrayBuffer], { type: file.type || 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      
-      // Определяем формат шрифта
-      let format = 'woff2';
-      if (file.name.endsWith('.woff')) format = 'woff';
-      else if (file.name.endsWith('.ttf')) format = 'truetype';
-      else if (file.name.endsWith('.otf')) format = 'opentype';
-      
-      // Создаем уникальное имя для шрифта
-      const fontName = `CustomFont_${fontType}_${Date.now()}`;
-      
-      // Создаем @font-face правило
-      const style = document.createElement('style');
-      style.id = `font-face-${fontType}`;
-      style.textContent = `
-        @font-face {
-          font-family: '${fontName}';
-          src: url('${url}') format('${format}');
-          font-display: swap;
+    reader.onload = async (e) => {
+      try {
+        const arrayBuffer = e.target.result;
+        
+        // Если шрифт не в формате WOFF2, показываем предупреждение
+        // (конвертация в браузере требует дополнительных библиотек)
+        const fileName = file.name.toLowerCase();
+        const isWoff2 = fileName.endsWith('.woff2');
+        
+        if (!isWoff2) {
+          console.warn(`Шрифт ${file.name} не в формате WOFF2. Рекомендуется конвертировать для лучшей производительности.`);
         }
-      `;
-      
-      // Удаляем старое правило, если есть
-      const oldStyle = document.getElementById(`font-face-${fontType}`);
-      if (oldStyle) {
-        oldStyle.remove();
-        // Освобождаем старый URL
-        const state = getState();
-        const oldUrl = state[`${fontType}CustomFont`];
-        if (oldUrl) {
-          URL.revokeObjectURL(oldUrl);
+        
+        const blob = new Blob([arrayBuffer], { 
+          type: isWoff2 ? 'font/woff2' : (file.type || 'application/octet-stream')
+        });
+        const url = URL.createObjectURL(blob);
+        
+        // Определяем формат шрифта
+        let format = 'woff2';
+        if (fileName.endsWith('.woff')) format = 'woff';
+        else if (fileName.endsWith('.ttf')) format = 'truetype';
+        else if (fileName.endsWith('.otf')) format = 'opentype';
+        else if (fileName.endsWith('.woff2')) format = 'woff2';
+        
+        // Создаем уникальное имя для шрифта
+        const fontName = `CustomFont_${fontType}_${Date.now()}`;
+        
+        // Создаем @font-face правило
+        const style = document.createElement('style');
+        style.id = `font-face-${fontType}`;
+        style.textContent = `
+          @font-face {
+            font-family: '${fontName}';
+            src: url('${url}') format('${format}');
+            font-display: swap;
+          }
+        `;
+        
+        // Удаляем старое правило, если есть
+        const oldStyle = document.getElementById(`font-face-${fontType}`);
+        if (oldStyle) {
+          oldStyle.remove();
+          // Освобождаем старый URL
+          const state = getState();
+          const oldUrl = state[`${fontType}CustomFont`];
+          if (oldUrl) {
+            URL.revokeObjectURL(oldUrl);
+          }
         }
+        
+        document.head.appendChild(style);
+        
+        resolve({ url, fontName, fileName: file.name });
+      } catch (error) {
+        reject(error);
       }
-      
-      document.head.appendChild(style);
-      
-      resolve({ url, fontName, fileName: file.name });
     };
     reader.onerror = reject;
     reader.readAsArrayBuffer(file);
@@ -351,15 +380,21 @@ export const handleTitleFontUpload = async (event) => {
   if (!file) return;
   
   try {
-    const { url, fontName, fileName } = await loadCustomFont(file, 'title');
-    setState({
-      titleCustomFont: url,
-      titleCustomFontName: fileName,
-      titleFontFamily: fontName
-    });
-    updateCustomFontInfo('title', fileName);
-    clearTextMeasurementCache();
-    renderer.render();
+    await withLoader(
+      async () => {
+        const { url, fontName, fileName } = await loadCustomFont(file, 'title');
+        setState({
+          titleCustomFont: url,
+          titleCustomFontName: fileName,
+          titleFontFamily: fontName
+        });
+        updateCustomFontInfo('title', fileName);
+        clearTextMeasurementCache();
+        renderer.render();
+      },
+      'Загрузка шрифта для заголовка...',
+      true
+    );
   } catch (error) {
     console.error('Ошибка загрузки шрифта:', error);
     alert('Ошибка загрузки шрифта');
@@ -374,15 +409,21 @@ export const handleSubtitleFontUpload = async (event) => {
   if (!file) return;
   
   try {
-    const { url, fontName, fileName } = await loadCustomFont(file, 'subtitle');
-    setState({
-      subtitleCustomFont: url,
-      subtitleCustomFontName: fileName,
-      subtitleFontFamily: fontName
-    });
-    updateCustomFontInfo('subtitle', fileName);
-    clearTextMeasurementCache();
-    renderer.render();
+    await withLoader(
+      async () => {
+        const { url, fontName, fileName } = await loadCustomFont(file, 'subtitle');
+        setState({
+          subtitleCustomFont: url,
+          subtitleCustomFontName: fileName,
+          subtitleFontFamily: fontName
+        });
+        updateCustomFontInfo('subtitle', fileName);
+        clearTextMeasurementCache();
+        renderer.render();
+      },
+      'Загрузка шрифта для подзаголовка...',
+      true
+    );
   } catch (error) {
     console.error('Ошибка загрузки шрифта:', error);
     alert('Ошибка загрузки шрифта');
@@ -396,15 +437,21 @@ export const handleLegalFontUpload = async (event) => {
   if (!file) return;
   
   try {
-    const { url, fontName, fileName } = await loadCustomFont(file, 'legal');
-    setState({
-      legalCustomFont: url,
-      legalCustomFontName: fileName,
-      legalFontFamily: fontName
-    });
-    updateCustomFontInfo('legal', fileName);
-    clearTextMeasurementCache();
-    renderer.render();
+    await withLoader(
+      async () => {
+        const { url, fontName, fileName } = await loadCustomFont(file, 'legal');
+        setState({
+          legalCustomFont: url,
+          legalCustomFontName: fileName,
+          legalFontFamily: fontName
+        });
+        updateCustomFontInfo('legal', fileName);
+        clearTextMeasurementCache();
+        renderer.render();
+      },
+      'Загрузка шрифта для лигала...',
+      true
+    );
   } catch (error) {
     console.error('Ошибка загрузки шрифта:', error);
     alert('Ошибка загрузки шрифта');
@@ -418,15 +465,21 @@ export const handleAgeFontUpload = async (event) => {
   if (!file) return;
   
   try {
-    const { url, fontName, fileName } = await loadCustomFont(file, 'age');
-    setState({
-      ageCustomFont: url,
-      ageCustomFontName: fileName,
-      ageFontFamily: fontName
-    });
-    updateCustomFontInfo('age', fileName);
-    clearTextMeasurementCache();
-    renderer.render();
+    await withLoader(
+      async () => {
+        const { url, fontName, fileName } = await loadCustomFont(file, 'age');
+        setState({
+          ageCustomFont: url,
+          ageCustomFontName: fileName,
+          ageFontFamily: fontName
+        });
+        updateCustomFontInfo('age', fileName);
+        clearTextMeasurementCache();
+        renderer.render();
+      },
+      'Загрузка шрифта для возраста...',
+      true
+    );
   } catch (error) {
     console.error('Ошибка загрузки шрифта:', error);
     alert('Ошибка загрузки шрифта');

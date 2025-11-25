@@ -1,15 +1,173 @@
+// Кэш для проверки существования файлов
+const fileExistsCache = new Map();
+
 // Функция для проверки существования файла (без ошибок в консоли)
-const checkFileExists = async (url) => {
-  try {
-    const response = await fetch(url, { 
-      method: 'HEAD',
-      cache: 'no-cache'
-    });
-    return response.ok;
-  } catch (error) {
-    // Игнорируем ошибки - файл не существует
-    return false;
+// Использует Image объект для изображений, чтобы избежать ошибок 404 в консоли
+export const checkFileExists = async (url) => {
+  // Проверяем кэш
+  if (fileExistsCache.has(url)) {
+    return fileExistsCache.get(url);
   }
+  
+  // Используем абсолютный URL, если передан относительный путь
+  const absoluteUrl = url.startsWith('http') ? url : new URL(url, window.location.origin).href;
+  
+  // Определяем, является ли файл изображением
+  const isImage = /\.(webp|jpg|jpeg|png|gif|svg|bmp|ico)$/i.test(url);
+  
+  if (isImage) {
+    // Для изображений используем Image объект, который не выводит ошибки в консоль
+    return new Promise((resolve) => {
+      const img = new Image();
+      let resolved = false;
+      
+      const cleanup = () => {
+        img.onload = null;
+        img.onerror = null;
+        img.src = '';
+      };
+      
+      const timeoutId = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          const exists = false;
+          fileExistsCache.set(url, exists);
+          resolve(exists);
+        }
+      }, 2000); // Таймаут 2 секунды
+      
+      img.onload = () => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeoutId);
+          cleanup();
+          const exists = true;
+          fileExistsCache.set(url, exists);
+          resolve(exists);
+        }
+      };
+      
+      img.onerror = () => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeoutId);
+          cleanup();
+          const exists = false;
+          fileExistsCache.set(url, exists);
+          resolve(exists);
+        }
+      };
+      
+      // Начинаем загрузку
+      img.src = absoluteUrl;
+    });
+  } else {
+    // Для не-изображений используем fetch (например, для шрифтов)
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // Таймаут 2 секунды
+      
+      const response = await fetch(absoluteUrl, { 
+        method: 'HEAD',
+        cache: 'default',
+        mode: 'cors',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      const exists = response.ok;
+      fileExistsCache.set(url, exists);
+      return exists;
+    } catch (error) {
+      // Игнорируем все ошибки (404, таймаут, сетевые ошибки) - файл не существует
+      const exists = false;
+      fileExistsCache.set(url, exists);
+      return exists;
+    }
+  }
+};
+
+/**
+ * Умная проверка файлов с ранней остановкой
+ * Проверяет файлы последовательно и останавливается, если несколько подряд не найдены
+ */
+export const checkFilesSmart = async (basePath, startNum = 1, endNum = 99, maxConsecutiveMisses = 5) => {
+  const foundFiles = [];
+  let consecutiveMisses = 0;
+  
+  // Сначала проверяем первые несколько файлов, чтобы понять, есть ли вообще файлы в папке
+  const quickCheckPromises = [];
+  for (let i = startNum; i <= Math.min(startNum + 4, endNum); i++) {
+    const num = i.toString().padStart(2, '0');
+    quickCheckPromises.push(
+      checkFileExists(`${basePath}/${num}.webp`).then(exists => ({ num, ext: 'webp', exists, index: i })),
+      checkFileExists(`${basePath}/${num}.jpg`).then(exists => ({ num, ext: 'jpg', exists, index: i })),
+      checkFileExists(`${basePath}/${num}.jpeg`).then(exists => ({ num, ext: 'jpeg', exists, index: i }))
+    );
+  }
+  
+  const quickResults = await Promise.all(quickCheckPromises);
+  let hasAnyFiles = false;
+  
+  // Обрабатываем результаты быстрой проверки
+  for (let k = 0; k < quickResults.length; k += 3) {
+    const webpResult = quickResults[k];
+    const jpgResult = quickResults[k + 1];
+    const jpegResult = quickResults[k + 2];
+    
+    if (webpResult.exists) {
+      foundFiles.push({ name: webpResult.num, file: `${basePath}/${webpResult.num}.webp` });
+      hasAnyFiles = true;
+      consecutiveMisses = 0;
+    } else if (jpgResult.exists) {
+      foundFiles.push({ name: jpgResult.num, file: `${basePath}/${jpgResult.num}.jpg` });
+      hasAnyFiles = true;
+      consecutiveMisses = 0;
+    } else if (jpegResult.exists) {
+      foundFiles.push({ name: jpegResult.num, file: `${basePath}/${jpegResult.num}.jpeg` });
+      hasAnyFiles = true;
+      consecutiveMisses = 0;
+    } else {
+      consecutiveMisses++;
+    }
+  }
+  
+  // Если в быстрой проверке не найдено ни одного файла, прекращаем поиск
+  if (!hasAnyFiles) {
+    return foundFiles;
+  }
+  
+  // Продолжаем проверку остальных файлов с ранней остановкой
+  for (let i = startNum + 5; i <= endNum; i++) {
+    const num = i.toString().padStart(2, '0');
+    
+    // Проверяем файлы параллельно
+    const [webpExists, jpgExists, jpegExists] = await Promise.all([
+      checkFileExists(`${basePath}/${num}.webp`),
+      checkFileExists(`${basePath}/${num}.jpg`),
+      checkFileExists(`${basePath}/${num}.jpeg`)
+    ]);
+    
+    if (webpExists) {
+      foundFiles.push({ name: num, file: `${basePath}/${num}.webp` });
+      consecutiveMisses = 0;
+    } else if (jpgExists) {
+      foundFiles.push({ name: num, file: `${basePath}/${num}.jpg` });
+      consecutiveMisses = 0;
+    } else if (jpegExists) {
+      foundFiles.push({ name: num, file: `${basePath}/${num}.jpeg` });
+      consecutiveMisses = 0;
+    } else {
+      consecutiveMisses++;
+      // Если несколько файлов подряд не найдены, прекращаем проверку
+      if (consecutiveMisses >= maxConsecutiveMisses) {
+        break;
+      }
+    }
+  }
+  
+  return foundFiles;
 };
 
 // Сканирование логотипов из папки logo/ с динамическим обнаружением структуры (аналогично scanKV)
@@ -38,75 +196,24 @@ export const scanLogos = async () => {
     // Определяем путь в зависимости от наличия folder2
     const basePath = folder2 ? `logo/${folder1}/${folder2}/${folder3}` : `logo/${folder1}/${folder3}`;
     
-    // Проверяем именованные файлы
+    // Проверяем только именованные SVG файлы (PNG и числовые файлы не используются в проекте)
     const namedFilePromises = [];
     for (const name of knownNames) {
       namedFilePromises.push(
-        checkFileExists(`${basePath}/${name}.svg`).then(exists => ({ name, exists, ext: 'svg' })),
-        checkFileExists(`${basePath}/${name}.png`).then(exists => ({ name, exists, ext: 'png' }))
+        checkFileExists(`${basePath}/${name}.svg`).then(exists => ({ name, exists, ext: 'svg' }))
       );
     }
     
     const namedResults = await Promise.all(namedFilePromises);
-    let foundAny = false;
     
-    for (let i = 0; i < namedResults.length; i += 2) {
-      const svgResult = namedResults[i];
-      const pngResult = namedResults[i + 1];
-      
-      if (svgResult.exists) {
+    for (const result of namedResults) {
+      if (result.exists) {
         const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
         const folder2Name = folder2 ? folder2.charAt(0).toUpperCase() + folder2.slice(1) : '';
         const folder3Name = folder3.toUpperCase();
-        const displayName = svgResult.name.charAt(0).toUpperCase() + svgResult.name.slice(1).replace(/_/g, ' ');
+        const displayName = result.name.charAt(0).toUpperCase() + result.name.slice(1).replace(/_/g, ' ');
         const displayPath = folder2 ? `${folder1Name} / ${folder2Name} / ${folder3Name} / ${displayName}` : `${folder1Name} / ${folder3Name} / ${displayName}`;
-        folderFiles.push({ name: displayPath, file: `${basePath}/${svgResult.name}.svg` });
-        foundAny = true;
-      } else if (pngResult.exists) {
-        const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-        const folder2Name = folder2 ? folder2.charAt(0).toUpperCase() + folder2.slice(1) : '';
-        const folder3Name = folder3.toUpperCase();
-        const displayName = pngResult.name.charAt(0).toUpperCase() + pngResult.name.slice(1).replace(/_/g, ' ');
-        const displayPath = folder2 ? `${folder1Name} / ${folder2Name} / ${folder3Name} / ${displayName}` : `${folder1Name} / ${folder3Name} / ${displayName}`;
-        folderFiles.push({ name: displayPath, file: `${basePath}/${pngResult.name}.png` });
-        foundAny = true;
-      }
-    }
-    
-    // Проверяем числовые файлы (01-99)
-    if (foundAny) {
-      for (let batchStart = 1; batchStart <= 99; batchStart += 10) {
-        const batchEnd = Math.min(batchStart + 9, 99);
-        const batchPromises = [];
-        
-        for (let i = batchStart; i <= batchEnd; i++) {
-          const num = i.toString().padStart(2, '0');
-          batchPromises.push(
-            checkFileExists(`${basePath}/${num}.svg`).then(exists => ({ num, exists, ext: 'svg' })),
-            checkFileExists(`${basePath}/${num}.png`).then(exists => ({ num, exists, ext: 'png' }))
-          );
-        }
-        
-        const batchResults = await Promise.all(batchPromises);
-        
-        for (let i = 0; i < batchResults.length; i += 2) {
-          const svgResult = batchResults[i];
-          const pngResult = batchResults[i + 1];
-          
-          if (svgResult.exists) {
-            const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-            const folder2Name = folder2 ? folder2.charAt(0).toUpperCase() + folder2.slice(1) : '';
-            const folder3Name = folder3.toUpperCase();
-            const displayPath = folder2 ? `${folder1Name} / ${folder2Name} / ${folder3Name} / ${svgResult.num}` : `${folder1Name} / ${folder3Name} / ${svgResult.num}`;
-            folderFiles.push({ name: displayPath, file: `${basePath}/${svgResult.num}.svg` });
-          } else if (pngResult.exists) {
-            const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-            const folder2Name = folder2 ? folder2.charAt(0).toUpperCase() + folder2.slice(1) : '';
-            const folder3Name = folder3.toUpperCase();
-            const displayPath = folder2 ? `${folder1Name} / ${folder2Name} / ${folder3Name} / ${pngResult.num}` : `${folder1Name} / ${folder3Name} / ${pngResult.num}`;
-            folderFiles.push({ name: displayPath, file: `${basePath}/${pngResult.num}.png` });
-          }
-        }
+        folderFiles.push({ name: displayPath, file: `${basePath}/${result.name}.svg` });
       }
     }
     
@@ -120,99 +227,22 @@ export const scanLogos = async () => {
     // Список известных именованных файлов для проверки
     const knownNames = ['main', 'main_mono', 'mono', 'long', 'logo', 'long_logo', 'black', 'white', 'icon', 'symbol', 'mark', 'emblem'];
     
-    // Сначала проверяем именованные файлы
+    // Проверяем только именованные SVG файлы (PNG и числовые файлы не используются в проекте)
     const namedFilePromises = [];
     for (const name of knownNames) {
       namedFilePromises.push(
-        checkFileExists(`logo/${folder1}/${folder2}/${name}.svg`).then(exists => ({ name, exists, ext: 'svg' })),
-        checkFileExists(`logo/${folder1}/${folder2}/${name}.png`).then(exists => ({ name, exists, ext: 'png' }))
+        checkFileExists(`logo/${folder1}/${folder2}/${name}.svg`).then(exists => ({ name, exists, ext: 'svg' }))
       );
     }
     
     const namedResults = await Promise.all(namedFilePromises);
-    let foundAny = false;
     
-    for (let i = 0; i < namedResults.length; i += 2) {
-      const svgResult = namedResults[i];
-      const pngResult = namedResults[i + 1];
-      
-      if (svgResult.exists) {
+    for (const result of namedResults) {
+      if (result.exists) {
         const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
         const folder2Name = folder2.charAt(0).toUpperCase() + folder2.slice(1);
-        const displayName = svgResult.name.charAt(0).toUpperCase() + svgResult.name.slice(1).replace(/_/g, ' ');
-        folderFiles.push({ name: `${folder1Name} / ${folder2Name} / ${displayName}`, file: `logo/${folder1}/${folder2}/${svgResult.name}.svg` });
-        foundAny = true;
-      } else if (pngResult.exists) {
-        const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-        const folder2Name = folder2.charAt(0).toUpperCase() + folder2.slice(1);
-        const displayName = pngResult.name.charAt(0).toUpperCase() + pngResult.name.slice(1).replace(/_/g, ' ');
-        folderFiles.push({ name: `${folder1Name} / ${folder2Name} / ${displayName}`, file: `logo/${folder1}/${folder2}/${pngResult.name}.png` });
-        foundAny = true;
-      }
-    }
-    
-    // Затем проверяем числовые файлы (01-99)
-    const quickCheckPromises = [];
-    for (let i = 1; i <= 10; i++) {
-      const num = i.toString().padStart(2, '0');
-      quickCheckPromises.push(
-        checkFileExists(`logo/${folder1}/${folder2}/${num}.svg`),
-        checkFileExists(`logo/${folder1}/${folder2}/${num}.png`)
-      );
-    }
-    
-    const quickCheckResults = await Promise.all(quickCheckPromises);
-    
-    // Проверяем результаты быстрой проверки
-    for (let i = 0; i < 10; i++) {
-      const svgExists = quickCheckResults[i * 2];
-      const pngExists = quickCheckResults[i * 2 + 1];
-      const num = (i + 1).toString().padStart(2, '0');
-      
-      if (svgExists) {
-        const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-        const folder2Name = folder2.charAt(0).toUpperCase() + folder2.slice(1);
-        folderFiles.push({ name: `${folder1Name} / ${folder2Name} / ${num}`, file: `logo/${folder1}/${folder2}/${num}.svg` });
-        foundAny = true;
-      } else if (pngExists) {
-        const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-        const folder2Name = folder2.charAt(0).toUpperCase() + folder2.slice(1);
-        folderFiles.push({ name: `${folder1Name} / ${folder2Name} / ${num}`, file: `logo/${folder1}/${folder2}/${num}.png` });
-        foundAny = true;
-      }
-    }
-    
-    // Если нашли хотя бы один файл, сканируем остальные
-    if (foundAny) {
-      // Сканируем файлы 11-99 батчами для оптимизации
-      for (let batchStart = 11; batchStart <= 99; batchStart += 10) {
-        const batchEnd = Math.min(batchStart + 9, 99);
-        const batchPromises = [];
-        
-        for (let i = batchStart; i <= batchEnd; i++) {
-          const num = i.toString().padStart(2, '0');
-          batchPromises.push(
-            checkFileExists(`logo/${folder1}/${folder2}/${num}.svg`).then(exists => ({ num, exists, ext: 'svg' })),
-            checkFileExists(`logo/${folder1}/${folder2}/${num}.png`).then(exists => ({ num, exists, ext: 'png' }))
-          );
-        }
-        
-        const batchResults = await Promise.all(batchPromises);
-        
-        for (let i = 0; i < batchResults.length; i += 2) {
-          const svgResult = batchResults[i];
-          const pngResult = batchResults[i + 1];
-          
-          if (svgResult.exists) {
-            const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-            const folder2Name = folder2.charAt(0).toUpperCase() + folder2.slice(1);
-            folderFiles.push({ name: `${folder1Name} / ${folder2Name} / ${svgResult.num}`, file: `logo/${folder1}/${folder2}/${svgResult.num}.svg` });
-          } else if (pngResult.exists) {
-            const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-            const folder2Name = folder2.charAt(0).toUpperCase() + folder2.slice(1);
-            folderFiles.push({ name: `${folder1Name} / ${folder2Name} / ${pngResult.num}`, file: `logo/${folder1}/${folder2}/${pngResult.num}.png` });
-          }
-        }
+        const displayName = result.name.charAt(0).toUpperCase() + result.name.slice(1).replace(/_/g, ' ');
+        folderFiles.push({ name: `${folder1Name} / ${folder2Name} / ${displayName}`, file: `logo/${folder1}/${folder2}/${result.name}.svg` });
       }
     }
     
@@ -301,67 +331,35 @@ export const scanLogos = async () => {
   });
   
   // Также проверяем файлы в одноуровневой структуре (logo/folder1/file) для обратной совместимости
+  // Только SVG файлы (PNG не используются в проекте)
   const knownLogoFiles = [
-    'black.svg', 'black.png',
-    'long_black.svg', 'long_black.png',
-    'long_white.svg', 'long_white.png',
-    'white.svg', 'white.png',
-    'logo.svg', 'logo.png',
-    'long_logo.svg', 'long_logo.png',
-    'main.svg', 'main.png',
-    'main_mono.svg', 'main_mono.png',
-    'mono.svg', 'mono.png',
-    'long.svg', 'long.png',
-    'icon.svg', 'icon.png',
-    'symbol.svg', 'symbol.png',
-    'mark.svg', 'mark.png',
-    'emblem.svg', 'emblem.png'
+    'black.svg',
+    'long_black.svg',
+    'long_white.svg',
+    'white.svg',
+    'logo.svg',
+    'long_logo.svg',
+    'main.svg',
+    'main_mono.svg',
+    'mono.svg',
+    'long.svg',
+    'icon.svg',
+    'symbol.svg',
+    'mark.svg',
+    'emblem.svg'
   ];
   
   for (const folder1 of firstLevelFolders) {
-    // Проверяем известные файлы
+    // Проверяем только известные SVG файлы
     for (const filename of knownLogoFiles) {
       const file = `logo/${folder1}/${filename}`;
       const exists = await checkFileExists(file);
       if (exists) {
-        const baseName = filename.replace(/\.(svg|png)$/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const baseName = filename.replace(/\.svg$/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
         const name = `${folder1Name} / ${baseName}`;
         if (!logos.find(l => l.file === file)) {
           logos.push({ name, file });
-        }
-      }
-    }
-    
-    // Проверяем числовые файлы в одноуровневой структуре (батчами для оптимизации)
-    for (let batchStart = 1; batchStart <= 99; batchStart += 10) {
-      const batchEnd = Math.min(batchStart + 9, 99);
-      const batchPromises = [];
-      
-      for (let i = batchStart; i <= batchEnd; i++) {
-        const num = i.toString().padStart(2, '0');
-        batchPromises.push(
-          checkFileExists(`logo/${folder1}/${num}.svg`).then(exists => ({ num, exists, ext: 'svg' })),
-          checkFileExists(`logo/${folder1}/${num}.png`).then(exists => ({ num, exists, ext: 'png' }))
-        );
-      }
-      
-      const batchResults = await Promise.all(batchPromises);
-      
-      for (let i = 0; i < batchResults.length; i += 2) {
-        const svgResult = batchResults[i];
-        const pngResult = batchResults[i + 1];
-        
-        if (svgResult.exists) {
-          const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-          if (!logos.find(l => l.file === `logo/${folder1}/${svgResult.num}.svg`)) {
-            logos.push({ name: `${folder1Name} / ${svgResult.num}`, file: `logo/${folder1}/${svgResult.num}.svg` });
-          }
-        } else if (pngResult.exists) {
-          const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-          if (!logos.find(l => l.file === `logo/${folder1}/${pngResult.num}.png`)) {
-            logos.push({ name: `${folder1Name} / ${pngResult.num}`, file: `logo/${folder1}/${pngResult.num}.png` });
-          }
         }
       }
     }
@@ -390,103 +388,54 @@ export const scanKV = async () => {
     // Если folder1 пустой, проверяем assets/folder2/
     const basePath = folder1 ? `assets/${folder1}/${folder2}` : `assets/${folder2}`;
     
-    // Проверяем первые несколько файлов, чтобы понять, существует ли папка
-    // Проверяем числовые файлы (01-10)
-    for (let i = 1; i <= 10; i++) {
+    // Проверяем только первые 3 файла параллельно для быстрой проверки
+    // Если ни один не найден, папка скорее всего не существует
+    const quickCheckPromises = [];
+    for (let i = 1; i <= 3; i++) {
       const num = i.toString().padStart(2, '0');
-      const pngExists = await checkFileExists(`${basePath}/${num}.png`);
-      const jpgExists = await checkFileExists(`${basePath}/${num}.jpg`);
-      if (pngExists || jpgExists) {
+      quickCheckPromises.push(
+        checkFileExists(`${basePath}/${num}.webp`),
+        checkFileExists(`${basePath}/${num}.jpg`)
+      );
+    }
+    
+    const quickResults = await Promise.all(quickCheckPromises);
+    
+    // Проверяем результаты
+    for (let i = 0; i < quickResults.length; i += 2) {
+      if (quickResults[i] || quickResults[i + 1]) {
         return true;
       }
     }
-    // Также проверяем некоторые распространенные имена файлов
-    const commonNames = ['01', '1', 'image', 'img', 'photo', 'pic', 'picture'];
+    
+    // Если первые 3 файла не найдены, проверяем еще несколько распространенных имен
+    const commonNames = ['01', '1'];
+    const commonCheckPromises = [];
     for (const name of commonNames) {
-      const pngExists = await checkFileExists(`${basePath}/${name}.png`);
-      const jpgExists = await checkFileExists(`${basePath}/${name}.jpg`);
-      const jpegExists = await checkFileExists(`${basePath}/${name}.jpeg`);
-      if (pngExists || jpgExists || jpegExists) {
+      commonCheckPromises.push(
+        checkFileExists(`${basePath}/${name}.webp`),
+        checkFileExists(`${basePath}/${name}.jpg`)
+      );
+    }
+    
+    const commonResults = await Promise.all(commonCheckPromises);
+    for (let i = 0; i < commonResults.length; i += 2) {
+      if (commonResults[i] || commonResults[i + 1]) {
         return true;
       }
     }
+    
     return false;
   };
   
   // Функция для сканирования файлов в папке
   const scanFolder = async (folder1, folder2) => {
-    const folderFiles = [];
+    const basePath = folder1 ? `assets/${folder1}/${folder2}` : `assets/${folder2}`;
     
-    // Сначала проверяем первые 10 файлов, чтобы понять, существует ли папка
-    let foundAny = false;
-    const quickCheckPromises = [];
-    
-    for (let i = 1; i <= 10; i++) {
-      const num = i.toString().padStart(2, '0');
-      quickCheckPromises.push(
-        checkFileExists(`assets/${folder1}/${folder2}/${num}.png`),
-        checkFileExists(`assets/${folder1}/${folder2}/${num}.jpg`),
-        checkFileExists(`assets/${folder1}/${folder2}/${num}.jpeg`)
-      );
-    }
-    
-    const quickCheckResults = await Promise.all(quickCheckPromises);
-    
-    // Проверяем результаты быстрой проверки
-    for (let i = 0; i < 10; i++) {
-      const pngExists = quickCheckResults[i * 3];
-      const jpgExists = quickCheckResults[i * 3 + 1];
-      const jpegExists = quickCheckResults[i * 3 + 2];
-      const num = (i + 1).toString().padStart(2, '0');
-      
-      if (pngExists) {
-        folderFiles.push({ name: num, file: `assets/${folder1}/${folder2}/${num}.png` });
-        foundAny = true;
-      } else if (jpgExists) {
-        folderFiles.push({ name: num, file: `assets/${folder1}/${folder2}/${num}.jpg` });
-        foundAny = true;
-      } else if (jpegExists) {
-        folderFiles.push({ name: num, file: `assets/${folder1}/${folder2}/${num}.jpeg` });
-        foundAny = true;
-      }
-    }
-    
-    // Если нашли хотя бы один файл, сканируем остальные
-    if (foundAny) {
-      // Сканируем файлы 11-99 батчами для оптимизации
-      for (let batchStart = 11; batchStart <= 99; batchStart += 10) {
-        const batchEnd = Math.min(batchStart + 9, 99);
-        const batchPromises = [];
-        
-        for (let i = batchStart; i <= batchEnd; i++) {
-          const num = i.toString().padStart(2, '0');
-          batchPromises.push(
-            checkFileExists(`assets/${folder1}/${folder2}/${num}.png`).then(exists => ({ num, exists, ext: 'png' })),
-            checkFileExists(`assets/${folder1}/${folder2}/${num}.jpg`).then(exists => ({ num, exists, ext: 'jpg' })),
-            checkFileExists(`assets/${folder1}/${folder2}/${num}.jpeg`).then(exists => ({ num, exists, ext: 'jpeg' }))
-          );
-        }
-        
-        const batchResults = await Promise.all(batchPromises);
-        
-        for (let i = 0; i < batchResults.length; i += 3) {
-          const pngResult = batchResults[i];
-          const jpgResult = batchResults[i + 1];
-          const jpegResult = batchResults[i + 2];
-          
-          if (pngResult.exists) {
-            folderFiles.push({ name: pngResult.num, file: `assets/${folder1}/${folder2}/${pngResult.num}.png` });
-          } else if (jpgResult.exists) {
-            folderFiles.push({ name: jpgResult.num, file: `assets/${folder1}/${folder2}/${jpgResult.num}.jpg` });
-          } else if (jpegResult.exists) {
-            folderFiles.push({ name: jpegResult.num, file: `assets/${folder1}/${folder2}/${jpegResult.num}.jpeg` });
-          }
-        }
-      }
-    }
-    
-    return folderFiles;
+    // Используем умную проверку файлов с ранней остановкой
+    return await checkFilesSmart(basePath, 1, 99, 5);
   };
+  
   
   // Сканируем каждую папку первого уровня
   for (const folder1 of firstLevelFolders) {
@@ -635,8 +584,9 @@ export const scanFonts = async () => {
     'Yandex Serif Display'
   ];
   
-  // Известные расширения шрифтов
-  const fontExtensions = ['ttf', 'otf', 'woff', 'woff2'];
+  // Известные расширения шрифтов (только woff2 для оптимизации, ttf как fallback)
+  // Проверяем сначала woff2 (оптимальный формат), затем ttf если woff2 нет
+  const fontExtensions = ['woff2', 'ttf'];
   
   // Известные начертания для проверки
   const knownWeights = ['Thin', 'Light', 'Regular', 'Medium', 'Bold', 'Heavy', 'Black'];
@@ -648,10 +598,10 @@ export const scanFonts = async () => {
     const fontFamily = folder;
     
     // Сканируем файлы в папке
-    // Проверяем известные начертания с дефисом и пробелами
+    // Проверяем только формат с дефисом (как в проекте): "YS Text-Regular.woff2"
     const fontPromises = [];
     
-    // Формат с дефисом: "YS Text-Regular.ttf"
+    // Формат с дефисом: "YS Text-Regular.woff2"
     for (const weightName of allKnownWeights) {
       for (const ext of fontExtensions) {
         const fileName = `${fontFamily}-${weightName}.${ext}`;
@@ -664,24 +614,6 @@ export const scanFonts = async () => {
             weightName,
             ext,
             format: 'hyphen'
-          }))
-        );
-      }
-    }
-    
-    // Формат с пробелом: "YS Text Regular.ttf"
-    for (const weightName of allKnownWeights) {
-      for (const ext of fontExtensions) {
-        const fileName = `${fontFamily} ${weightName}.${ext}`;
-        const filePath = `font/${folder}/${fileName}`;
-        fontPromises.push(
-          checkFileExists(filePath).then(exists => ({
-            exists,
-            fileName,
-            filePath,
-            weightName,
-            ext,
-            format: 'space'
           }))
         );
       }
@@ -713,11 +645,14 @@ export const scanFonts = async () => {
         const parsed = parseFontFileName(result.fileName, fontFamily);
         const key = `${fontFamily}-${parsed.weight}-${parsed.style}`;
         
-        // Если такой шрифт уже найден, пропускаем (приоритет: woff2 > woff > ttf > otf)
+        // Если такой шрифт уже найден, пропускаем (приоритет: woff2 > ttf)
+        // WOFF2 имеет наивысший приоритет для лучшей производительности
         if (foundFonts.has(key)) {
           const existing = foundFonts.get(key);
-          const extPriority = { woff2: 4, woff: 3, ttf: 2, otf: 1 };
-          if (extPriority[result.ext] > extPriority[existing.ext]) {
+          const extPriority = { woff2: 2, ttf: 1 };
+          const currentPriority = extPriority[result.ext] || 0;
+          const existingPriority = extPriority[existing.ext] || 0;
+          if (currentPriority > existingPriority) {
             foundFonts.set(key, { ...result, ...parsed });
           }
         } else {

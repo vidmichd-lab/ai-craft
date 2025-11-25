@@ -5,67 +5,142 @@ const TITLE_SUBTITLE_RATIO = 1 / 2;
 
 const cloneDeep = (value) => JSON.parse(JSON.stringify(value));
 
-const createTitleSubtitlePair = (index = 0) => ({
-  id: `pair-${Date.now()}-${index}`,
-  title: index === 0 ? 'Курс «Frontend-разработчик» от Практикума' : '',
-  subtitle: index === 0 ? 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев' : '',
-  kvSelected: index === 0 ? 'assets/3d/sign/01.png' : '', // KV для этой пары
-  bgImageSelected: null, // Фоновое изображение для этой пары
-});
+const createTitleSubtitlePair = (index = 0, baseState = null) => {
+  const brandName = (baseState && baseState.brandName) || 'Практикума';
+  
+  // Получаем значения по умолчанию из localStorage, если есть
+  let defaultTitle = `Курс «Frontend-разработчик» от ${brandName}`;
+  let defaultSubtitle = 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев';
+  let defaultKV = 'assets/3d/sign/01.webp';
+  
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('default-values');
+      if (saved) {
+        const savedDefaults = JSON.parse(saved);
+        if (savedDefaults.title) defaultTitle = savedDefaults.title;
+        if (savedDefaults.subtitle) defaultSubtitle = savedDefaults.subtitle;
+        if (savedDefaults.kvSelected) defaultKV = savedDefaults.kvSelected;
+      }
+    } catch (e) {
+      // Игнорируем ошибки
+    }
+  }
+  
+  return {
+    id: `pair-${Date.now()}-${index}`,
+    title: index === 0 ? defaultTitle : '',
+    subtitle: index === 0 ? defaultSubtitle : '',
+    kvSelected: index === 0 ? defaultKV : '', // KV для этой пары
+    bgImageSelected: null, // Фоновое изображение для этой пары
+    bgColor: (baseState && baseState.bgColor) || '#1e1e1e'
+  };
+};
 
 const createInitialState = () => {
   // Получаем размеры из конфига (или дефолтные, если еще не загружены)
   const sizes = getPresetSizes();
+  // Получаем brandName из localStorage, если есть
+  const savedBrandName = typeof localStorage !== 'undefined' ? localStorage.getItem('brandName') : null;
+  const brandName = savedBrandName || 'Практикума';
+  
+  // Загружаем значения по умолчанию из localStorage (если есть)
+  let savedDefaults = null;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('default-values');
+      if (saved) {
+        savedDefaults = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Ошибка при загрузке default-values из localStorage:', e);
+    }
+  }
+  
+  // Функция-хелпер для получения значения из savedDefaults или дефолтного значения
+  const getValue = (key, defaultValue) => {
+    if (savedDefaults && savedDefaults.hasOwnProperty(key)) {
+      return savedDefaults[key];
+    }
+    return defaultValue;
+  };
+  
+  // Загружаем пользовательские охранные области из localStorage
+  let userSafeAreas = null;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('user-safe-areas');
+      if (saved) {
+        userSafeAreas = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Ошибка при загрузке user-safe-areas из localStorage:', e);
+    }
+  }
+  
+  // Загружаем множители размера логотипа из localStorage
+  let logoSizeMultipliers = null;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('logoSizeMultipliers');
+      if (saved) {
+        logoSizeMultipliers = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Ошибка при загрузке logoSizeMultipliers из localStorage:', e);
+    }
+  }
+  
   return {
-    paddingPercent: 5,
+    paddingPercent: getValue('paddingPercent', 5),
     // Массивы заголовков и подзаголовков
-    titleSubtitlePairs: [createTitleSubtitlePair(0)],
+    titleSubtitlePairs: [createTitleSubtitlePair(0, { bgColor: getValue('bgColor', '#1e1e1e'), brandName })],
     activePairIndex: 0, // Индекс активной пары для отображения на превью
     // Общие настройки для всех заголовков
-    titleColor: '#ffffff',
-    titleAlign: 'left',
-    titleVPos: 'top',
-    titleSize: 8,
-    titleWeight: 'Regular', // Используем название начертания вместо цифр
-    titleLetterSpacing: 0,
-    titleLineHeight: 1.1,
-    titleFontFamily: 'YS Text',
+    titleColor: getValue('titleColor', '#ffffff'),
+    titleAlign: getValue('titleAlign', 'left'),
+    titleVPos: getValue('titleVPos', 'top'),
+    titleSize: getValue('titleSize', 8),
+    titleWeight: getValue('titleWeight', 'Regular'), // Используем название начертания вместо цифр
+    titleLetterSpacing: getValue('titleLetterSpacing', 0),
+    titleLineHeight: getValue('titleLineHeight', 1.1),
+    titleFontFamily: getValue('titleFontFamily', null) || getValue('fontFamily', 'YS Text'),
     titleFontFamilyFile: null,
     titleCustomFont: null, // URL blob для загруженного шрифта
     titleCustomFontName: null, // Имя загруженного файла
     titleTransform: 'none', // Преобразование регистра заголовка
     // Общие настройки для всех подзаголовков
-    subtitleColor: '#e0e0e0',
-    subtitleOpacity: 90,
-    subtitleAlign: 'left',
-    subtitleSize: 4,
-    subtitleWeight: 'Regular', // Используем название начертания вместо цифр
-    subtitleLetterSpacing: 0,
-    subtitleLineHeight: 1.2,
-    subtitleGap: -1,
-    titleSubtitleRatio: 0.5, // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
-    subtitleFontFamily: 'YS Text',
+    subtitleColor: getValue('subtitleColor', '#e0e0e0'),
+    subtitleOpacity: getValue('subtitleOpacity', 90),
+    subtitleAlign: getValue('subtitleAlign', 'left'),
+    subtitleSize: getValue('subtitleSize', 4),
+    subtitleWeight: getValue('subtitleWeight', 'Regular'), // Используем название начертания вместо цифр
+    subtitleLetterSpacing: getValue('subtitleLetterSpacing', 0),
+    subtitleLineHeight: getValue('subtitleLineHeight', 1.2),
+    subtitleGap: getValue('subtitleGap', -1),
+    titleSubtitleRatio: getValue('titleSubtitleRatio', 0.5), // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
+    subtitleFontFamily: getValue('subtitleFontFamily', null) || getValue('fontFamily', 'YS Text'),
     subtitleFontFamilyFile: null,
     subtitleCustomFont: null,
     subtitleCustomFontName: null,
     subtitleTransform: 'none', // Преобразование регистра подзаголовка
     // Обратная совместимость (используются для рендеринга активной пары)
-    title: 'Курс «Frontend-разработчик» от Практикума',
-    subtitle: 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев',
-    legal: 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/',
+    title: getValue('title', `Курс «Frontend-разработчик» от ${brandName}`), // Использует brandName из state
+    subtitle: getValue('subtitle', 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев'),
+    legal: getValue('legal', 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/'),
     legalKZ: '*Жарнама / Реклама. ТОО "Y. Izdeu men Jarnama", регистрационный номер:170240015454 Сайт: https://practicum.yandex.kz/.',
-    legalColor: '#ffffff',
-    legalOpacity: 60,
-    legalAlign: 'left',
-    legalSize: 2,
+    legalColor: getValue('legalColor', '#ffffff'),
+    legalOpacity: getValue('legalOpacity', 60),
+    legalAlign: getValue('legalAlign', 'left'),
+    legalSize: getValue('legalSize', 2),
     legalTransform: 'none', // Преобразование регистра юридического текста
-    legalWeight: 'Regular', // Используем название начертания вместо цифр
-    legalLetterSpacing: 0,
-    legalLineHeight: 1.4,
-    age: '18+',
-    ageGapPercent: 1,
-    ageSize: 4,
-    ageWeight: 'Regular', // Используем название начертания вместо цифр
+    legalWeight: getValue('legalWeight', 'Regular'), // Используем название начертания вместо цифр
+    legalLetterSpacing: getValue('legalLetterSpacing', 0),
+    legalLineHeight: getValue('legalLineHeight', 1.4),
+    age: getValue('age', '18+'),
+    ageGapPercent: getValue('ageGapPercent', 1),
+    ageSize: getValue('ageSize', 4),
+    ageWeight: getValue('ageWeight', 'Regular'), // Используем название начертания вместо цифр
     showLogo: true,
     showSubtitle: true,
     hideSubtitleOnWide: false,
@@ -74,33 +149,39 @@ const createInitialState = () => {
     showKV: true,
     showBlocks: false,
     showGuides: false,
-    layoutMode: 'auto',
     logo: null,
-    logoSelected: 'logo/white/ru/main.svg',
-    logoSize: 40,
-    logoLanguage: 'ru', // ru или kz
+    logoSelected: getValue('logoSelected', 'logo/white/ru/main.svg'),
+    logoSize: getValue('logoSize', 40),
+    logoLanguage: getValue('logoLanguage', 'ru'), // ru или kz
     partnerLogo: null,
-    partnerLogoFile: null,
+    partnerLogoFile: getValue('partnerLogoFile', null),
     kv: null,
-    kvSelected: 'assets/3d/sign/01.png',
-    kvBorderRadius: 0,
-    kvPosition: 'center', // 'left', 'center', 'right' - позиция KV (не применяется к широким макетам)
-    bgColor: '#1e1e1e',
+    kvSelected: getValue('kvSelected', 'assets/3d/sign/01.webp'),
+    kvBorderRadius: getValue('kvBorderRadius', 0),
+    kvPosition: getValue('kvPosition', 'center'), // 'left', 'center', 'right' - позиция KV (не применяется к широким макетам)
+    bgColor: getValue('bgColor', '#1e1e1e'),
+    bgGradient: getValue('bgGradient', null), // { type: 'linear'|'radial'|'angular'|'diamond', stops: [{color, position, alpha}], angle: number }
+    bgGradientAngle: getValue('bgGradientAngle', 0), // Угол градиента (0-360)
     bgImage: null,
-    bgSize: 'cover',
-    bgPosition: 'center',
-    bgVPosition: 'center', // 'top', 'center', 'bottom' - вертикальная позиция фона
-    textGradientOpacity: 100, // Прозрачность градиентной подложки под текстом (0-100)
+    bgSize: getValue('bgSize', 'cover'),
+    bgPosition: getValue('bgPosition', 'center'),
+    bgVPosition: getValue('bgVPosition', 'center'), // 'top', 'center', 'bottom' - вертикальная позиция фона
+    bgImageSize: getValue('bgImageSize', 100), // Размер изображения в процентах (10-500)
+    textGradientOpacity: getValue('textGradientOpacity', 100), // Прозрачность градиентной подложки под текстом (0-100)
     centerTextOverlayOpacity: 20, // Прозрачность подложки для центрированного текста (0-100)
-    logoPos: 'left',
-    fontFamily: 'YS Text', // Общая гарнитура (для обратной совместимости)
+    logoPos: getValue('logoPos', 'left'),
+    fontFamily: getValue('fontFamily', 'YS Text'), // Общая гарнитура (для обратной совместимости)
     fontFamilyFile: null,
     customFont: null,
-    legalFontFamily: 'YS Text',
+    legalFontFamily: getValue('legalFontFamily', null) || getValue('fontFamily', 'YS Text'),
     legalFontFamilyFile: null,
     legalCustomFont: null,
+    // Figma интеграция
+    figmaMode: getValue('figmaMode', 'constructor'), // 'constructor' или 'figma'
+    figmaUrl: getValue('figmaUrl', ''),
+    figmaData: getValue('figmaData', null), // { fileKey, nodeId, imageUrl, image, bounds }
     legalCustomFontName: null,
-    ageFontFamily: 'YS Text',
+    ageFontFamily: (getValue('ageFontFamily', null) || getValue('fontFamily', 'YS Text')),
     ageFontFamilyFile: null,
     ageCustomFont: null,
     ageCustomFontName: null,
@@ -109,7 +190,28 @@ const createInitialState = () => {
     namePrefix: 'layout',
     kvCanvasWidth: null,
     kvCanvasHeight: null,
-    exportScale: 1 // Масштаб экспорта: 1, 2, 3 или 4
+    exportScale: 1, // Масштаб экспорта: 1, 2, 3 или 4
+    brandName: brandName, // Название бренда для использования в интерфейсе
+    layoutMode: getValue('layoutMode', 'auto'),
+    // Настройки веса файла при экспорте
+    maxFileSizeUnit: getValue('maxFileSizeUnit', 'KB'), // 'KB' или 'MB'
+    maxFileSizeValue: getValue('maxFileSizeValue', 150), // Значение (например, 1 для 1MB или 150 для 150KB)
+    // Настройки рамки для Хабра
+    habrBorderEnabled: getValue('habrBorderEnabled', false), // Включена ли рамка для Хабра
+    habrBorderColor: getValue('habrBorderColor', '#D5DDDF'), // Цвет рамки для Хабра
+    // Охранные области для специфичных платформ (игнорируют paddingPercent)
+    // Пользовательские значения имеют приоритет над дефолтными
+    safeAreas: userSafeAreas || getValue('safeAreas', {
+      'Ozon': {
+        '2832x600': { width: 2100, height: 570 },
+        '1080x450': { width: 1020, height: 405 }
+      },
+      'РСЯ': {
+        '1600x1200': { width: 900, height: 900 }
+      }
+    }),
+    // Множители размера логотипа для конкретных размеров
+    logoSizeMultipliers: logoSizeMultipliers || getValue('logoSizeMultipliers', {})
   };
 };
 
@@ -174,19 +276,21 @@ const applyDerivedState = (state, delta) => {
   if (!delta) return state;
   const next = { ...state };
 
+  // Определяем ключи изменений
+  const deltaKeys = delta && typeof delta === 'object' ? delta : {};
 
   // Используем коэффициент из состояния, если он задан, иначе используем значение по умолчанию
   const ratio = state.titleSubtitleRatio !== undefined ? state.titleSubtitleRatio : TITLE_SUBTITLE_RATIO;
-  if ('titleSize' in delta) {
+  if ('titleSize' in deltaKeys) {
     next.subtitleSize = parseFloat((state.titleSize * ratio).toFixed(2));
   }
 
-  if ('subtitleSize' in delta) {
+  if ('subtitleSize' in deltaKeys) {
     next.titleSize = parseFloat((state.subtitleSize / ratio).toFixed(2));
   }
 
   // Автоматически обновляем лигал при изменении языка логотипа
-  if ('logoLanguage' in delta) {
+  if ('logoLanguage' in deltaKeys) {
     const logoLanguage = delta.logoLanguage || state.logoLanguage || 'ru';
     if (logoLanguage === 'kz') {
       const legalKZ = state.legalKZ || '*Жарнама / Реклама. ТОО "Y. Izdeu men Jarnama", регистрационный номер:170240015454 Сайт: https://practicum.yandex.kz/.';
@@ -194,6 +298,31 @@ const applyDerivedState = (state, delta) => {
     } else if (logoLanguage === 'ru') {
       const legalRU = 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/';
       next.legal = legalRU;
+    }
+  }
+
+  // Автоматически применяем шрифт по умолчанию ко всем текстовым элементам при его изменении
+  if ('fontFamily' in deltaKeys && delta.fontFamily) {
+    const newFontFamily = delta.fontFamily === 'system-ui' ? 'YS Text' : delta.fontFamily;
+    const fontFile = delta.fontFamilyFile || state.fontFamilyFile || null;
+    
+    // Обновляем все текстовые шрифты, если они не были изменены индивидуально
+    // (т.е. если они равны старому fontFamily)
+    if (state.titleFontFamily === state.fontFamily || !state.titleFontFamily) {
+      next.titleFontFamily = newFontFamily;
+      next.titleFontFamilyFile = fontFile;
+    }
+    if (state.subtitleFontFamily === state.fontFamily || !state.subtitleFontFamily) {
+      next.subtitleFontFamily = newFontFamily;
+      next.subtitleFontFamilyFile = fontFile;
+    }
+    if (state.legalFontFamily === state.fontFamily || !state.legalFontFamily) {
+      next.legalFontFamily = newFontFamily;
+      next.legalFontFamilyFile = fontFile;
+    }
+    if (state.ageFontFamily === state.fontFamily || !state.ageFontFamily) {
+      next.ageFontFamily = newFontFamily;
+      next.ageFontFamilyFile = fontFile;
     }
   }
 
@@ -248,6 +377,10 @@ const applyDerivedState = (state, delta) => {
           next.bgImage = bgImageSelected;
         }
       }
+
+      if (activePair.bgColor !== undefined && !('bgColor' in deltaKeys)) {
+        next.bgColor = activePair.bgColor || '#1e1e1e';
+      }
     }
   }
 
@@ -255,6 +388,126 @@ const applyDerivedState = (state, delta) => {
 };
 
 export const store = new Store(createInitialState());
+
+// Экспортируем функцию для получения реальных значений по умолчанию
+export const getDefaultValues = () => {
+  // Сначала пытаемся загрузить из localStorage
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('default-values');
+      if (saved) {
+        const savedDefaults = JSON.parse(saved);
+        // Возвращаем значения из localStorage, если они есть
+        return {
+          logoSelected: savedDefaults.logoSelected,
+          kvSelected: savedDefaults.kvSelected,
+          title: savedDefaults.title,
+          subtitle: savedDefaults.subtitle,
+          legal: savedDefaults.legal,
+          age: savedDefaults.age,
+          bgColor: savedDefaults.bgColor,
+          bgImage: savedDefaults.bgImage,
+          titleColor: savedDefaults.titleColor,
+          subtitleColor: savedDefaults.subtitleColor,
+          subtitleOpacity: savedDefaults.subtitleOpacity,
+          legalColor: savedDefaults.legalColor,
+          legalOpacity: savedDefaults.legalOpacity,
+          titleAlign: savedDefaults.titleAlign,
+          subtitleAlign: savedDefaults.subtitleAlign,
+          legalAlign: savedDefaults.legalAlign,
+          titleVPos: savedDefaults.titleVPos,
+          titleSize: savedDefaults.titleSize,
+          subtitleSize: savedDefaults.subtitleSize,
+          titleSubtitleRatio: savedDefaults.titleSubtitleRatio,
+          legalSize: savedDefaults.legalSize,
+          ageSize: savedDefaults.ageSize,
+          logoSize: savedDefaults.logoSize,
+          titleWeight: savedDefaults.titleWeight,
+          subtitleWeight: savedDefaults.subtitleWeight,
+          legalWeight: savedDefaults.legalWeight,
+          ageWeight: savedDefaults.ageWeight,
+          titleLetterSpacing: savedDefaults.titleLetterSpacing,
+          subtitleLetterSpacing: savedDefaults.subtitleLetterSpacing,
+          legalLetterSpacing: savedDefaults.legalLetterSpacing,
+          titleLineHeight: savedDefaults.titleLineHeight,
+          subtitleLineHeight: savedDefaults.subtitleLineHeight,
+          legalLineHeight: savedDefaults.legalLineHeight,
+          subtitleGap: savedDefaults.subtitleGap,
+          ageGapPercent: savedDefaults.ageGapPercent,
+          logoPos: savedDefaults.logoPos,
+          logoLanguage: savedDefaults.logoLanguage,
+          partnerLogoFile: savedDefaults.partnerLogoFile,
+          kvBorderRadius: savedDefaults.kvBorderRadius,
+          kvPosition: savedDefaults.kvPosition,
+          bgSize: savedDefaults.bgSize,
+          bgImageSize: savedDefaults.bgImageSize,
+          bgPosition: savedDefaults.bgPosition,
+          bgVPosition: savedDefaults.bgVPosition,
+          textGradientOpacity: savedDefaults.textGradientOpacity,
+          paddingPercent: savedDefaults.paddingPercent,
+          layoutMode: savedDefaults.layoutMode,
+          fontFamily: savedDefaults.fontFamily
+        };
+      }
+    } catch (e) {
+      console.warn('Ошибка при загрузке default-values из localStorage в getDefaultValues:', e);
+    }
+  }
+  
+  // Если в localStorage нет значений, используем значения из createInitialState
+  const initialState = createInitialState();
+  // Возвращаем только те значения, которые используются в админке
+  return {
+    logoSelected: initialState.logoSelected,
+    kvSelected: initialState.kvSelected,
+    title: initialState.title,
+    subtitle: initialState.subtitle,
+    legal: initialState.legal,
+    age: initialState.age,
+    bgColor: initialState.bgColor,
+    bgImage: initialState.bgImage,
+    titleColor: initialState.titleColor,
+    subtitleColor: initialState.subtitleColor,
+    subtitleOpacity: initialState.subtitleOpacity,
+    legalColor: initialState.legalColor,
+    legalOpacity: initialState.legalOpacity,
+    titleAlign: initialState.titleAlign,
+    subtitleAlign: initialState.subtitleAlign,
+    legalAlign: initialState.legalAlign,
+    titleVPos: initialState.titleVPos,
+    titleSize: initialState.titleSize,
+    subtitleSize: initialState.subtitleSize,
+    titleSubtitleRatio: initialState.titleSubtitleRatio,
+    legalSize: initialState.legalSize,
+    ageSize: initialState.ageSize,
+    logoSize: initialState.logoSize,
+    titleWeight: initialState.titleWeight,
+    subtitleWeight: initialState.subtitleWeight,
+    legalWeight: initialState.legalWeight,
+    ageWeight: initialState.ageWeight,
+    titleLetterSpacing: initialState.titleLetterSpacing,
+    subtitleLetterSpacing: initialState.subtitleLetterSpacing,
+    legalLetterSpacing: initialState.legalLetterSpacing,
+    titleLineHeight: initialState.titleLineHeight,
+    subtitleLineHeight: initialState.subtitleLineHeight,
+    legalLineHeight: initialState.legalLineHeight,
+    subtitleGap: initialState.subtitleGap,
+    ageGapPercent: initialState.ageGapPercent,
+    logoPos: initialState.logoPos,
+    logoLanguage: initialState.logoLanguage,
+    partnerLogoFile: initialState.partnerLogoFile,
+    kvBorderRadius: initialState.kvBorderRadius,
+    kvPosition: initialState.kvPosition,
+    bgSize: initialState.bgSize,
+    bgImageSize: initialState.bgImageSize,
+    bgPosition: initialState.bgPosition,
+    bgVPosition: initialState.bgVPosition,
+    textGradientOpacity: initialState.textGradientOpacity,
+    paddingPercent: initialState.paddingPercent,
+    layoutMode: initialState.layoutMode,
+    fontFamily: initialState.fontFamily
+  };
+};
 
 export const getState = () => store.getState();
 export const subscribe = (listener) => store.subscribe(listener);
@@ -291,7 +544,7 @@ export const updatePresetSizesFromConfig = () => {
 // Функции для управления парами заголовок/подзаголовок
 export const addTitleSubtitlePair = () => {
   const state = getState();
-  const newPair = createTitleSubtitlePair(state.titleSubtitlePairs.length);
+  const newPair = createTitleSubtitlePair(state.titleSubtitlePairs.length, { ...state, brandName: state.brandName || 'Практикума' });
   const newPairs = [...state.titleSubtitlePairs, newPair];
   setState({ titleSubtitlePairs: newPairs });
 };
@@ -354,6 +607,15 @@ export const updatePairBgImage = (index, bgImage) => {
   const newPairs = [...state.titleSubtitlePairs];
   if (newPairs[index]) {
     newPairs[index] = { ...newPairs[index], bgImageSelected: bgImage || null };
+    setState({ titleSubtitlePairs: newPairs });
+  }
+};
+
+export const updatePairBgColor = (index, bgColor) => {
+  const state = getState();
+  const newPairs = [...state.titleSubtitlePairs];
+  if (newPairs[index]) {
+    newPairs[index] = { ...newPairs[index], bgColor: bgColor || '#1e1e1e' };
     setState({ titleSubtitlePairs: newPairs });
   }
 };
@@ -482,6 +744,23 @@ export const applySavedSettings = (snapshot) => {
   } else if (logoLanguage === 'ru') {
     const legalRU = 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/';
     snapshot.legal = legalRU;
+  }
+  
+  // Заменяем 'system-ui' на 'YS Text' для всех полей шрифтов
+  if (snapshot.fontFamily === 'system-ui') {
+    snapshot.fontFamily = 'YS Text';
+  }
+  if (snapshot.titleFontFamily === 'system-ui') {
+    snapshot.titleFontFamily = 'YS Text';
+  }
+  if (snapshot.subtitleFontFamily === 'system-ui') {
+    snapshot.subtitleFontFamily = 'YS Text';
+  }
+  if (snapshot.legalFontFamily === 'system-ui') {
+    snapshot.legalFontFamily = 'YS Text';
+  }
+  if (snapshot.ageFontFamily === 'system-ui') {
+    snapshot.ageFontFamily = 'YS Text';
   }
   
   store.state = applyDerivedState({ ...current, ...snapshot }, snapshot);

@@ -8,10 +8,27 @@ import { AVAILABLE_LOGOS } from '../../constants.js';
 import { scanLogos } from '../../utils/assetScanner.js';
 import { renderer } from '../../renderer.js';
 import { getDom } from '../domCache.js';
+import { observeImages } from '../../utils/lazyImageLoader.js';
+import { t } from '../../utils/i18n.js';
 
 // Кэш для отсканированных логотипов (структурированный)
 let cachedLogosStructure = null;
 let logosScanning = false;
+
+/**
+ * Обновляет прогресс-бар для логотипов
+ */
+const updateLogoProgress = (percent) => {
+  const progressBar = document.getElementById('logoProgressBar');
+  const progressText = document.getElementById('logoProgressText');
+  if (progressBar) {
+    const clampedPercent = Math.min(100, Math.max(0, percent));
+    progressBar.style.width = `${clampedPercent}%`;
+    if (progressText) {
+      progressText.textContent = `${Math.round(clampedPercent)}%`;
+    }
+  }
+};
 
 // Выбранные папки для навигации по структуре логотипов
 let selectedLogoFolder1 = null;
@@ -19,16 +36,25 @@ let selectedLogoFolder2 = null;
 let selectedLogoFolder3 = null;
 
 /**
- * Загружает изображение из файла или URL
+ * Загружает изображение из файла или URL (без кеширования для модальных окон)
  */
-const loadImage = (src) =>
-  new Promise((resolve, reject) => {
+const loadImage = async (src) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-    img.src = src;
+    img.onerror = (error) => {
+      console.error(`Failed to load image: ${src}`, error);
+      reject(new Error(`Failed to load image: ${src}`));
+    };
+    // Используем абсолютный URL для относительных путей
+    if (src && !src.startsWith('http') && !src.startsWith('data:')) {
+      img.src = new URL(src, window.location.origin).href;
+    } else {
+      img.src = src;
+    }
   });
+};
 
 /**
  * Читает файл как Data URL
@@ -210,12 +236,12 @@ export const updateLogoTriggerText = async (value) => {
   if (!textSpan) return;
   
   if (!value) {
-    textSpan.textContent = 'Выбрать';
+    textSpan.textContent = t('logo.select');
     return;
   }
   
   // Если есть логотип, показываем "Выбрать из библиотеки"
-  textSpan.textContent = 'Выбрать из библиотеки';
+  textSpan.textContent = t('layout.bgImage.select');
 };
 
 /**
@@ -233,7 +259,7 @@ const renderLogoColumn1 = (allLogos) => {
   
   if (folders1.length === 0) {
     const emptyMsg = document.createElement('div');
-    emptyMsg.textContent = 'Логотипы не найдены';
+    emptyMsg.textContent = t('logo.notFound');
     emptyMsg.className = 'column-empty-message';
     column1.appendChild(emptyMsg);
     return;
@@ -244,8 +270,9 @@ const renderLogoColumn1 = (allLogos) => {
     item.className = 'column-item logo-folder1-item';
     item.dataset.folder1 = folder1;
     item.textContent = folder1;
+    item.style.cursor = 'pointer'; // Убеждаемся, что курсор указывает на кликабельность
     
-    item.addEventListener('click', (e) => {
+    const clickHandler = (e) => {
       e.stopPropagation(); // Предотвращаем закрытие модального окна
       selectedLogoFolder1 = folder1;
       selectedLogoFolder2 = null;
@@ -268,7 +295,9 @@ const renderLogoColumn1 = (allLogos) => {
       if (column4) {
         column4.innerHTML = '';
       }
-    });
+    };
+    
+    item.addEventListener('click', clickHandler);
     
     column1.appendChild(item);
   });
@@ -304,6 +333,7 @@ const renderLogoColumn2 = (allLogos) => {
     item.dataset.folder2 = folder2;
     // Показываем "root" как пустую строку или скрываем
     item.textContent = folder2 === 'root' ? '—' : folder2;
+    item.style.cursor = 'pointer'; // Убеждаемся, что курсор указывает на кликабельность
     
     item.addEventListener('click', (e) => {
       e.stopPropagation(); // Предотвращаем закрытие модального окна
@@ -406,6 +436,7 @@ const renderLogoColumn3 = (allLogos) => {
     item.className = 'column-item logo-folder3-item';
     item.dataset.folder3 = folder3;
     item.textContent = folder3 === 'root' ? '—' : folder3.toUpperCase();
+    item.style.cursor = 'pointer'; // Убеждаемся, что курсор указывает на кликабельность
     
     item.addEventListener('click', (e) => {
       e.stopPropagation(); // Предотвращаем закрытие модального окна
@@ -445,6 +476,41 @@ const renderLogoColumn4 = (images) => {
   
   column4.innerHTML = '';
   
+  // Показываем прогресс-бар, если изображений нет или идет загрузка
+  if (!images || images.length === 0 || logosScanning) {
+    const progressContainer = document.createElement('div');
+    progressContainer.id = 'logoProgressContainer';
+    progressContainer.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; min-height: 200px; width: 100%;';
+    
+    const text = document.createElement('div');
+    text.textContent = t('logo.loading');
+    text.style.cssText = 'margin-bottom: 16px; color: var(--text-primary, #e9e9e9); font-size: 14px; text-align: center;';
+    
+    const progressBarContainer = document.createElement('div');
+    progressBarContainer.style.cssText = 'width: 100%; max-width: 300px; position: relative;';
+    
+    const progressBarBg = document.createElement('div');
+    progressBarBg.style.cssText = 'width: 100%; height: 8px; background: var(--bg-secondary, #1a1a1a); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color, #2a2a2a); position: relative;';
+    
+    const progressBar = document.createElement('div');
+    progressBar.id = 'logoProgressBar';
+    progressBar.style.cssText = 'height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-color, #027EF2), #00a8ff); border-radius: 4px; transition: width 0.3s ease; position: absolute; top: 0; left: 0;';
+    
+    const progressText = document.createElement('div');
+    progressText.id = 'logoProgressText';
+    progressText.style.cssText = 'margin-top: 12px; text-align: center; color: var(--text-secondary, #b4b4b4); font-size: 13px; font-weight: 500;';
+    progressText.textContent = '0%';
+    
+    progressBarBg.appendChild(progressBar);
+    progressBarContainer.appendChild(progressBarBg);
+    progressBarContainer.appendChild(progressText);
+    progressContainer.appendChild(text);
+    progressContainer.appendChild(progressBarContainer);
+    column4.appendChild(progressContainer);
+    
+    return;
+  }
+  
   const state = getState();
   const selectedLanguage = state.logoLanguage || 'ru';
   
@@ -458,20 +524,42 @@ const renderLogoColumn4 = (images) => {
     return true;
   });
   
+  // Если после фильтрации ничего не осталось, показываем сообщение
+  if (filteredImages.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.style.cssText = 'display: flex; align-items: center; justify-content: center; padding: 40px; min-height: 200px; color: #888; font-size: 14px;';
+    emptyMessage.textContent = t('logo.loading');
+    column4.appendChild(emptyMessage);
+    return;
+  }
+  
   filteredImages.forEach((logo, index) => {
     const imgContainer = document.createElement('div');
     imgContainer.className = 'preview-item';
     
     const img = document.createElement('img');
     img.alt = logo.name;
-    img.src = logo.file;
     
-    // Используем нативный loading="lazy" для прогрессивной загрузки
-    // Первые 6 изображений загружаем сразу (eager), остальные - лениво
-    if (index < 6) {
-      img.loading = 'eager'; // Загружаем сразу
+    // Используем data-src для lazy loading через Intersection Observer
+    // Первые 12 изображений загружаем сразу для быстрого отображения
+    if (index < 12) {
+      img.src = logo.file;
+      img.loading = 'eager';
+      // Добавляем обработчик ошибок для отладки
+      img.onerror = () => {
+        console.warn('Ошибка загрузки изображения:', logo.file);
+        img.style.backgroundColor = '#ff0000';
+        img.style.minHeight = '100px';
+      };
     } else {
-      img.loading = 'lazy'; // Ленивая загрузка
+      // Для остальных используем data-src и загружаем при появлении в viewport
+      img.dataset.src = logo.file;
+      img.loading = 'lazy';
+      // Показываем placeholder
+      img.style.backgroundColor = '#1a1a1a';
+      img.style.minHeight = '100px';
+      img.style.width = '100%';
+      img.style.objectFit = 'cover';
     }
     
     imgContainer.appendChild(img);
@@ -485,6 +573,9 @@ const renderLogoColumn4 = (images) => {
     
     column4.appendChild(imgContainer);
   });
+  
+  // Запускаем lazy loading для изображений в колонке
+  observeImages(column4);
 };
 
 /**
@@ -636,13 +727,162 @@ const populateLogoColumns = async (forceRefresh = false) => {
     return;
   }
   
-  // Сканируем в фоне
-  logosScanning = true;
-  const scannedStructure = await scanLogos();
+  // Сначала показываем папки из AVAILABLE_LOGOS (известные данные) сразу
+  const initialStructure = {};
+  AVAILABLE_LOGOS.forEach(logo => {
+    const pathParts = logo.file.split('/');
+    if (pathParts.length >= 3 && pathParts[0] === 'logo') {
+      const folder1 = pathParts[1];
+      if (!initialStructure[folder1]) {
+        initialStructure[folder1] = {};
+      }
+      // Создаем структуру и добавляем сам логотип
+      if (pathParts.length === 5) {
+        const folder2 = pathParts[2];
+        const folder3 = pathParts[3];
+        if (!initialStructure[folder1][folder2]) {
+          initialStructure[folder1][folder2] = {};
+        }
+        if (!initialStructure[folder1][folder2][folder3]) {
+          initialStructure[folder1][folder2][folder3] = [];
+        }
+        // Добавляем логотип в массив
+        if (!initialStructure[folder1][folder2][folder3].find(l => l.file === logo.file)) {
+          initialStructure[folder1][folder2][folder3].push(logo);
+        }
+      } else if (pathParts.length === 4) {
+        const folder2 = pathParts[2];
+        if (!initialStructure[folder1][folder2]) {
+          initialStructure[folder1][folder2] = [];
+        }
+        // Добавляем логотип в массив
+        if (!initialStructure[folder1][folder2].find(l => l.file === logo.file)) {
+          initialStructure[folder1][folder2].push(logo);
+        }
+      } else {
+        if (!initialStructure[folder1]['root']) {
+          initialStructure[folder1]['root'] = [];
+        }
+        // Добавляем логотип в массив
+        if (!initialStructure[folder1]['root'].find(l => l.file === logo.file)) {
+          initialStructure[folder1]['root'].push(logo);
+        }
+      }
+    }
+  });
   
-  // scanLogos теперь возвращает структурированные данные напрямую
-  // Добавляем AVAILABLE_LOGOS в структуру
-  const logoStructure = { ...scannedStructure };
+  // Показываем папки сразу, не дожидаясь сканирования
+  if (Object.keys(initialStructure).length > 0) {
+    selectedLogoFolder1 = null;
+    selectedLogoFolder2 = null;
+    selectedLogoFolder3 = null;
+    renderLogoColumn1(initialStructure);
+  } else {
+    // Если нет известных данных, показываем базовую структуру папок (black, white)
+    const basicStructure = {
+      black: { ru: [], en: [], kz: [] },
+      white: { ru: [], en: [], kz: [] }
+    };
+    selectedLogoFolder1 = null;
+    selectedLogoFolder2 = null;
+    selectedLogoFolder3 = null;
+    renderLogoColumn1(basicStructure);
+  }
+  
+  // Используем кэш, если доступен
+  if (cachedLogosStructure && !forceRefresh) {
+    selectedLogoFolder1 = null;
+    selectedLogoFolder2 = null;
+    selectedLogoFolder3 = null;
+    renderLogoColumn1(cachedLogosStructure);
+    return;
+  }
+  
+  // Сканируем в фоне по папкам постепенно и обновляем структуру
+  logosScanning = true;
+  
+  // Начинаем с текущей структуры (известные данные или базовая)
+  let logoStructure = {};
+  if (Object.keys(initialStructure).length > 0) {
+    logoStructure = JSON.parse(JSON.stringify(initialStructure)); // Глубокое копирование
+  } else {
+    logoStructure = {
+      black: { ru: [], en: [], kz: [] },
+      white: { ru: [], en: [], kz: [] }
+    };
+  }
+  
+  // Сканируем по папкам постепенно
+  const firstLevelFolders = ['black', 'white'];
+  const thirdLevelFolders = ['ru', 'en', 'kz'];
+  
+  // Импортируем функцию проверки файлов
+  const { checkFileExists } = await import('../../utils/assetScanner.js');
+  
+  // Подсчитываем общее количество папок для сканирования
+  const totalFolders = firstLevelFolders.length * thirdLevelFolders.length;
+  let scannedFolders = 0;
+  
+  // Инициализируем прогресс-бар
+  updateLogoProgress(0);
+  
+  // Сканируем каждую папку отдельно и обновляем UI
+  for (const folder1 of firstLevelFolders) {
+    for (const folder3 of thirdLevelFolders) {
+      // Сканируем одну папку
+      const basePath = `logo/${folder1}/${folder3}`;
+      const knownNames = ['main', 'main_mono', 'mono', 'long', 'logo', 'long_logo', 'black', 'white', 'icon', 'symbol', 'mark', 'emblem'];
+      
+      const folderFiles = [];
+      
+      // Проверяем файлы в папке
+      for (const name of knownNames) {
+        const exists = await checkFileExists(`${basePath}/${name}.svg`);
+        if (exists) {
+          const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
+          const folder3Name = folder3.toUpperCase();
+          const displayName = name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' ');
+          folderFiles.push({ 
+            name: `${folder1Name} / ${folder3Name} / ${displayName}`, 
+            file: `${basePath}/${name}.svg` 
+          });
+        }
+      }
+      
+      // Обновляем структуру
+      if (folderFiles.length > 0) {
+        if (!logoStructure[folder1]) {
+          logoStructure[folder1] = {};
+        }
+        if (!logoStructure[folder1][folder3]) {
+          logoStructure[folder1][folder3] = [];
+        }
+        folderFiles.forEach(file => {
+          if (!logoStructure[folder1][folder3].find(l => l.file === file.file)) {
+            logoStructure[folder1][folder3].push(file);
+          }
+        });
+        
+        // Обновляем UI после каждой папки
+        cachedLogosStructure = logoStructure;
+        renderLogoColumn1(logoStructure);
+      }
+      
+      // Обновляем прогресс
+      scannedFolders++;
+      const progress = (scannedFolders / totalFolders) * 100;
+      updateLogoProgress(progress);
+      
+      // Небольшая задержка для плавности
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+  
+  // Завершаем прогресс
+  updateLogoProgress(100);
+  
+  // Небольшая задержка, чтобы показать 100% перед скрытием прогресс-бара
+  await new Promise(resolve => setTimeout(resolve, 300));
   
   // Добавляем AVAILABLE_LOGOS в структуру
   AVAILABLE_LOGOS.forEach(logo => {
@@ -702,13 +942,55 @@ const populateLogoColumns = async (forceRefresh = false) => {
   cachedLogosStructure = logoStructure;
   logosScanning = false;
   
-  // Сбрасываем выбранные папки перед рендерингом
-  selectedLogoFolder1 = null;
-  selectedLogoFolder2 = null;
-  selectedLogoFolder3 = null;
+  // Финальное обновление UI после завершения сканирования всех папок
+  // Сохраняем текущие выбранные папки, чтобы восстановить состояние после обновления
+  const currentFolder1 = selectedLogoFolder1;
+  const currentFolder2 = selectedLogoFolder2;
+  const currentFolder3 = selectedLogoFolder3;
   
-  // Заполняем колонки
+  // Обновляем колонки с полной структурой
   renderLogoColumn1(logoStructure);
+  
+  // Восстанавливаем выбранные папки и обновляем остальные колонки, если они были открыты
+  if (currentFolder1) {
+    selectedLogoFolder1 = currentFolder1;
+    const folder1Item = document.querySelector(`[data-folder1="${currentFolder1}"]`);
+    if (folder1Item) {
+      folder1Item.classList.add('active');
+      renderLogoColumn2(logoStructure);
+      
+      if (currentFolder2) {
+        selectedLogoFolder2 = currentFolder2;
+        const folder2Item = document.querySelector(`[data-folder2="${currentFolder2}"]`);
+        if (folder2Item) {
+          folder2Item.classList.add('active');
+          const folder2Data = logoStructure[currentFolder1]?.[currentFolder2];
+          if (folder2Data && typeof folder2Data === 'object' && !Array.isArray(folder2Data)) {
+            // Трехуровневая структура
+            renderLogoColumn3(logoStructure);
+            if (currentFolder3) {
+              selectedLogoFolder3 = currentFolder3;
+              const folder3Item = document.querySelector(`[data-folder3="${currentFolder3}"]`);
+              if (folder3Item) {
+                folder3Item.classList.add('active');
+                const images = logoStructure[currentFolder1]?.[currentFolder2]?.[currentFolder3] || [];
+                renderLogoColumn4(images);
+              }
+            }
+          } else {
+            // Двухуровневая структура
+            const images = Array.isArray(folder2Data) ? folder2Data : [];
+            const state = getState();
+            const selectedLanguage = state.logoLanguage || 'ru';
+            const filteredImages = selectedLanguage === 'kz' 
+              ? images.filter(logo => logo.file.includes(`/${selectedLanguage}/`))
+              : images;
+            renderLogoColumn4(filteredImages);
+          }
+        }
+      }
+    }
+  }
 };
 
 /**
@@ -748,17 +1030,31 @@ const openLogoSelectModal = async () => {
   const overlay = document.getElementById('logoSelectModalOverlay');
   if (!overlay) return;
   
+  // Инициализируем dropdown, если еще не инициализирован
+  const trigger = document.getElementById('logoSelectTrigger');
+  if (trigger && !trigger.dataset.initialized) {
+    await initializeLogoDropdown();
+  }
+  
   // Сбрасываем выбранные папки
   selectedLogoFolder1 = null;
   selectedLogoFolder2 = null;
   selectedLogoFolder3 = null;
   
-  // При открытии заполняем колонки лениво
-  await populateLogoColumns();
-  
-  // Показываем модальное окно
+  // Показываем модальное окно сразу
   overlay.style.display = 'block';
   document.body.style.overflow = 'hidden'; // Блокируем скролл фона
+  
+  // Скрываем индикатор загрузки сразу - показываем содержимое немедленно
+  const loadingIndicator = overlay.querySelector('.loading-indicator');
+  if (loadingIndicator) {
+    loadingIndicator.style.display = 'none';
+  }
+  
+  // Заполняем колонки сразу (показываем известные данные) и загружаем остальное в фоне
+  populateLogoColumns().catch((error) => {
+    console.error('Ошибка при заполнении колонок логотипов:', error);
+  });
 };
 
 /**
@@ -788,6 +1084,11 @@ export const initializeLogoDropdown = async () => {
   const newTrigger = trigger.cloneNode(true);
   trigger.parentNode.replaceChild(newTrigger, trigger);
   const updatedTrigger = document.getElementById('logoSelectTrigger');
+  
+  // Помечаем как инициализированный
+  if (updatedTrigger) {
+    updatedTrigger.dataset.initialized = 'true';
+  }
   
   // Обработчик открытия модального окна
   updatedTrigger.addEventListener('click', async (e) => {

@@ -209,12 +209,12 @@ export const calculateTextArea = (width, height, paddingPx, layoutType, logoBoun
       textArea.left = Math.max(paddingPx, textArea.right - 200);
     }
   } else if (isSuperWide) {
-    const logoRight = logoBounds ? (logoBounds.x + (logoBounds.totalWidth || logoBounds.width)) : paddingPx;
-    textArea.left = logoRight + Math.max(paddingPx * 0.5, width * 0.01);
+    // Для широких форматов без KV текст всегда начинается с paddingPx (не зависит от логотипа)
+    textArea.left = paddingPx;
     textArea.right = width - paddingPx;
   } else if (isUltraWide) {
-    const logoRight = logoBounds ? (logoBounds.x + (logoBounds.totalWidth || logoBounds.width)) : paddingPx;
-    textArea.left = logoRight + paddingPx;
+    // Для широких форматов без KV текст всегда начинается с paddingPx (не зависит от логотипа)
+    textArea.left = paddingPx;
     textArea.right = width - paddingPx;
   } else if (isHorizontalLayout && kvPlannedMeta) {
     const minTextRatio = width >= height * LAYOUT_CONSTANTS.HORIZONTAL_THRESHOLD ? LAYOUT_CONSTANTS.MIN_TEXT_RATIO_WIDE : LAYOUT_CONSTANTS.MIN_TEXT_RATIO_NORMAL;
@@ -235,10 +235,9 @@ export const calculateTextArea = (width, height, paddingPx, layoutType, logoBoun
       textArea.right = Math.max(textArea.left + 50, maxTextRight);
     }
   } else if (isHorizontalLayout) {
-    // Для горизонтальных форматов без KV учитываем логотип
-    const logoRight = logoBounds ? (logoBounds.x + (logoBounds.totalWidth || logoBounds.width)) : paddingPx;
-    textArea.left = Math.max(paddingPx, logoRight + paddingPx * 0.5);
-    // Область текста занимает всю доступную ширину справа от логотипа
+    // Для горизонтальных форматов без KV текст всегда начинается с paddingPx (не зависит от логотипа)
+    textArea.left = paddingPx;
+    // Область текста занимает всю доступную ширину
     textArea.right = width - paddingPx;
   }
 
@@ -254,9 +253,19 @@ export const calculateTextArea = (width, height, paddingPx, layoutType, logoBoun
 
 /**
  * Вычисляет позицию логотипа
+ * @param {Object} state - состояние приложения
+ * @param {number} width - ширина области для логотипа
+ * @param {number} height - высота области для логотипа
+ * @param {number} paddingPx - отступ в пикселях
+ * @param {Object} layoutType - тип макета
+ * @param {number} logoSizePercent - размер логотипа в процентах
+ * @param {string|null} logoPosForSize - позиция логотипа для конкретного размера (из админки), null = использовать глобальную настройку
  */
-export const calculateLogoBounds = (state, width, height, paddingPx, layoutType, logoSizePercent) => {
+export const calculateLogoBounds = (state, width, height, paddingPx, layoutType, logoSizePercent, logoPosForSize = null) => {
   const { isUltraWide, isSuperWide, isHorizontalLayout } = layoutType;
+  
+  // Определяем эффективную позицию логотипа: сначала настройка для размера, потом глобальная
+  const effectiveLogoPos = logoPosForSize !== null ? logoPosForSize : state.logoPos;
   
   if (!state.showLogo || !state.logo) return null;
 
@@ -294,8 +303,16 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
       totalLogoWidth = mainLogoWidth;
     }
     
+    // Применяем позицию логотипа из настроек
+    let logoX;
+    if (effectiveLogoPos === 'center') {
+      logoX = (width - totalLogoWidth) / 2;
+    } else {
+      logoX = paddingPx;
+    }
+    
     return {
-      x: paddingPx,
+      x: logoX,
       y: paddingPx,
       width: mainLogoWidth,
       height: logoHeight,
@@ -317,8 +334,16 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
       totalLogoWidth = mainLogoWidth;
     }
     
+    // Применяем позицию логотипа из настроек
+    let logoX;
+    if (effectiveLogoPos === 'center') {
+      logoX = (width - totalLogoWidth) / 2;
+    } else {
+      logoX = paddingPx;
+    }
+    
     return {
-      x: paddingPx,
+      x: logoX,
       y: paddingPx + (availableHeight - logoHeight) / 2,
       width: mainLogoWidth,
       height: logoHeight,
@@ -335,8 +360,16 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
       totalLogoWidth = mainLogoWidth;
     }
     
+    // Применяем позицию логотипа из настроек
+    let logoX;
+    if (effectiveLogoPos === 'center') {
+      logoX = (width - totalLogoWidth) / 2;
+    } else {
+      logoX = paddingPx;
+    }
+    
     return {
-      x: paddingPx,
+      x: logoX,
       y: paddingPx,
       width: mainLogoWidth,
       height: logoHeight,
@@ -346,7 +379,9 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
   } else {
     let logoX;
     let logoY;
-    const effectiveLogoPos = (state.titleAlign === 'center') ? 'center' : state.logoPos;
+    // Если titleAlign === 'center', то логотип тоже центрируем (для обратной совместимости)
+    // Иначе используем effectiveLogoPos из настроек
+    const finalLogoPos = (state.titleAlign === 'center' && logoPosForSize === null) ? 'center' : effectiveLogoPos;
     
     // Пересчитываем для партнерского логотипа (нужно сделать это раньше для правильного центрирования)
     if (hasPartnerLogo) {
@@ -358,10 +393,10 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
     }
     
     if (state.titleVPos === 'top') {
-      if (effectiveLogoPos === 'left') {
+      if (finalLogoPos === 'left') {
         logoX = paddingPx;
         logoY = paddingPx;
-      } else if (effectiveLogoPos === 'center') {
+      } else if (finalLogoPos === 'center') {
         logoX = (width - totalLogoWidth) / 2;
         logoY = paddingPx;
       } else {
@@ -370,10 +405,10 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
       }
     } else if (state.titleVPos === 'center') {
       // При центрировании текста логотип остается вверху, меняется только позиция текста
-      if (effectiveLogoPos === 'center') {
+      if (finalLogoPos === 'center') {
         logoX = (width - totalLogoWidth) / 2;
         logoY = paddingPx;
-      } else if (effectiveLogoPos === 'left') {
+      } else if (finalLogoPos === 'left') {
         logoX = paddingPx;
         logoY = paddingPx;
       } else {
@@ -381,10 +416,10 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
         logoY = paddingPx;
       }
     } else {
-      if (effectiveLogoPos === 'left') {
+      if (finalLogoPos === 'left') {
         logoX = paddingPx;
         logoY = paddingPx;
-      } else if (effectiveLogoPos === 'center') {
+      } else if (finalLogoPos === 'center') {
         logoX = (width - totalLogoWidth) / 2;
         logoY = paddingPx;
       } else {
@@ -395,7 +430,7 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
     
     // Если позиция center, нужно учесть общую ширину для центрирования (уже сделано выше)
     // Оставляем для обратной совместимости, но это уже не нужно
-    if (effectiveLogoPos === 'center' && hasPartnerLogo) {
+    if (finalLogoPos === 'center' && hasPartnerLogo) {
       logoX = (width - totalLogoWidth) / 2;
     }
     

@@ -9,10 +9,27 @@ import { scanKV } from '../../utils/assetScanner.js';
 import { renderer } from '../../renderer.js';
 import { getDom } from '../domCache.js';
 import { updatePairKV } from '../../state/store.js';
+import { observeImages } from '../../utils/lazyImageLoader.js';
+import { t } from '../../utils/i18n.js';
 
 // Кэш для отсканированных KV
 let cachedKV = null;
 let kvScanning = false;
+
+/**
+ * Обновляет прогресс-бар для KV
+ */
+const updateKVProgress = (percent) => {
+  const progressBar = document.getElementById('kvProgressBar');
+  const progressText = document.getElementById('kvProgressText');
+  if (progressBar) {
+    const clampedPercent = Math.min(100, Math.max(0, percent));
+    progressBar.style.width = `${clampedPercent}%`;
+    if (progressText) {
+      progressText.textContent = `${Math.round(clampedPercent)}%`;
+    }
+  }
+};
 
 // Выбранные папки для навигации по структуре KV
 let selectedFolder1 = null;
@@ -22,16 +39,25 @@ let selectedFolder2 = null;
 let currentKVModalPairIndex = null;
 
 /**
- * Загружает изображение из файла или URL
+ * Загружает изображение из файла или URL (без кеширования для модальных окон)
  */
-const loadImage = (src) =>
-  new Promise((resolve, reject) => {
+const loadImage = async (src) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-    img.src = src;
+    img.onerror = (error) => {
+      console.error(`Failed to load image: ${src}`, error);
+      reject(new Error(`Failed to load image: ${src}`));
+    };
+    // Используем абсолютный URL для относительных путей
+    if (src && !src.startsWith('http') && !src.startsWith('data:')) {
+      img.src = new URL(src, window.location.origin).href;
+    } else {
+      img.src = src;
+    }
   });
+};
 
 /**
  * Читает файл как Data URL
@@ -59,7 +85,7 @@ export const updateKVUI = () => {
   // Обновляем метку активной пары
   const activeIndex = state.activePairIndex || 0;
   if (kvActivePairLabel) {
-    kvActivePairLabel.textContent = `KV ${String(activeIndex + 1).padStart(2, '0')}`;
+    kvActivePairLabel.textContent = t('kv.label', { number: String(activeIndex + 1).padStart(2, '0') });
   }
   
   // Обновляем превью KV
@@ -298,12 +324,12 @@ export const updateKVTriggerText = (value) => {
   if (!textSpan) return;
   
   if (!value) {
-    textSpan.textContent = 'Выбрать';
+    textSpan.textContent = t('kv.select');
     return;
   }
   
   // Если есть KV, показываем "Выбрать из библиотеки"
-  textSpan.textContent = 'Выбрать из библиотеки';
+  textSpan.textContent = t('layout.bgImage.select');
 };
 
 /**
@@ -315,6 +341,9 @@ const renderKVColumn1 = (allKV) => {
   
   column1.innerHTML = '';
   const folders1 = Object.keys(allKV).sort();
+  
+  // Используем DocumentFragment для батчинга DOM операций
+  const fragment = document.createDocumentFragment();
   
   folders1.forEach((folder1) => {
     const item = document.createElement('div');
@@ -338,8 +367,11 @@ const renderKVColumn1 = (allKV) => {
       renderKVColumn3([]);
     });
     
-    column1.appendChild(item);
+    fragment.appendChild(item);
   });
+  
+  // Добавляем все элементы одним батчем
+  column1.appendChild(fragment);
   
   // Выбираем первую папку по умолчанию
   if (folders1.length > 0 && !selectedFolder1) {
@@ -355,12 +387,43 @@ const renderKVColumn1 = (allKV) => {
 /**
  * Рендерит вторую колонку со списком папок второго уровня
  */
-const renderKVColumn2 = (allKV) => {
+const renderKVColumn2 = (allKV, showLoading = false) => {
   const column2 = document.getElementById('kvFolder2Column');
   if (!column2 || !selectedFolder1) return;
   
   column2.innerHTML = '';
+  
+  // Показываем индикатор загрузки, если идет сканирование и папок еще нет
   const folders2 = Object.keys(allKV[selectedFolder1] || {}).sort();
+  if (showLoading && folders2.length === 0 && kvScanning) {
+    const loadingContainer = document.createElement('div');
+    loadingContainer.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;';
+    
+    const spinner = document.createElement('div');
+    spinner.className = 'spinner';
+    spinner.style.cssText = 'width: 24px; height: 24px; border: 3px solid rgba(255, 255, 255, 0.1); border-top-color: #027EF2; border-radius: 50%; animation: spin 1s linear infinite;';
+    
+    const text = document.createElement('div');
+    text.textContent = t('kv.folders.loading');
+    text.style.cssText = 'margin-top: 8px; color: #888; font-size: 12px;';
+    
+    loadingContainer.appendChild(spinner);
+    loadingContainer.appendChild(text);
+    column2.appendChild(loadingContainer);
+    
+    // Добавляем CSS анимацию для спиннера, если её еще нет
+    if (!document.getElementById('spinner-style')) {
+      const style = document.createElement('style');
+      style.id = 'spinner-style';
+      style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+      document.head.appendChild(style);
+    }
+    
+    return;
+  }
+  
+  // Используем DocumentFragment для батчинга DOM операций
+  const fragment = document.createDocumentFragment();
   
   folders2.forEach((folder2) => {
     const item = document.createElement('div');
@@ -382,8 +445,11 @@ const renderKVColumn2 = (allKV) => {
       renderKVColumn3(images);
     });
     
-    column2.appendChild(item);
+    fragment.appendChild(item);
   });
+  
+  // Добавляем все элементы одним батчем
+  column2.appendChild(fragment);
   
   // Выбираем первую подпапку по умолчанию
   if (folders2.length > 0 && !selectedFolder2) {
@@ -406,6 +472,41 @@ const renderKVColumn3 = (images) => {
   
   column3.innerHTML = '';
   
+  // Показываем прогресс-бар, если изображений нет или идет загрузка
+  if (!images || images.length === 0 || kvScanning) {
+    const progressContainer = document.createElement('div');
+    progressContainer.id = 'kvProgressContainer';
+    progressContainer.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; min-height: 200px; width: 100%;';
+    
+    const text = document.createElement('div');
+    text.textContent = t('kv.loading');
+    text.style.cssText = 'margin-bottom: 16px; color: var(--text-primary, #e9e9e9); font-size: 14px; text-align: center;';
+    
+    const progressBarContainer = document.createElement('div');
+    progressBarContainer.style.cssText = 'width: 100%; max-width: 300px; position: relative;';
+    
+    const progressBarBg = document.createElement('div');
+    progressBarBg.style.cssText = 'width: 100%; height: 8px; background: var(--bg-secondary, #1a1a1a); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color, #2a2a2a); position: relative;';
+    
+    const progressBar = document.createElement('div');
+    progressBar.id = 'kvProgressBar';
+    progressBar.style.cssText = 'height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-color, #027EF2), #00a8ff); border-radius: 4px; transition: width 0.3s ease; position: absolute; top: 0; left: 0;';
+    
+    const progressText = document.createElement('div');
+    progressText.id = 'kvProgressText';
+    progressText.style.cssText = 'margin-top: 12px; text-align: center; color: var(--text-secondary, #b4b4b4); font-size: 13px; font-weight: 500;';
+    progressText.textContent = '0%';
+    
+    progressBarBg.appendChild(progressBar);
+    progressBarContainer.appendChild(progressBarBg);
+    progressBarContainer.appendChild(progressText);
+    progressContainer.appendChild(text);
+    progressContainer.appendChild(progressBarContainer);
+    column3.appendChild(progressContainer);
+    
+    return;
+  }
+  
   // Определяем активный KV
   const state = getState();
   let activeKVFile = null;
@@ -421,6 +522,9 @@ const renderKVColumn3 = (images) => {
     // Модальное окно открыто для обычного KV
     activeKVFile = state.kvSelected || '';
   }
+  
+  // Используем DocumentFragment для батчинга DOM операций
+  const fragment = document.createDocumentFragment();
   
   images.forEach((kv, index) => {
     const imgContainer = document.createElement('div');
@@ -439,14 +543,27 @@ const renderKVColumn3 = (images) => {
     
     const img = document.createElement('img');
     img.alt = kv.name;
-    img.src = kv.file;
     
-    // Используем нативный loading="lazy" для прогрессивной загрузки
-    // Первые 6 изображений и активное загружаем сразу (eager), остальные - лениво
-    if (index < 6 || isActive) {
-      img.loading = 'eager'; // Загружаем сразу
+    // Используем data-src для lazy loading через Intersection Observer
+    // Первые 12 изображений и активное загружаем сразу для быстрого отображения
+    if (index < 12 || isActive) {
+      img.src = kv.file;
+      img.loading = 'eager';
+      // Добавляем обработчик ошибок для отладки
+      img.onerror = () => {
+        console.warn('Ошибка загрузки изображения:', kv.file);
+        img.style.backgroundColor = '#ff0000';
+        img.style.minHeight = '100px';
+      };
     } else {
-      img.loading = 'lazy'; // Ленивая загрузка
+      // Для остальных используем data-src и загружаем при появлении в viewport
+      img.dataset.src = kv.file;
+      img.loading = 'lazy';
+      // Показываем placeholder
+      img.style.backgroundColor = '#1a1a1a';
+      img.style.minHeight = '100px';
+      img.style.width = '100%';
+      img.style.objectFit = 'cover';
     }
     
     imgContainer.appendChild(img);
@@ -458,8 +575,14 @@ const renderKVColumn3 = (images) => {
       closeKVSelectModal();
     });
     
-    column3.appendChild(imgContainer);
+    fragment.appendChild(imgContainer);
   });
+  
+  // Добавляем все элементы одним батчем
+  column3.appendChild(fragment);
+  
+  // Запускаем lazy loading для изображений в колонке
+  observeImages(column3);
 };
 
 /**
@@ -488,7 +611,7 @@ const buildKVStructure = (scannedKV) => {
 };
 
 /**
- * Заполняет колонки KV
+ * Заполняет колонки KV с инкрементальной загрузкой
  */
 const populateKVColumns = async (forceRefresh = false) => {
   const column1 = document.getElementById('kvFolder1Column');
@@ -509,21 +632,184 @@ const populateKVColumns = async (forceRefresh = false) => {
   // Если есть кэш и не принудительное обновление, используем его
   if (cachedKV && !forceRefresh) {
     renderKVColumn1(cachedKV);
+    if (selectedFolder1) {
+      renderKVColumn2(cachedKV);
+    }
     return;
   }
   
-  // Сканируем в фоне
+  // Сначала показываем папки из AVAILABLE_KV (известные данные) сразу
+  let initialStructure = {};
+  if (Object.keys(AVAILABLE_KV).length > 0) {
+    initialStructure = JSON.parse(JSON.stringify(AVAILABLE_KV));
+    selectedFolder1 = null;
+    selectedFolder2 = null;
+    renderKVColumn1(initialStructure);
+    // Если есть папки первого уровня, выбираем первую и показываем вторую колонку
+    const folders1 = Object.keys(initialStructure);
+    if (folders1.length > 0) {
+      selectedFolder1 = folders1[0];
+      const firstItem = column1.querySelector(`[data-folder1="${folders1[0]}"]`);
+      if (firstItem) {
+        firstItem.classList.add('active');
+        renderKVColumn2(initialStructure, true); // Показываем индикатор загрузки
+      }
+    }
+  } else {
+    // Если нет известных данных, показываем базовую структуру папок (3d, photo)
+    const basicStructure = {
+      '3d': {},
+      'photo': {}
+    };
+    initialStructure = basicStructure;
+    selectedFolder1 = null;
+    selectedFolder2 = null;
+    renderKVColumn1(basicStructure);
+    // Выбираем первую папку и показываем индикатор загрузки
+    selectedFolder1 = '3d';
+    const firstItem = column1.querySelector(`[data-folder1="3d"]`);
+    if (firstItem) {
+      firstItem.classList.add('active');
+      renderKVColumn2(basicStructure, true);
+    }
+  }
+  
+  // Сканируем в фоне по папкам постепенно и обновляем структуру
   kvScanning = true;
-  const scannedKV = await scanKV();
   
-  // Создаем структуру
-  const allKV = buildKVStructure(scannedKV);
+  // Начинаем с текущей структуры
+  let kvStructure = JSON.parse(JSON.stringify(initialStructure));
   
-  cachedKV = allKV;
+  // Импортируем функцию проверки файлов
+  const { checkFileExists } = await import('../../utils/assetScanner.js');
+  
+  // Сканируем по папкам постепенно
+  const firstLevelFolders = ['3d', 'photo'];
+  const knownSecondLevelFolders3d = ['sign', 'icons', 'logos', 'numbers', 'other', 'shapes', 'tech', 'yandex'];
+  const knownSecondLevelFoldersPhoto = ['pro', 'ai_reskill', 'old_reskill'];
+  
+  // Подсчитываем общее количество папок для сканирования
+  let totalFolders = 0;
+  for (const folder1 of firstLevelFolders) {
+    const knownSecondLevelFolders = folder1 === 'photo' 
+      ? knownSecondLevelFoldersPhoto 
+      : knownSecondLevelFolders3d;
+    totalFolders += knownSecondLevelFolders.length;
+  }
+  let scannedFolders = 0;
+  
+  // Инициализируем прогресс-бар
+  updateKVProgress(0);
+  
+  // Сканируем каждую папку отдельно и обновляем UI
+  // Используем батчинг для параллельной проверки нескольких файлов
+  for (const folder1 of firstLevelFolders) {
+    const knownSecondLevelFolders = folder1 === 'photo' 
+      ? knownSecondLevelFoldersPhoto 
+      : knownSecondLevelFolders3d;
+    
+    // Сканируем папки второго уровня параллельно (батчами по 3)
+    for (let i = 0; i < knownSecondLevelFolders.length; i += 3) {
+      const batch = knownSecondLevelFolders.slice(i, i + 3);
+      const batchPromises = batch.map(async (folder2) => {
+        const basePath = `assets/${folder1}/${folder2}`;
+        
+        // Используем умную проверку файлов с ранней остановкой
+        const { checkFilesSmart } = await import('../../utils/assetScanner.js');
+        const folderFiles = await checkFilesSmart(basePath, 1, 99, 5);
+        
+        return { folder2, folderFiles };
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Обновляем структуру после каждого батча
+      for (const { folder2, folderFiles } of batchResults) {
+        if (folderFiles.length > 0) {
+          if (!kvStructure[folder1]) {
+            kvStructure[folder1] = {};
+          }
+          if (!kvStructure[folder1][folder2]) {
+            kvStructure[folder1][folder2] = [];
+          }
+          folderFiles.forEach(file => {
+            if (!kvStructure[folder1][folder2].find(k => k.file === file.file)) {
+              kvStructure[folder1][folder2].push(file);
+            }
+          });
+        }
+        
+        // Обновляем прогресс после каждой папки
+        scannedFolders++;
+        const progress = (scannedFolders / totalFolders) * 100;
+        updateKVProgress(progress);
+      }
+      
+      // Обновляем UI после каждого батча папок
+      cachedKV = kvStructure;
+      renderKVColumn1(kvStructure);
+      
+      // Обновляем вторую колонку, если выбрана соответствующая папка первого уровня
+      if (selectedFolder1 === folder1) {
+        renderKVColumn2(kvStructure, false);
+      }
+      
+      // Небольшая задержка для плавности UI
+      await new Promise(resolve => setTimeout(resolve, 30));
+    }
+  }
+  
+  // Завершаем прогресс
+  updateKVProgress(100);
+  
+  // Небольшая задержка, чтобы показать 100% перед скрытием прогресс-бара
+  await new Promise(resolve => setTimeout(resolve, 300));
+  
+  // Финальное обновление
+  cachedKV = kvStructure;
   kvScanning = false;
   
-  // Заполняем колонки
-  renderKVColumn1(allKV);
+  // Сохраняем текущие выбранные папки, чтобы восстановить состояние после обновления
+  const currentFolder1 = selectedFolder1;
+  const currentFolder2 = selectedFolder2;
+  
+  // Обновляем колонки с полной структурой
+  renderKVColumn1(kvStructure);
+  
+  // Восстанавливаем выбранные папки и обновляем остальные колонки, если они были открыты
+  if (currentFolder1) {
+    selectedFolder1 = currentFolder1;
+    const folder1Item = document.querySelector(`[data-folder1="${currentFolder1}"]`);
+    if (folder1Item) {
+      folder1Item.classList.add('active');
+      renderKVColumn2(kvStructure, false);
+      
+      if (currentFolder2) {
+        selectedFolder2 = currentFolder2;
+        const folder2Item = document.querySelector(`[data-folder2="${currentFolder2}"]`);
+        if (folder2Item) {
+          folder2Item.classList.add('active');
+          const images = kvStructure[currentFolder1]?.[currentFolder2] || [];
+          renderKVColumn3(images);
+        }
+      } else {
+        // Если папка второго уровня не выбрана, выбираем первую
+        const folders2 = Object.keys(kvStructure[currentFolder1] || {});
+        if (folders2.length > 0) {
+          selectedFolder2 = folders2[0];
+          const column2 = document.getElementById('kvFolder2Column');
+          if (column2) {
+            const firstItem = column2.querySelector(`[data-folder2="${folders2[0]}"]`);
+            if (firstItem) {
+              firstItem.classList.add('active');
+              const images = kvStructure[currentFolder1][folders2[0]] || [];
+              renderKVColumn3(images);
+            }
+          }
+        }
+      }
+    }
+  }
 };
 
 /**
@@ -569,6 +855,12 @@ const openKVSelectModal = async (pairIndex = null) => {
   const overlay = document.getElementById('kvSelectModalOverlay');
   if (!overlay) return;
   
+  // Инициализируем dropdown, если еще не инициализирован
+  const trigger = document.getElementById('kvSelectTrigger');
+  if (trigger && !trigger.dataset.initialized) {
+    await initializeKVDropdown();
+  }
+  
   // Сохраняем индекс пары, если указан
   currentKVModalPairIndex = pairIndex;
   
@@ -576,12 +868,20 @@ const openKVSelectModal = async (pairIndex = null) => {
   selectedFolder1 = null;
   selectedFolder2 = null;
   
-  // При открытии заполняем колонки лениво
-  await populateKVColumns();
-  
-  // Показываем модальное окно
+  // Показываем модальное окно сразу
   overlay.style.display = 'block';
   document.body.style.overflow = 'hidden'; // Блокируем скролл фона
+  
+  // Скрываем индикатор загрузки сразу - показываем содержимое немедленно
+  const loadingIndicator = overlay.querySelector('.loading-indicator');
+  if (loadingIndicator) {
+    loadingIndicator.style.display = 'none';
+  }
+  
+  // Заполняем колонки сразу (показываем известные данные) и загружаем остальное в фоне
+  populateKVColumns().catch((error) => {
+    console.error('Ошибка при заполнении колонок KV:', error);
+  });
 };
 
 /**
@@ -614,6 +914,11 @@ export const initializeKVDropdown = async () => {
   trigger.parentNode.replaceChild(newTrigger, trigger);
   const updatedTrigger = document.getElementById('kvSelectTrigger');
   
+  // Помечаем как инициализированный
+  if (updatedTrigger) {
+    updatedTrigger.dataset.initialized = 'true';
+  }
+  
   // Обработчик открытия модального окна
   updatedTrigger.addEventListener('click', async (e) => {
     e.stopPropagation();
@@ -641,12 +946,12 @@ export const initializeKVDropdown = async () => {
 };
 
 /**
- * Загружает KV по умолчанию
+ * Загружает Визуал по умолчанию
  */
 export const loadDefaultKV = async () => {
   const dom = getDom();
   const state = getState();
-  const defaultKV = state.kvSelected || 'assets/3d/sign/01.png';
+  const defaultKV = state.kvSelected || 'assets/3d/sign/01.webp';
   
   if (!defaultKV) return;
   

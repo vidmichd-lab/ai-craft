@@ -16,6 +16,7 @@ import {
 } from '../../state/store.js';
 import { renderer } from '../../renderer.js';
 import { getDom } from '../domCache.js';
+import { t } from '../../utils/i18n.js';
 
 /**
  * Закрывает все дропдауны превью
@@ -37,7 +38,7 @@ export const updateSizesSummary = () => {
   const dom = getDom();
   if (!dom.sizesSummary) return;
   const sizes = getCheckedSizes();
-  dom.sizesSummary.textContent = `Выбрано: ${sizes.length} размеров`;
+  dom.sizesSummary.textContent = t('export.presetSizes.selected', { count: sizes.length });
 };
 
 /**
@@ -476,12 +477,15 @@ export const removeCustomSizeAction = (id) => {
  * Добавляет кастомный размер
  */
 export const addCustomSizeAction = (width, height) => {
-  if (!width || !height || width <= 0 || height <= 0) {
-    alert('Пожалуйста, введите корректные размеры.');
+  // Проверяем, что значения являются числами и больше 0
+  const widthNum = typeof width === 'number' ? width : parseInt(width, 10);
+  const heightNum = typeof height === 'number' ? height : parseInt(height, 10);
+  
+  if (isNaN(widthNum) || isNaN(heightNum) || widthNum <= 0 || heightNum <= 0) {
     return;
   }
   
-  addCustomSize(width, height);
+  addCustomSize(widthNum, heightNum);
   renderCustomSizes();
   updatePreviewSizeSelect();
   updateSizesSummary();
@@ -515,26 +519,49 @@ export const updateAddSizeButtonState = () => {
 /**
  * Добавляет кастомный размер из полей ввода
  */
+let isAddingSize = false; // Флаг для предотвращения повторных вызовов
+
 export const addCustomSizeFromInput = () => {
+  // Предотвращаем повторные вызовы
+  if (isAddingSize) {
+    return;
+  }
+  
   const widthInput = document.getElementById('customWidth');
   const heightInput = document.getElementById('customHeight');
   
   if (!widthInput || !heightInput) return;
   
-  const width = parseInt(widthInput.value, 10);
-  const height = parseInt(heightInput.value, 10);
+  // Получаем значения и проверяем, что они не пустые
+  const widthStr = widthInput.value.trim();
+  const heightStr = heightInput.value.trim();
   
-  if (!width || !height || width <= 0 || height <= 0) {
-    alert('Пожалуйста, введите корректные размеры.');
+  if (!widthStr || !heightStr) {
     return;
   }
   
-  addCustomSizeAction(width, height);
+  const width = parseInt(widthStr, 10);
+  const height = parseInt(heightStr, 10);
   
-  // Очищаем поля ввода
-  widthInput.value = '';
-  heightInput.value = '';
-  updateAddSizeButtonState();
+  // Проверяем, что значения являются валидными числами и больше 0
+  if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+    return;
+  }
+  
+  // Устанавливаем флаг перед добавлением
+  isAddingSize = true;
+  
+  try {
+    addCustomSizeAction(width, height);
+    
+    // Очищаем поля ввода только после успешного добавления
+    widthInput.value = '';
+    heightInput.value = '';
+    updateAddSizeButtonState();
+  } finally {
+    // Сбрасываем флаг после завершения
+    isAddingSize = false;
+  }
 };
 
 /**

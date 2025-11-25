@@ -39,6 +39,7 @@ const ELEMENT_IDS = [
   'ageSizeValue',
   'ageFontFamily',
   'ageGapPercent',
+  'ageGapPercentValue',
   'showLogo',
   'showSubtitle',
   'hideSubtitleOnWide',

@@ -209,6 +209,22 @@ export const initEventDelegation = () => {
         try {
           // Функции обновления принимают только значение, не ключ
           window[updateHandler](value);
+          
+          // Для range input обновляем отображаемое значение, если есть соответствующий span
+          if (target.type === 'range') {
+            const valueSpanId = target.id + 'Value';
+            const valueSpan = document.getElementById(valueSpanId);
+            if (valueSpan) {
+              // Форматируем значение в зависимости от типа
+              if (updateHandler.includes('Opacity') || updateHandler.includes('Percent')) {
+                valueSpan.textContent = `${Math.round(value)}%`;
+              } else if (updateHandler.includes('Size') && updateHandler.includes('Image')) {
+                valueSpan.textContent = `${Math.round(value)}%`;
+              } else {
+                valueSpan.textContent = Math.round(value);
+              }
+            }
+          }
         } catch (error) {
           console.error('Ошибка в обработчике обновления:', error);
           console.error('Обработчик:', updateHandler, 'Значение:', value);
@@ -356,6 +372,11 @@ export const initEventDelegation = () => {
           if (typeof window.selectBgVPosition === 'function') {
             window.selectBgVPosition(value);
           }
+        },
+        'bgGradientTypeToggle': () => {
+          if (typeof window.updateBgGradientType === 'function') {
+            window.updateBgGradientType(value);
+          }
         }
       };
       
@@ -442,14 +463,27 @@ export const initEventDelegation = () => {
       if (typeof window[funcName] === 'function') {
         try {
           console.log('Вызываем функцию:', funcName, 'с параметрами:', params);
-          window[funcName](...params);
+          const result = window[funcName](...params);
+          // Если функция возвращает Promise, обрабатываем ошибки
+          if (result && typeof result.then === 'function') {
+            result.catch((error) => {
+              console.error('Ошибка в асинхронном обработчике data-function:', funcName, error);
+              console.error('Параметры:', params);
+              console.error('Стек ошибки:', error.stack);
+            });
+          }
         } catch (error) {
           console.error('Ошибка выполнения функции:', funcName, error);
           console.error('Параметры:', params);
           console.error('Стек ошибки:', error.stack);
         }
       } else {
-        console.warn('Функция не найдена:', funcName, 'Доступные функции:', Object.keys(window).filter(k => typeof window[k] === 'function' && k.includes('Size')));
+        console.warn('Функция не найдена:', funcName);
+        console.warn('Доступные функции с "Size":', Object.keys(window).filter(k => typeof window[k] === 'function' && k.includes('Size')));
+        console.warn('Доступные функции с "Admin":', Object.keys(window).filter(k => typeof window[k] === 'function' && k.includes('Admin')));
+        console.warn('Доступные функции с "show":', Object.keys(window).filter(k => typeof window[k] === 'function' && k.includes('show')));
+        console.warn('Доступные функции с "Logo":', Object.keys(window).filter(k => typeof window[k] === 'function' && k.includes('Logo')));
+        console.warn('Все функции в window:', Object.keys(window).filter(k => typeof window[k] === 'function').sort());
       }
     } catch (error) {
       console.error('Ошибка в обработчике data-function:', error);
@@ -485,11 +519,27 @@ export const initEventDelegation = () => {
     const target = e.target.closest('[data-action="close-modal"]');
     if (!target) return;
     
+    // Проверяем, не произошел ли клик внутри панели модального окна
+    // Если клик внутри панели, не закрываем модальное окно
+    const panel = e.target.closest('[data-action="stop-propagation"]');
+    if (panel) {
+      // Клик произошел внутри панели, не закрываем модальное окно
+      return;
+    }
+    
+    // Проверяем, не произошел ли клик на элементе с классом column-item (папки)
+    if (e.target.closest('.column-item')) {
+      // Клик произошел на папке, не закрываем модальное окно
+      return;
+    }
+    
     const modalId = target.getAttribute('data-modal');
     if (modalId === 'logoSelectModal' && typeof window.closeLogoSelectModal === 'function') {
       window.closeLogoSelectModal();
     } else if (modalId === 'kvSelectModal' && typeof window.closeKVSelectModal === 'function') {
       window.closeKVSelectModal();
+    } else if (modalId === 'guideModal' && typeof window.closeGuideModal === 'function') {
+      window.closeGuideModal();
     }
   });
 
@@ -509,6 +559,38 @@ export const initEventDelegation = () => {
     if (e.target.hasAttribute('data-action') && e.target.getAttribute('data-action') === 'update-add-size-button') {
       if (typeof window.updateAddSizeButtonState === 'function') {
         window.updateAddSizeButtonState();
+      }
+    }
+  });
+
+  // Обработка Escape для закрытия модальных окон
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      // Проверяем, открыто ли модальное окно гайда
+      const guideModal = document.getElementById('guideModalOverlay');
+      if (guideModal && guideModal.style.display === 'block') {
+        if (typeof window.closeGuideModal === 'function') {
+          window.closeGuideModal();
+        }
+      }
+      // Проверяем другие модальные окна
+      const logoModal = document.getElementById('logoSelectModalOverlay');
+      if (logoModal && logoModal.style.display !== 'none') {
+        if (typeof window.closeLogoSelectModal === 'function') {
+          window.closeLogoSelectModal();
+        }
+      }
+      const kvModal = document.getElementById('kvSelectModalOverlay');
+      if (kvModal && kvModal.style.display !== 'none') {
+        if (typeof window.closeKVSelectModal === 'function') {
+          window.closeKVSelectModal();
+        }
+      }
+      const bgModal = document.getElementById('bgSelectModalOverlay');
+      if (bgModal && bgModal.style.display !== 'none') {
+        if (typeof window.closeBGSelectModal === 'function') {
+          window.closeBGSelectModal();
+        }
       }
     }
   });

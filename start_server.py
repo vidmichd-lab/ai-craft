@@ -9,6 +9,16 @@ import os
 import sys
 import socket
 import traceback
+import json
+import shutil
+from urllib.parse import urlparse, parse_qs, unquote
+try:
+    from PIL import Image
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+    print("⚠️  Предупреждение: Pillow не установлен. Конвертация в WebP недоступна.")
+    print("   Установите: pip install Pillow")
 
 PORT = 8000
 
@@ -184,7 +194,7 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         try:
             self.send_response(200)
             self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
             self.send_header('Access-Control-Allow-Headers', 'Content-Type')
             self.end_headers()
         except Exception as e:
@@ -196,7 +206,7 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         try:
             # Добавляем заголовки CORS для работы с модулями
             self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
             self.send_header('Access-Control-Allow-Headers', 'Content-Type')
             super().end_headers()
         except Exception as e:
@@ -206,6 +216,408 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 super().end_headers()
             except:
                 pass
+    
+    def do_POST(self):
+        """Обработка POST запросов для загрузки файлов"""
+        try:
+            # Обрабатываем API запросы
+            if self.path.startswith('/api/'):
+                self.handle_api_post()
+            else:
+                self.send_error(404, "Not Found")
+        except Exception as e:
+            print(f"❌ ОШИБКА при обработке POST запроса '{self.path}': {e}")
+            traceback.print_exc()
+            self.send_error(500, f"Internal Server Error: {str(e)}")
+    
+    def do_DELETE(self):
+        """Обработка DELETE запросов для удаления файлов и папок"""
+        try:
+            if self.path.startswith('/api/'):
+                self.handle_api_delete()
+            else:
+                self.send_error(404, "Not Found")
+        except Exception as e:
+            print(f"❌ ОШИБКА при обработке DELETE запроса '{self.path}': {e}")
+            traceback.print_exc()
+            self.send_error(500, f"Internal Server Error: {str(e)}")
+    
+    def handle_api_post(self):
+        """Обработка POST API запросов"""
+        parsed_path = urlparse(self.path)
+        path_parts = parsed_path.path.split('/')
+        
+        if len(path_parts) < 3:
+            self.send_error(400, "Bad Request")
+            return
+        
+        api_action = path_parts[2]
+        
+        if api_action == 'upload':
+            self.handle_upload()
+        elif api_action == 'create-folder':
+            self.handle_create_folder()
+        elif api_action == 'rename-folder':
+            self.handle_rename_folder()
+        else:
+            self.send_error(404, "API endpoint not found")
+    
+    def handle_api_delete(self):
+        """Обработка DELETE API запросов"""
+        parsed_path = urlparse(self.path)
+        path_parts = parsed_path.path.split('/')
+        
+        if len(path_parts) < 3:
+            self.send_error(400, "Bad Request")
+            return
+        
+        api_action = path_parts[2]
+        
+        if api_action == 'file':
+            self.handle_delete_file()
+        elif api_action == 'folder':
+            self.handle_delete_folder()
+        else:
+            self.send_error(404, "API endpoint not found")
+    
+    def handle_upload(self):
+        """Обработка загрузки файла"""
+        try:
+            # Получаем параметры из query string
+            parsed_path = urlparse(self.path)
+            query_params = parse_qs(parsed_path.query)
+            
+            target_path = query_params.get('path', [None])[0]
+            if not target_path:
+                self.send_error(400, "Missing 'path' parameter")
+                return
+            
+            target_path = unquote(target_path)
+            
+            # Проверяем, что путь находится в разрешенных директориях
+            allowed_dirs = ['logo', 'assets']
+            if not any(target_path.startswith(d + '/') or target_path == d for d in allowed_dirs):
+                self.send_error(403, "Path not allowed")
+                return
+            
+            # Читаем данные из запроса
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length == 0:
+                self.send_error(400, "Empty file")
+                return
+            
+            file_data = self.rfile.read(content_length)
+            
+            # Получаем имя файла из заголовков
+            content_disposition = self.headers.get('Content-Disposition', '')
+            filename = None
+            if 'filename=' in content_disposition:
+                filename = content_disposition.split('filename=')[1].strip('"')
+            
+            if not filename:
+                # Пытаемся получить из query параметра
+                filename = query_params.get('filename', [None])[0]
+                if not filename:
+                    self.send_error(400, "Missing filename")
+                    return
+            
+            filename = unquote(filename)
+            
+            # Формируем полный путь
+            full_path = os.path.join(os.getcwd(), target_path, filename)
+            
+            # Создаем директорию, если её нет
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            
+            # Определяем, нужно ли конвертировать в WebP
+            should_convert_to_webp = target_path.startswith('assets/') and HAS_PIL
+            
+            if should_convert_to_webp:
+                # Конвертируем в WebP с качеством 50%
+                try:
+                    # Сохраняем временный файл
+                    temp_path = full_path + '.tmp'
+                    with open(temp_path, 'wb') as f:
+                        f.write(file_data)
+                    
+                    # Открываем изображение
+                    img = Image.open(temp_path)
+                    
+                    # Конвертируем RGBA в RGB, если нужно (для JPEG)
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        # Создаем белый фон
+                        rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                        img = rgb_img
+                    elif img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Сохраняем как WebP с качеством 50%
+                    webp_path = os.path.splitext(full_path)[0] + '.webp'
+                    img.save(webp_path, 'WEBP', quality=50, method=6)
+                    
+                    # Удаляем временный файл
+                    os.remove(temp_path)
+                    
+                    # Если оригинальный файл не WebP, удаляем его
+                    if not filename.lower().endswith('.webp'):
+                        if os.path.exists(full_path):
+                            os.remove(full_path)
+                        full_path = webp_path
+                        filename = os.path.splitext(filename)[0] + '.webp'
+                    
+                    print(f"✅ Загружен и сконвертирован: {target_path}/{filename}")
+                except Exception as e:
+                    print(f"❌ Ошибка конвертации в WebP: {e}")
+                    traceback.print_exc()
+                    # Сохраняем оригинальный файл, если конвертация не удалась
+                    with open(full_path, 'wb') as f:
+                        f.write(file_data)
+            else:
+                # Сохраняем файл как есть
+                with open(full_path, 'wb') as f:
+                    f.write(file_data)
+                print(f"✅ Загружен: {target_path}/{filename}")
+            
+            # Отправляем успешный ответ
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = {
+                'success': True,
+                'path': f"{target_path}/{filename}",
+                'message': 'File uploaded successfully'
+            }
+            self.wfile.write(json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            print(f"❌ Ошибка при загрузке файла: {e}")
+            traceback.print_exc()
+            self.send_error(500, f"Upload failed: {str(e)}")
+    
+    def handle_create_folder(self):
+        """Обработка создания папки"""
+        try:
+            # Получаем параметры из query string
+            parsed_path = urlparse(self.path)
+            query_params = parse_qs(parsed_path.query)
+            
+            target_path = query_params.get('path', [None])[0]
+            folder_name = query_params.get('name', [None])[0]
+            
+            if not target_path or not folder_name:
+                self.send_error(400, "Missing 'path' or 'name' parameter")
+                return
+            
+            target_path = unquote(target_path)
+            folder_name = unquote(folder_name)
+            
+            # Нормализуем путь (убираем начальные/конечные слэши)
+            target_path = target_path.strip('/')
+            
+            # Проверяем, что путь находится в разрешенных директориях
+            allowed_dirs = ['logo', 'assets']
+            # Проверяем, что путь начинается с разрешенной директории
+            path_allowed = False
+            for allowed_dir in allowed_dirs:
+                if target_path == allowed_dir or target_path.startswith(allowed_dir + '/'):
+                    path_allowed = True
+                    break
+            
+            if not path_allowed:
+                self.send_error(403, f"Path not allowed: {target_path}")
+                return
+            
+            # Формируем полный путь
+            full_path = os.path.join(os.getcwd(), target_path, folder_name)
+            
+            # Создаем папку
+            os.makedirs(full_path, exist_ok=True)
+            
+            print(f"✅ Создана папка: {target_path}/{folder_name}")
+            
+            # Отправляем успешный ответ
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = {
+                'success': True,
+                'path': f"{target_path}/{folder_name}",
+                'message': 'Folder created successfully'
+            }
+            self.wfile.write(json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            print(f"❌ Ошибка при создании папки: {e}")
+            traceback.print_exc()
+            self.send_error(500, f"Create folder failed: {str(e)}")
+    
+    def handle_delete_file(self):
+        """Обработка удаления файла"""
+        try:
+            # Получаем путь из query string
+            parsed_path = urlparse(self.path)
+            query_params = parse_qs(parsed_path.query)
+            
+            file_path = query_params.get('path', [None])[0]
+            if not file_path:
+                self.send_error(400, "Missing 'path' parameter")
+                return
+            
+            file_path = unquote(file_path)
+            
+            # Проверяем, что путь находится в разрешенных директориях
+            allowed_dirs = ['logo', 'assets']
+            if not any(file_path.startswith(d + '/') for d in allowed_dirs):
+                self.send_error(403, "Path not allowed")
+                return
+            
+            # Формируем полный путь
+            full_path = os.path.join(os.getcwd(), file_path)
+            
+            # Проверяем, что это файл, а не папка
+            if not os.path.isfile(full_path):
+                self.send_error(404, "File not found")
+                return
+            
+            # Удаляем файл
+            os.remove(full_path)
+            
+            print(f"✅ Удален файл: {file_path}")
+            
+            # Отправляем успешный ответ
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = {
+                'success': True,
+                'message': 'File deleted successfully'
+            }
+            self.wfile.write(json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            print(f"❌ Ошибка при удалении файла: {e}")
+            traceback.print_exc()
+            self.send_error(500, f"Delete file failed: {str(e)}")
+    
+    def handle_delete_folder(self):
+        """Обработка удаления папки"""
+        try:
+            # Получаем путь из query string
+            parsed_path = urlparse(self.path)
+            query_params = parse_qs(parsed_path.query)
+            
+            folder_path = query_params.get('path', [None])[0]
+            if not folder_path:
+                self.send_error(400, "Missing 'path' parameter")
+                return
+            
+            folder_path = unquote(folder_path)
+            
+            # Проверяем, что путь находится в разрешенных директориях
+            allowed_dirs = ['logo', 'assets']
+            if not any(folder_path.startswith(d + '/') for d in allowed_dirs):
+                self.send_error(403, "Path not allowed")
+                return
+            
+            # Формируем полный путь
+            full_path = os.path.join(os.getcwd(), folder_path)
+            
+            # Проверяем, что это папка
+            if not os.path.isdir(full_path):
+                self.send_error(404, "Folder not found")
+                return
+            
+            # Удаляем папку со всем содержимым
+            shutil.rmtree(full_path)
+            
+            print(f"✅ Удалена папка: {folder_path}")
+            
+            # Отправляем успешный ответ
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = {
+                'success': True,
+                'message': 'Folder deleted successfully'
+            }
+            self.wfile.write(json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            print(f"❌ Ошибка при удалении папки: {e}")
+            traceback.print_exc()
+            self.send_error(500, f"Delete folder failed: {str(e)}")
+    
+    def handle_rename_folder(self):
+        """Обработка переименования папки"""
+        try:
+            # Получаем параметры из query string
+            parsed_path = urlparse(self.path)
+            query_params = parse_qs(parsed_path.query)
+            
+            folder_path = query_params.get('path', [None])[0]
+            new_name = query_params.get('name', [None])[0]
+            
+            if not folder_path or not new_name:
+                self.send_error(400, "Missing 'path' or 'name' parameter")
+                return
+            
+            folder_path = unquote(folder_path)
+            new_name = unquote(new_name)
+            
+            # Проверяем, что путь находится в разрешенных директориях
+            allowed_dirs = ['logo', 'assets']
+            if not any(folder_path.startswith(d + '/') for d in allowed_dirs):
+                self.send_error(403, "Path not allowed")
+                return
+            
+            # Проверяем на недопустимые символы
+            if '/' in new_name or '\\' in new_name:
+                self.send_error(400, "Folder name cannot contain / or \\")
+                return
+            
+            # Формируем полный путь
+            full_path = os.path.join(os.getcwd(), folder_path)
+            
+            # Проверяем, что это папка
+            if not os.path.isdir(full_path):
+                self.send_error(404, "Folder not found")
+                return
+            
+            # Формируем новый путь
+            parent_dir = os.path.dirname(full_path)
+            new_full_path = os.path.join(parent_dir, new_name)
+            
+            # Проверяем, что папка с таким именем не существует
+            if os.path.exists(new_full_path):
+                self.send_error(409, "Folder with this name already exists")
+                return
+            
+            # Переименовываем папку
+            os.rename(full_path, new_full_path)
+            
+            # Формируем новый относительный путь
+            new_relative_path = os.path.relpath(new_full_path, os.getcwd()).replace('\\', '/')
+            
+            print(f"✅ Переименована папка: {folder_path} -> {new_relative_path}")
+            
+            # Отправляем успешный ответ
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = {
+                'success': True,
+                'path': new_relative_path,
+                'message': 'Folder renamed successfully'
+            }
+            self.wfile.write(json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            print(f"❌ Ошибка при переименовании папки: {e}")
+            traceback.print_exc()
+            self.send_error(500, f"Rename folder failed: {str(e)}")
 
 def main():
     try:

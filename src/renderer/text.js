@@ -38,18 +38,23 @@ export const measureLineWidth = (ctx, text) => {
 
 /**
  * Рисует текст с учетом межбуквенного расстояния
+ * letterSpacing - процент от размера шрифта (например, 2 означает 2% от fontSize)
+ * fontSize - размер шрифта в пикселях
  */
-export const drawTextWithSpacing = (ctx, text, x, y, letterSpacing, align) => {
+export const drawTextWithSpacing = (ctx, text, x, y, letterSpacingPercent, fontSize, align) => {
   ctx.textAlign = align;
 
-  if (!letterSpacing) {
+  if (!letterSpacingPercent) {
     ctx.fillText(text, x, y);
     return;
   }
 
+  // Вычисляем межбуквенное расстояние в пикселях на основе процента от размера шрифта
+  const letterSpacingPx = (letterSpacingPercent / 100) * fontSize;
+
   const characters = Array.from(text);
   const widths = characters.map((char) => measureLineWidth(ctx, char));
-  const totalWidth = widths.reduce((acc, width) => acc + width, 0) + letterSpacing * (characters.length - 1);
+  const totalWidth = widths.reduce((acc, width) => acc + width, 0) + letterSpacingPx * (characters.length - 1);
 
   let startX = x;
   if (align === 'center') {
@@ -61,7 +66,7 @@ export const drawTextWithSpacing = (ctx, text, x, y, letterSpacing, align) => {
   let currentX = startX;
   characters.forEach((char, index) => {
     ctx.fillText(char, currentX, y);
-    currentX += widths[index] + letterSpacing;
+    currentX += widths[index] + letterSpacingPx;
   });
 };
 

@@ -4,12 +4,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Multi-Artboard Layout Generator</title>
   <link rel="icon" href="data:,">
-      <!-- Performance optimizations -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="styles.css">
+  <!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+  (function(m,e,t,r,i,k,a){
+      m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+      m[i].l=1*new Date();
+      for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+      k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+  })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=105500161', 'ym');
+
+  ym(105500161, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", accurateTrackBounce:true, trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/105500161" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
+  
+  <!-- Performance optimizations -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+  
+  <!-- Версия приложения для обхода кеша -->
+  <script>
+    window.APP_VERSION = '1.0.0';
+    window.APP_BUILD_TIME = '2024-01-01T00:00:00Z';
+  </script>
+  
+  <!-- Preload критических ресурсов -->
+  <link rel="preload" href="styles.css?v=1.0.0" as="style">
+  <link rel="preload" href="src/main.js?v=1.0.0" as="script" type="module">
+  <link rel="preload" href="src/constants.js?v=1.0.0" as="script" type="module">
+  <link rel="preload" href="src/state/store.js?v=1.0.0" as="script" type="module">
+  <link rel="preload" href="src/renderer.js?v=1.0.0" as="script" type="module">
+  
+  <!-- Prefetch для часто используемых ресурсов -->
+  <link rel="prefetch" href="sizes-config.json?v=1.0.0" as="fetch" crossorigin>
+  <link rel="prefetch" href="src/utils/assetScanner.js?v=1.0.0" as="script" type="module">
+  <link rel="prefetch" href="src/utils/imageCache.js?v=1.0.0" as="script" type="module">
+  
+  <link rel="stylesheet" href="styles.css?v=1.0.0">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script>
     // Инициализация темы до загрузки страницы (избегаем мерцания)
@@ -19,60 +55,85 @@
         document.documentElement.setAttribute('data-theme', 'light');
       }
     })();
+    
+    // Инициализация языка до загрузки страницы (избегаем мерцания)
+    (function() {
+      const savedLang = localStorage.getItem('language');
+      // Убеждаемся, что язык валидный, иначе устанавливаем 'ru'
+      if (!savedLang || (savedLang !== 'ru' && savedLang !== 'en')) {
+        localStorage.setItem('language', 'ru');
+      }
+    })();
   </script>
 </head>
 <body>
   <div class="app">
     <div class="header">
-      <h1>Генератор макетов Практикума</h1>
+      <h1 data-i18n="app.title">Генератор макетов Практикума <span style="color: var(--text-secondary, #999999); font-size: 0.6em; font-weight: normal; margin-left: 8px;">V1.0</span></h1>
       <div class="header-actions">
-        <div class="theme-toggle">
-          <div class="toggle-switch" id="themeToggle" data-value="dark" data-options="2" title="Переключить тему">
-            <div class="toggle-switch-slider"></div>
-            <div class="toggle-switch-track">
-              <div class="toggle-switch-option active" data-value="dark">
-                <span class="material-icons">dark_mode</span>
+          <div class="language-selector">
+            <div class="custom-select-wrapper">
+              <div class="custom-select-button" id="languageSelectBtn">
+                <span id="languageSelectText">RU</span>
+                <span class="custom-select-arrow">▼</span>
               </div>
-              <div class="toggle-switch-option" data-value="light">
-                <span class="material-icons">light_mode</span>
+              <div class="custom-select-dropdown" id="languageSelectDropdown">
+                <div class="custom-select-option selected" data-value="ru" data-i18n="common.language.ru">RU</div>
+                <div class="custom-select-option" data-value="en" data-i18n="common.language.en">EN</div>
               </div>
             </div>
           </div>
-        </div>
+          <div class="theme-toggle" style="display: flex; align-items: center; gap: 12px;">
+            <div class="toggle-switch" id="themeToggle" data-value="dark" data-options="2" data-i18n-title="theme.toggle">
+              <div class="toggle-switch-slider"></div>
+              <div class="toggle-switch-track">
+                <div class="toggle-switch-option active" data-value="dark">
+                  <span class="material-icons">dark_mode</span>
+                </div>
+                <div class="toggle-switch-option" data-value="light">
+                  <span class="material-icons">light_mode</span>
+                </div>
+              </div>
+            </div>
+          </div>
       </div>
     </div>
     <div class="main">
       <!-- Icons Panel -->
       <div class="tabs-panel">
         <div class="tab active" data-section="layout">
-          <span>Макет</span>
+          <span data-i18n="tab.layout">Макет</span>
         </div>
         <div class="tab" data-section="logo">
-          <span>Логотип</span>
+          <span data-i18n="tab.logo">Логотип</span>
         </div>
         <div class="tab" data-section="title">
-          <span>Заголовок</span>
+          <span data-i18n="tab.title">Заголовок</span>
         </div>
         <div class="tab" data-section="subtitle">
-          <span>Подзаголовок</span>
+          <span data-i18n="tab.subtitle">Подзаголовок</span>
         </div>
         <div class="tab" data-section="legal">
-          <span>Лигал</span>
+          <span data-i18n="tab.legal">Лигал</span>
         </div>
         <div class="tab" data-section="kv">
-          <span>KV</span>
+          <span data-i18n="tab.kv">Визуал</span>
         </div>
-        <div class="theme-text-muted" style="margin-top: auto; padding: 16px; text-align: center; font-size: 12px;">
-          <span>Вайб-код от <a href="https://staff.yandex-team.ru/vidmich" target="_blank" rel="noopener" style="color: var(--accent-color); text-decoration: none;">@vidmich</a></span>
+        <div class="tab" data-section="figma">
+          <span data-i18n="tab.figma">Figma</span>
+        </div>
+        <div class="theme-text-muted" style="margin-top: auto; padding: 16px; text-align: center; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <span><span data-i18n="footer.credit">Вайб-код от</span> <a href="https://staff.yandex-team.ru/vidmich" target="_blank" rel="noopener" style="color: var(--accent-color); text-decoration: none;">@vidmich</a></span>
         </div>
       </div>
       
       <!-- Left Panel -->
       <div class="panel">
+        <div class="panel-resizer" id="leftPanelResizer"></div>
         <!-- Layout Section -->
         <div class="panel-section active" id="panel-section-layout">
             <div class="form-group">
-              <label>Отступ от края</label>
+              <label for="paddingPercent" data-i18n="layout.padding">Отступ от края</label>
               <input type="range" id="paddingPercent" value="5" min="2" max="8" data-state-key="paddingPercent" data-update-handler="updatePadding">
               <div class="slider-value">
                 <span>2%</span>
@@ -81,10 +142,12 @@
               </div>
             </div>
             <div class="form-group form-group-section">
-            <label>Фон</label>
+            <label data-i18n="layout.background">Фон</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
-              <input type="color" id="bgColor" value="#1e1e1e" data-state-key="bgColor" data-update-handler="updateColorFromPicker" data-handler-param="bgColor" style="flex: 0 0 60px;">
-              <input type="text" id="bgColorHex" value="#1e1e1e" placeholder="#1e1e1e" data-state-key="bgColor" data-update-handler="updateColorFromHex" data-handler-param="bgColor" style="flex: 1;">
+              <label for="bgColor" class="sr-only" data-i18n="layout.background"></label>
+              <input type="color" id="bgColor" value="#1e1e1e" data-state-key="bgColor" data-update-handler="updateColorFromPicker" data-handler-param="bgColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.bgColor">
+              <label for="bgColorHex" class="sr-only" data-i18n="layout.background"></label>
+              <input type="text" id="bgColorHex" value="#1e1e1e" placeholder="#1e1e1e" data-state-key="bgColor" data-update-handler="updateColorFromHex" data-handler-param="bgColor" style="flex: 1;" data-i18n-aria-label="aria.bgColorHex">
             </div>
             <div class="gap-sm mt-md" style="display: flex; flex-wrap: wrap;">
               <button class="btn" data-function="applyPresetBgColor" data-params='["#027EF2"]' style="background: #027EF2; width: 32px; height: 32px; padding: 0; border-radius: 6px;" title="#027EF2"></button>
@@ -97,20 +160,52 @@
               <button class="btn" data-function="applyPresetBgColor" data-params='["#1E1E1E"]' style="background: #1E1E1E; width: 32px; height: 32px; padding: 0; border-radius: 6px;" title="#1E1E1E"></button>
               <button class="btn" data-function="applyPresetBgColor" data-params='["#FFFFFF"]' style="background: #FFFFFF; width: 32px; height: 32px; padding: 0; border-radius: 6px; border: none;" title="#FFFFFF"></button>
             </div>
+            <div class="form-group" style="margin-top: 16px;">
+              <label data-i18n="layout.bgGradient">Градиент фона</label>
+              <div class="toggle-switch" id="bgGradientTypeToggle" data-value="none" data-options="3">
+                <div class="toggle-switch-slider"></div>
+                <div class="toggle-switch-track">
+                  <div class="toggle-switch-option active" data-value="none" data-i18n-title="layout.bgGradient.none">
+                    <span class="material-icons">close</span>
+                  </div>
+                  <div class="toggle-switch-option" data-value="linear" data-i18n-title="layout.bgGradient.linear">
+                    <span class="material-icons">linear_scale</span>
+                  </div>
+                  <div class="toggle-switch-option" data-value="radial" data-i18n-title="layout.bgGradient.radial">
+                    <span class="material-icons">radio_button_unchecked</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group" id="bgGradientOptions" style="display: none;">
+              <div id="bgGradientAngleContainer">
+                <label for="bgGradientAngle" data-i18n="layout.bgGradient.angle">Угол градиента</label>
+                <input type="range" id="bgGradientAngle" value="0" min="0" max="360" step="1" data-state-key="bgGradientAngle" data-update-handler="updateBgGradientAngle">
+                <div class="slider-value">
+                  <span>0°</span>
+                  <span id="bgGradientAngleValue">0°</span>
+                  <span>360°</span>
+                </div>
+              </div>
+              <div id="bgGradientStops" style="margin-top: 16px;">
+                <!-- Остановки градиента будут добавлены динамически -->
+              </div>
+              <button class="btn btn-full mt-sm" id="addGradientStopBtn" data-function="addGradientStop"><span class="material-icons" style="margin-right: 6px; font-size: 18px;">add</span><span data-i18n="layout.bgGradient.addStop">Добавить остановку</span></button>
+            </div>
           </div>
           <div class="form-group">
-            <label>Фоновое изображение</label>
+            <label data-i18n="layout.bgImage">Фоновое изображение</label>
             <div id="bgPreviewContainer" class="preview-container">
               <img id="bgPreviewImg" src="" class="preview-img" style="display: none;">
-              <span id="bgPreviewPlaceholder" class="preview-placeholder">— Нет —</span>
+              <span id="bgPreviewPlaceholder" class="preview-placeholder" data-i18n="common.none">— Нет —</span>
             </div>
             <div id="bgSelectModalOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); z-index: 10000; backdrop-filter: blur(2px);" data-action="close-modal" data-modal="bgSelectModal">
               <div id="bgSelectPanel" class="theme-bg-secondary" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; max-width: 900px; max-height: 80vh; border: none; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); z-index: 10001;" data-action="stop-propagation">
                 <div class="modal-header">
-                  <span class="modal-title">Выбрать фоновое изображение</span>
+                  <span class="modal-title" data-i18n="layout.bgImage.selectModal.title">Выбрать фоновое изображение</span>
                   <div class="modal-actions">
-                    <button class="btn" data-function="refreshBGColumns" data-action="stop-propagation" title="Обновить"><span class="material-icons">refresh</span></button>
-                    <button class="btn" data-function="closeBGSelectModal" data-action="stop-propagation" title="Закрыть"><span class="material-icons">close</span></button>
+                    <button class="btn" data-function="refreshBGColumns" data-action="stop-propagation" data-i18n-title="common.refresh"><span class="material-icons">refresh</span></button>
+                    <button class="btn" data-function="closeBGSelectModal" data-action="stop-propagation" data-i18n-title="common.close"><span class="material-icons">close</span></button>
                   </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 150px 150px 1fr; height: calc(70vh - 50px); max-height: 550px;">
@@ -126,34 +221,49 @@
                 </div>
               </div>
             </div>
-            <button class="btn btn-full mb-sm" id="bgSelectTrigger"><span id="bgSelectText">Выбрать из библиотеки</span></button>
+            <button class="btn btn-full mb-sm" id="bgSelectTrigger"><span id="bgSelectText" data-i18n="layout.bgImage.select">Выбрать из библиотеки</span></button>
             <div style="display: flex; gap: 8px; width: 100%; margin-top: 8px;">
-              <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" style="flex: 1;" id="bgUploadBtn"><span class="material-icons" style="font-size: 18px; margin-right: 4px;">image</span>Загрузить</button>
-              <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" id="bgReplaceBtn" style="display: none; flex: 1;" title="Заменить"><span class="material-icons" style="font-size: 18px; margin-right: 4px;">refresh</span>Заменить</button>
-              <button class="btn" data-function="clearBg" id="bgDeleteBtn" style="display: none; flex: 1;" title="Удалить"><span class="material-icons" style="font-size: 18px;">delete</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" style="flex: 1;" id="bgUploadBtn"><span class="material-icons" style="font-size: 18px; margin-right: 4px;">image</span><span data-i18n="common.upload">Загрузить</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" id="bgReplaceBtn" style="display: none; flex: 1;" data-i18n-title="layout.bgImage.replace"><span class="material-icons" style="font-size: 18px; margin-right: 4px;">refresh</span><span data-i18n="layout.bgImage.replace">Заменить</span></button>
+              <button class="btn" data-function="clearBg" id="bgDeleteBtn" style="display: none; flex: 1;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 18px;">delete</span><span data-i18n="common.delete">Удалить</span></button>
             </div>
             <input type="file" id="bgUpload" accept="image/*" style="display: none;" data-handler="handleBgUpload">
           </div>
           <div class="form-group" id="bgImageOptions" style="display: none;">
-            <label>Горизонтальное расположение</label>
+            <label data-i18n="layout.bgImage.hPosition">Горизонтальное расположение</label>
             <div class="toggle-switch" id="bgPositionToggle" data-value="center" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option" data-value="left" title="Слева"><span class="material-icons" style="font-size: 18px;">align_horizontal_left</span></div>
-                <div class="toggle-switch-option active" data-value="center" title="По центру"><span class="material-icons" style="font-size: 18px;">align_horizontal_center</span></div>
-                <div class="toggle-switch-option" data-value="right" title="Справа"><span class="material-icons" style="font-size: 18px;">align_horizontal_right</span></div>
+                <div class="toggle-switch-option" data-value="left" data-i18n-title="logo.position.left"><span class="material-icons" style="font-size: 18px;">align_horizontal_left</span></div>
+                <div class="toggle-switch-option active" data-value="center" data-i18n-title="logo.position.center"><span class="material-icons" style="font-size: 18px;">align_horizontal_center</span></div>
+                <div class="toggle-switch-option" data-value="right" data-i18n-title="kv.position.right"><span class="material-icons" style="font-size: 18px;">align_horizontal_right</span></div>
               </div>
             </div>
-            <label style="margin-top: 16px;">Вертикальное выравнивание</label>
+            <label style="margin-top: 16px;" data-i18n="layout.bgImage.vPosition">Вертикальное выравнивание</label>
             <div class="toggle-switch" id="bgVPositionToggle" data-value="center" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option" data-value="top" title="Сверху"><span class="material-icons" style="font-size: 18px;">vertical_align_top</span></div>
-                <div class="toggle-switch-option active" data-value="center" title="По центру"><span class="material-icons" style="font-size: 18px;">vertical_align_center</span></div>
-                <div class="toggle-switch-option" data-value="bottom" title="Снизу"><span class="material-icons" style="font-size: 18px;">vertical_align_bottom</span></div>
+                <div class="toggle-switch-option" data-value="top" data-i18n-title="title.vPos.top"><span class="material-icons" style="font-size: 18px;">vertical_align_top</span></div>
+                <div class="toggle-switch-option active" data-value="center" data-i18n-title="title.vPos.center"><span class="material-icons" style="font-size: 18px;">vertical_align_center</span></div>
+                <div class="toggle-switch-option" data-value="bottom" data-i18n-title="title.vPos.bottom"><span class="material-icons" style="font-size: 18px;">vertical_align_bottom</span></div>
               </div>
             </div>
-            <label style="margin-top: 16px;">Прозрачность подложки под текстом</label>
+            <label style="margin-top: 16px;" data-i18n="layout.bgImage.size">Тип размещения</label>
+            <select id="bgSize" data-state-key="bgSize" data-update-handler="updateBgSize" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-family: inherit; font-size: 14px;">
+              <option value="cover" data-i18n="layout.bgImage.size.cover">Cover — Заполнить (по умолчанию)</option>
+              <option value="contain" data-i18n="layout.bgImage.size.contain">Contain — Вместить</option>
+              <option value="fill" data-i18n="layout.bgImage.size.fill">Fill — Растянуть</option>
+              <option value="tile" data-i18n="layout.bgImage.size.tile">Tile — Мозаика</option>
+            </select>
+            <div id="bgImageSizeGroup" style="display: none; margin-top: 16px;">
+              <label for="bgImageSize" data-i18n="layout.bgImage.imageSize">Размер изображения</label>
+              <input type="range" id="bgImageSize" data-state-key="bgImageSize" data-update-handler="updateBgImageSize" value="100" min="10" max="500" step="1" style="width: 100%;">
+              <div class="slider-value">
+                <span id="bgImageSizeValue">100%</span>
+              </div>
+              <div class="hint" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;" data-i18n="layout.bgImage.imageSize.hint">Размер изображения в процентах от исходного размера. 100% = исходный размер</div>
+            </div>
+            <label for="textGradientOpacity" style="margin-top: 16px;" data-i18n="layout.bgImage.textGradient">Прозрачность подложки под текстом</label>
             <input type="range" id="textGradientOpacity" value="100" min="0" max="100" step="1" data-state-key="textGradientOpacity" data-update-handler="updateTextGradientOpacity">
             <div class="slider-value">
               <span id="textGradientOpacityValue">100%</span>
@@ -167,30 +277,30 @@
           <div class="form-group">
             <div class="checkbox-group">
               <input type="checkbox" id="showLogo" checked data-state-key="showLogo">
-              <label for="showLogo">Показывать логотип</label>
+              <label for="showLogo" data-i18n="logo.show">Показывать логотип</label>
             </div>
           </div>
           <div class="form-group">
             <div class="toggle-switch" id="logoLangToggle" data-value="ru" data-options="2">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="ru">RU</div>
-                <div class="toggle-switch-option" data-value="kz">KZ</div>
+                <div class="toggle-switch-option active" data-value="ru" data-i18n="logo.language.ru">RU</div>
+                <div class="toggle-switch-option" data-value="kz" data-i18n="logo.language.kz">KZ</div>
               </div>
             </div>
           </div>
           <div class="form-group">
             <div id="logoPreviewContainer" class="preview-container">
               <img id="logoPreviewImg" src="" class="preview-img" style="display: none;">
-              <span id="logoPreviewPlaceholder" class="preview-placeholder">— Нет —</span>
+              <span id="logoPreviewPlaceholder" class="preview-placeholder" data-i18n="common.none">— Нет —</span>
             </div>
             <div id="logoSelectModalOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); z-index: 10000; backdrop-filter: blur(2px);" data-action="close-modal" data-modal="logoSelectModal">
               <div id="logoSelectPanel" class="theme-bg-secondary" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; max-width: 900px; max-height: 80vh; border: none; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); z-index: 10001;" data-action="stop-propagation">
                 <div class="modal-header">
-                  <span class="modal-title">Выбрать логотип</span>
+                  <span class="modal-title" data-i18n="logo.selectModal.title">Выбрать логотип</span>
                   <div class="modal-actions">
-                    <button class="btn" data-function="refreshLogoColumns" data-action="stop-propagation" title="Обновить"><span class="material-icons">refresh</span></button>
-                    <button class="btn" data-function="closeLogoSelectModal" data-action="stop-propagation" title="Закрыть"><span class="material-icons">close</span></button>
+                    <button class="btn" data-function="refreshLogoColumns" data-action="stop-propagation" data-i18n-title="common.refresh"><span class="material-icons">refresh</span></button>
+                    <button class="btn" data-function="closeLogoSelectModal" data-action="stop-propagation" data-i18n-title="common.close"><span class="material-icons">close</span></button>
                   </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 150px 150px 150px 1fr; height: calc(70vh - 50px); max-height: 550px;">
@@ -209,19 +319,19 @@
                 </div>
               </div>
             </div>
-            <button class="btn btn-full mb-sm" id="logoSelectTrigger"><span id="logoSelectText">Выбрать</span></button>
+            <button class="btn btn-full mb-sm" id="logoSelectTrigger"><span id="logoSelectText" data-i18n="logo.select">Выбрать</span></button>
             <select id="logoSelect" style="display: none;" data-state-key="logoSelected" data-update-handler="selectPreloadedLogo">
-              <option value="" selected>— Нет —</option>
+              <option value="" selected data-i18n="common.none">— Нет —</option>
             </select>
             <div style="display: flex; gap: 8px; width: 100%;">
-              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" style="flex: 1;" id="logoUploadBtn" title="Загрузить"><span class="material-icons">upload</span></button>
-              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" id="logoReplaceBtn" style="display: none; flex: 1;" title="Заменить"><span class="material-icons">refresh</span></button>
-              <button class="btn btn-danger" id="logoRemoveBtn" data-function="clearLogo" style="flex: 1;" disabled title="Удалить"><span class="material-icons">delete</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" style="flex: 1;" id="logoUploadBtn" data-i18n-title="common.upload"><span class="material-icons">upload</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" id="logoReplaceBtn" style="display: none; flex: 1;" data-i18n-title="logo.replace"><span class="material-icons">refresh</span></button>
+              <button class="btn btn-danger" id="logoRemoveBtn" data-function="clearLogo" style="flex: 1;" disabled data-i18n-title="common.delete"><span class="material-icons">delete</span></button>
               <input type="file" id="logoUpload" accept="image/*,.svg" style="display: none;" data-handler="handleLogoUpload">
             </div>
           </div>
           <div class="form-group">
-            <label>Размер</label>
+            <label for="logoSize" data-i18n="logo.size">Размер</label>
             <input type="range" id="logoSize" value="40" min="5" max="60" step="1" data-state-key="logoSize" data-update-handler="updateLogoSize">
             <div class="slider-value">
               <span>5%</span>
@@ -230,30 +340,30 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Позиция</label>
+            <label data-i18n="logo.position">Позиция</label>
             <div class="toggle-switch" id="logoPosToggle" data-value="left" data-options="2">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="left">Слева</div>
-                <div class="toggle-switch-option" data-value="center">По центру</div>
+                <div class="toggle-switch-option active" data-value="left" data-i18n-title="logo.position.left"><span class="material-icons" style="font-size: 18px;">west</span></div>
+                <div class="toggle-switch-option" data-value="center" data-i18n-title="logo.position.center"><span class="material-icons" style="font-size: 18px;">center_focus_strong</span></div>
               </div>
             </div>
             
           </div>
           <div class="form-group" id="partnerLogoSection" style="display: none;">
-            <label>Логотип партнера</label>
+            <label data-i18n="logo.partner">Логотип партнера</label>
             <div id="partnerLogoPreviewContainer" class="preview-container">
               <img id="partnerLogoPreviewImg" src="" class="preview-img" style="display: none;">
-              <span id="partnerLogoPreviewPlaceholder" class="preview-placeholder">— Нет —</span>
+              <span id="partnerLogoPreviewPlaceholder" class="preview-placeholder" data-i18n="common.none">— Нет —</span>
             </div>
             <div style="display: flex; gap: 8px; width: 100%;">
-              <button class="btn" data-action="trigger-file-input" data-input-id="partnerLogoUpload" style="flex: 1;" title="Заменить"><span class="material-icons">refresh</span></button>
-              <button class="btn btn-danger" id="partnerLogoRemoveBtn" data-function="clearPartnerLogo" style="flex: 1;" title="Удалить"><span class="material-icons">delete</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="partnerLogoUpload" style="flex: 1;" data-i18n-title="logo.replace"><span class="material-icons">refresh</span></button>
+              <button class="btn btn-danger" id="partnerLogoRemoveBtn" data-function="clearPartnerLogo" style="flex: 1;" data-i18n-title="common.delete"><span class="material-icons">delete</span></button>
               <input type="file" id="partnerLogoUpload" accept="image/*,.svg" style="display: none;" data-handler="handlePartnerLogoUpload">
             </div>
           </div>
           <div class="form-group">
-            <button class="btn btn-full" id="addPartnerLogoBtn" data-function="showPartnerLogoSection"><span class="material-icons" style="margin-right: 6px;">add</span>Добавить логотип</button>
+            <button class="btn btn-full" id="addPartnerLogoBtn" data-function="showPartnerLogoSection"><span class="material-icons" style="margin-right: 6px;">add</span><span data-i18n="logo.partner.add">Добавить логотип</span></button>
           </div>
         </div>
         <!-- End Logo Section -->
@@ -264,36 +374,38 @@
               <!-- Пары заголовок/подзаголовок будут добавлены динамически -->
             </div>
             <div class="form-group" id="titlePairEditor" style="display: none;">
-              <label>Текст заголовка (для активной пары)</label>
+              <label for="title" data-i18n="title.text">Текст заголовка (для активной пары)</label>
               <textarea id="title" data-state-key="title" data-update-handler="updateActivePairTitle">Курс «Frontend-разработчик» от Практикума</textarea>
               <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
                 
                 <div class="toggle-switch" id="titleTransformToggle" data-value="none" data-options="3">
                   <div class="toggle-switch-slider"></div>
                   <div class="toggle-switch-track">
-                    <div class="toggle-switch-option active" data-value="none">—</div>
-                    <div class="toggle-switch-option" data-value="uppercase">ААА</div>
-                    <div class="toggle-switch-option" data-value="lowercase">ааа</div>
+                    <div class="toggle-switch-option active" data-value="none" data-i18n="title.transform.none">—</div>
+                    <div class="toggle-switch-option" data-value="uppercase" data-i18n="title.transform.uppercase">ААА</div>
+                    <div class="toggle-switch-option" data-value="lowercase" data-i18n="title.transform.lowercase">ааа</div>
                   </div>
                 </div>
               </div>
             </div>
           <div class="form-group">
-          
+            <label data-i18n="title.transform">Трансформация</label>
             <div class="toggle-switch" id="titleTransformToggleMain" data-value="none" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="none">—</div>
-                <div class="toggle-switch-option" data-value="uppercase">ААА</div>
-                <div class="toggle-switch-option" data-value="lowercase">ааа</div>
+                <div class="toggle-switch-option active" data-value="none" data-i18n="title.transform.none">—</div>
+                <div class="toggle-switch-option" data-value="uppercase" data-i18n="title.transform.uppercase">ААА</div>
+                <div class="toggle-switch-option" data-value="lowercase" data-i18n="title.transform.lowercase">ааа</div>
               </div>
             </div>
           </div>
           <div class="form-group">
-            
+            <label data-i18n="title.color">Цвет</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
-              <input type="color" id="titleColor" value="#ffffff" data-state-key="titleColor" data-update-handler="updateColorFromPicker" data-handler-param="titleColor" style="flex: 0 0 60px;">
-              <input type="text" id="titleColorHex" value="#ffffff" placeholder="#ffffff" data-state-key="titleColor" data-update-handler="updateColorFromHex" data-handler-param="titleColor" style="flex: 1;">
+              <label for="titleColor" class="sr-only" data-i18n="title.color"></label>
+              <input type="color" id="titleColor" value="#ffffff" data-state-key="titleColor" data-update-handler="updateColorFromPicker" data-handler-param="titleColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.titleColor">
+              <label for="titleColorHex" class="sr-only" data-i18n="title.color"></label>
+              <input type="text" id="titleColorHex" value="#ffffff" placeholder="#ffffff" data-state-key="titleColor" data-update-handler="updateColorFromHex" data-handler-param="titleColor" style="flex: 1;" data-i18n-aria-label="aria.titleColorHex">
             </div>
             <div class="gap-sm mt-md" style="display: flex; flex-wrap: wrap;">
               <button class="btn" data-function="updateColorFromPicker" data-params='["titleColor", "#FFFFFF"]' style="background: #FFFFFF; width: 32px; height: 32px; padding: 0; border-radius: 6px; border: none;" title="#FFFFFF"></button>
@@ -301,81 +413,81 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Направление текста</label>
+            <label data-i18n="title.align">Направление текста</label>
             <div class="toggle-switch" id="titleAlignToggle" data-value="left" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="left" title="Слева"><span class="material-icons" style="font-size: 18px;">format_align_left</span></div>
-                <div class="toggle-switch-option" data-value="center" title="Центр"><span class="material-icons" style="font-size: 18px;">format_align_center</span></div>
-                <div class="toggle-switch-option" data-value="right" title="Справа"><span class="material-icons" style="font-size: 18px;">format_align_right</span></div>
+                <div class="toggle-switch-option active" data-value="left" data-i18n-title="title.align.left"><span class="material-icons" style="font-size: 18px;">format_align_left</span></div>
+                <div class="toggle-switch-option" data-value="center" data-i18n-title="title.align.center"><span class="material-icons" style="font-size: 18px;">format_align_center</span></div>
+                <div class="toggle-switch-option" data-value="right" data-i18n-title="title.align.right"><span class="material-icons" style="font-size: 18px;">format_align_right</span></div>
               </div>
             </div>
           </div>
           <div class="form-group">
-            <label>Вертикальное выравнивание</label>
+            <label data-i18n="title.vPos">Вертикальное выравнивание</label>
             <div class="toggle-switch" id="titleVPosToggle" data-value="top" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="top" title="Сверху"><span class="material-icons" style="font-size: 18px;">vertical_align_top</span></div>
-                <div class="toggle-switch-option" data-value="center" title="Середина"><span class="material-icons" style="font-size: 18px;">vertical_align_center</span></div>
-                <div class="toggle-switch-option" data-value="bottom" title="Снизу"><span class="material-icons" style="font-size: 18px;">vertical_align_bottom</span></div>
+                <div class="toggle-switch-option active" data-value="top" data-i18n-title="title.vPos.top"><span class="material-icons" style="font-size: 18px;">vertical_align_top</span></div>
+                <div class="toggle-switch-option" data-value="center" data-i18n-title="title.vPos.center"><span class="material-icons" style="font-size: 18px;">vertical_align_center</span></div>
+                <div class="toggle-switch-option" data-value="bottom" data-i18n-title="title.vPos.bottom"><span class="material-icons" style="font-size: 18px;">vertical_align_bottom</span></div>
               </div>
             </div>
           </div>
           <div class="form-group">
-            <label>Размер шрифта</label>
-            <input type="range" id="titleSize" value="7" min="6" max="10" step="0.1" data-state-key="titleSize" data-update-handler="updateTitleSize">
+            <label for="titleSize" data-i18n="title.size">Размер шрифта</label>
+            <input type="range" id="titleSize" value="8" min="6" max="10" step="0.1" data-state-key="titleSize" data-update-handler="updateTitleSize">
             <div class="slider-value">
               <span>6%</span>
-              <span id="titleSizeValue">7%</span>
+              <span id="titleSizeValue">8%</span>
               <span>10%</span>
             </div>
-            <div class="hint">Подзаголовок автоматически масштабируется</div>
+            <div class="hint" data-i18n="title.size.hint">Подзаголовок автоматически масштабируется</div>
           </div>
           <div class="form-group">
-            
+            <label data-i18n="title.font">Шрифт</label>
             <div style="display: flex; gap: 8px;">
               <div class="custom-select-wrapper" style="flex: 1;">
                 <div class="custom-select-button" id="titleFontFamilyBtn">
-                  <span id="titleFontFamilyText">Выберите...</span>
+                  <span id="titleFontFamilyText" data-i18n="common.select">Выберите...</span>
                   <span class="custom-select-arrow">▼</span>
                 </div>
                 <div class="custom-select-dropdown" id="titleFontFamilyDropdown"></div>
               </div>
-              <button class="btn" data-action="trigger-file-input" data-input-id="titleFontUpload" style="flex: 0 0 auto;" title="Загрузить"><span class="material-icons">download</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="titleFontUpload" style="flex: 0 0 auto;" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
               <input type="file" id="titleFontUpload" accept=".woff,.woff2,.ttf,.otf" style="display: none;" data-handler="handleTitleFontUpload">
             </div>
             <div id="titleCustomFontInfo" class="theme-text-muted" style="display: none; margin-top: 8px; font-size: 12px;">
               <span id="titleCustomFontName"></span>
-              <button class="btn btn-small" data-function="clearTitleCustomFont" style="margin-left: 8px; padding: 2px 8px;" title="Удалить"><span class="material-icons" style="font-size: 16px;">delete</span></button>
+              <button class="btn btn-small" data-function="clearTitleCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 16px;">delete</span></button>
             </div>
           </div>
           <div class="form-group">
-            
+            <label data-i18n="title.weight">Начертание</label>
             <div class="custom-select-wrapper">
               <div class="custom-select-button" id="titleWeightBtn">
-                <span id="titleWeightText">Regular — Обычный</span>
+                <span id="titleWeightText">Regular</span>
                 <span class="custom-select-arrow">▼</span>
               </div>
               <div class="custom-select-dropdown" id="titleWeightDropdown">
-                <div class="custom-select-option" data-value="Thin">Thin — Тонкий</div>
-                <div class="custom-select-option" data-value="ExtraLight">ExtraLight — Экстра-светлый</div>
-                <div class="custom-select-option" data-value="Light">Light — Светлый</div>
-                <div class="custom-select-option selected" data-value="Regular">Regular — Обычный</div>
-                <div class="custom-select-option" data-value="Medium">Medium — Средний</div>
-                <div class="custom-select-option" data-value="SemiBold">SemiBold — Полужирный</div>
-                <div class="custom-select-option" data-value="Bold">Bold — Жирный</div>
-                <div class="custom-select-option" data-value="Heavy">Heavy — Экстра-жирный</div>
-                <div class="custom-select-option" data-value="Black">Black — Чёрный</div>
+                <div class="custom-select-option" data-value="Thin">Thin</div>
+                <div class="custom-select-option" data-value="ExtraLight">ExtraLight</div>
+                <div class="custom-select-option" data-value="Light">Light</div>
+                <div class="custom-select-option selected" data-value="Regular">Regular</div>
+                <div class="custom-select-option" data-value="Medium">Medium</div>
+                <div class="custom-select-option" data-value="SemiBold">SemiBold</div>
+                <div class="custom-select-option" data-value="Bold">Bold</div>
+                <div class="custom-select-option" data-value="Heavy">Heavy</div>
+                <div class="custom-select-option" data-value="Black">Black</div>
               </div>
             </div>
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-            <label style="margin: 0; flex: 1;">Межбуквенное расстояние (px)</label>
-            <input type="number" id="titleLetterSpacing" value="0" step="0.5" data-state-key="titleLetterSpacing" style="width: 80px;">
+            <label for="titleLetterSpacing" style="margin: 0; flex: 1;" data-i18n="title.letterSpacing">Межбуквенное расстояние</label>
+            <input type="number" id="titleLetterSpacing" value="0" step="0.1" data-state-key="titleLetterSpacing" style="width: 80px;">
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-            <label style="margin: 0; flex: 1;">Межстрочный интервал</label>
+            <label for="titleLineHeight" style="margin: 0; flex: 1;" data-i18n="title.lineHeight">Межстрочный интервал</label>
             <input type="number" id="titleLineHeight" value="1.1" min="1.0" max="3.0" step="0.1" data-state-key="titleLineHeight" style="width: 80px;">
           </div>
         </div>
@@ -386,50 +498,52 @@
             <div class="form-group">
             <div class="checkbox-group">
               <input type="checkbox" id="showSubtitle" checked data-state-key="showSubtitle">
-              <label style="margin: 0">Показывать подзаголовок</label>
+              <label for="showSubtitle" style="margin: 0" data-i18n="subtitle.show">Показывать подзаголовок</label>
             </div>
           </div>
           <div class="form-group">
             <div class="checkbox-group">
               <input type="checkbox" id="hideSubtitleOnWide" data-state-key="hideSubtitleOnWide">
-              <label style="margin: 0">Скрывать подзаголовок на широких форматах</label>
+              <label for="hideSubtitleOnWide" style="margin: 0" data-i18n="subtitle.hideOnWide">Скрывать подзаголовок на широких форматах</label>
             </div>
-            <div class="hint">Скрывает подзаголовок на макетах с высотой меньше 150px</div>
+            <div class="hint" data-i18n="subtitle.hideOnWide.hint">Скрывает подзаголовок на макетах с высотой меньше 150px</div>
           </div>
           <div id="subtitlePairsContainer" style="display: flex; flex-direction: column; gap: 16px;">
               <!-- Пары заголовок/подзаголовок будут добавлены динамически -->
             </div>
             <div class="form-group" id="subtitlePairEditor" style="display: none;">
-              <label>Текст подзаголовка (для активной пары)</label>
+              <label for="subtitle" data-i18n="subtitle.text">Текст подзаголовка (для активной пары)</label>
               <textarea id="subtitle" data-state-key="subtitle" data-update-handler="updateActivePairSubtitle">Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев</textarea>
               <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
                
                 <div class="toggle-switch" id="subtitleTransformToggle" data-value="none" data-options="3">
                   <div class="toggle-switch-slider"></div>
                   <div class="toggle-switch-track">
-                    <div class="toggle-switch-option active" data-value="none">—</div>
-                    <div class="toggle-switch-option" data-value="uppercase">ААА</div>
-                    <div class="toggle-switch-option" data-value="lowercase">ааа</div>
+                    <div class="toggle-switch-option active" data-value="none" data-i18n="subtitle.transform.none">—</div>
+                    <div class="toggle-switch-option" data-value="uppercase" data-i18n="subtitle.transform.uppercase">ААА</div>
+                    <div class="toggle-switch-option" data-value="lowercase" data-i18n="subtitle.transform.lowercase">ааа</div>
                   </div>
                 </div>
               </div>
             </div>
           <div class="form-group">
-            
+            <label data-i18n="subtitle.transform">Трансформация</label>
             <div class="toggle-switch" id="subtitleTransformToggleMain" data-value="none" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="none">—</div>
-                <div class="toggle-switch-option" data-value="uppercase">ААА</div>
-                <div class="toggle-switch-option" data-value="lowercase">ааа</div>
+                <div class="toggle-switch-option active" data-value="none" data-i18n="subtitle.transform.none">—</div>
+                <div class="toggle-switch-option" data-value="uppercase" data-i18n="subtitle.transform.uppercase">ААА</div>
+                <div class="toggle-switch-option" data-value="lowercase" data-i18n="subtitle.transform.lowercase">ааа</div>
               </div>
             </div>
           </div>
           <div class="form-group">
-            
+            <label data-i18n="subtitle.color">Цвет</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
-              <input type="color" id="subtitleColor" value="#e0e0e0" data-state-key="subtitleColor" data-update-handler="updateColorFromPicker" data-handler-param="subtitleColor" style="flex: 0 0 60px;">
-              <input type="text" id="subtitleColorHex" value="#e0e0e0" placeholder="#e0e0e0" data-state-key="subtitleColor" data-update-handler="updateColorFromHex" data-handler-param="subtitleColor" style="flex: 1;">
+              <label for="subtitleColor" class="sr-only" data-i18n="subtitle.color"></label>
+              <input type="color" id="subtitleColor" value="#e0e0e0" data-state-key="subtitleColor" data-update-handler="updateColorFromPicker" data-handler-param="subtitleColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.subtitleColor">
+              <label for="subtitleColorHex" class="sr-only" data-i18n="subtitle.color"></label>
+              <input type="text" id="subtitleColorHex" value="#e0e0e0" placeholder="#e0e0e0" data-state-key="subtitleColor" data-update-handler="updateColorFromHex" data-handler-param="subtitleColor" style="flex: 1;" data-i18n-aria-label="aria.subtitleColorHex">
             </div>
             <div class="gap-sm mt-md" style="display: flex; flex-wrap: wrap;">
               <button class="btn" data-function="updateColorFromPicker" data-params='["subtitleColor", "#FFFFFF"]' style="background: #FFFFFF; width: 32px; height: 32px; padding: 0; border-radius: 6px; border: none;" title="#FFFFFF"></button>
@@ -437,7 +551,7 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Непрозрачность</label>
+            <label for="subtitleOpacity" data-i18n="subtitle.opacity">Непрозрачность</label>
             <input type="range" id="subtitleOpacity" value="90" min="0" max="100" data-state-key="subtitleOpacity" data-update-handler="updateSubtitleOpacity">
             <div class="slider-value">
               <span>0%</span>
@@ -446,7 +560,7 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Размер шрифта</label>
+            <label for="subtitleSize" data-i18n="subtitle.size">Размер шрифта</label>
             <input type="range" id="subtitleSize" value="4" min="1" max="12" step="0.1" data-state-key="subtitleSize" data-update-handler="updateSubtitleSize">
             <div class="slider-value">
               <span>1%</span>
@@ -456,53 +570,53 @@
             
           </div>
           <div class="form-group">
-            
+            <label data-i18n="subtitle.font">Шрифт</label>
             <div style="display: flex; gap: 8px;">
               <div class="custom-select-wrapper" style="flex: 1;">
                 <div class="custom-select-button" id="subtitleFontFamilyBtn">
-                  <span id="subtitleFontFamilyText">Выберите...</span>
+                  <span id="subtitleFontFamilyText" data-i18n="common.select">Выберите...</span>
                   <span class="custom-select-arrow">▼</span>
                 </div>
                 <div class="custom-select-dropdown" id="subtitleFontFamilyDropdown"></div>
               </div>
-              <button class="btn" data-action="trigger-file-input" data-input-id="subtitleFontUpload" style="flex: 0 0 auto;" title="Загрузить"><span class="material-icons">download</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="subtitleFontUpload" style="flex: 0 0 auto;" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
               <input type="file" id="subtitleFontUpload" accept=".woff,.woff2,.ttf,.otf" style="display: none;" data-handler="handleSubtitleFontUpload">
             </div>
             <div id="subtitleCustomFontInfo" class="theme-text-muted" style="display: none; margin-top: 8px; font-size: 12px;">
               <span id="subtitleCustomFontName"></span>
-              <button class="btn btn-small" data-function="clearSubtitleCustomFont" style="margin-left: 8px; padding: 2px 8px;" title="Удалить"><span class="material-icons" style="font-size: 16px;">delete</span></button>
+              <button class="btn btn-small" data-function="clearSubtitleCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 16px;">delete</span></button>
             </div>
           </div>
           <div class="form-group">
-            
+            <label data-i18n="subtitle.weight">Начертание</label>
             <div class="custom-select-wrapper">
               <div class="custom-select-button" id="subtitleWeightBtn">
-                <span id="subtitleWeightText">Regular — Обычный</span>
+                <span id="subtitleWeightText">Regular</span>
                 <span class="custom-select-arrow">▼</span>
               </div>
               <div class="custom-select-dropdown" id="subtitleWeightDropdown">
-                <div class="custom-select-option" data-value="Thin">Thin — Тонкий</div>
-                <div class="custom-select-option" data-value="ExtraLight">ExtraLight — Экстра-светлый</div>
-                <div class="custom-select-option" data-value="Light">Light — Светлый</div>
-                <div class="custom-select-option selected" data-value="Regular">Regular — Обычный</div>
-                <div class="custom-select-option" data-value="Medium">Medium — Средний</div>
-                <div class="custom-select-option" data-value="SemiBold">SemiBold — Полужирный</div>
-                <div class="custom-select-option" data-value="Bold">Bold — Жирный</div>
-                <div class="custom-select-option" data-value="Heavy">Heavy — Экстра-жирный</div>
-                <div class="custom-select-option" data-value="Black">Black — Чёрный</div>
+                <div class="custom-select-option" data-value="Thin">Thin</div>
+                <div class="custom-select-option" data-value="ExtraLight">ExtraLight</div>
+                <div class="custom-select-option" data-value="Light">Light</div>
+                <div class="custom-select-option selected" data-value="Regular">Regular</div>
+                <div class="custom-select-option" data-value="Medium">Medium</div>
+                <div class="custom-select-option" data-value="SemiBold">SemiBold</div>
+                <div class="custom-select-option" data-value="Bold">Bold</div>
+                <div class="custom-select-option" data-value="Heavy">Heavy</div>
+                <div class="custom-select-option" data-value="Black">Black</div>
               </div>
             </div>
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-            <label style="margin: 0; flex: 1;">Межбуквенное расстояние (px)</label>
-            <input type="number" id="subtitleLetterSpacing" value="0" step="0.5" data-state-key="subtitleLetterSpacing" style="width: 80px;">
+            <label for="subtitleLetterSpacing" style="margin: 0; flex: 1;" data-i18n="subtitle.letterSpacing">Межбуквенное расстояние</label>
+            <input type="number" id="subtitleLetterSpacing" value="0" step="0.1" data-state-key="subtitleLetterSpacing" style="width: 80px;">
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-            <label style="margin: 0; flex: 1;">Межстрочный интервал</label>
+            <label for="subtitleLineHeight" style="margin: 0; flex: 1;" data-i18n="subtitle.lineHeight">Межстрочный интервал</label>
             <input type="number" id="subtitleLineHeight" value="1.2" min="1.0" max="3.0" step="0.1" data-state-key="subtitleLineHeight" style="width: 80px;">
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-            <label style="margin: 0; flex: 1;">Отступ от заголовка (%)</label>
+            <label for="subtitleGap" style="margin: 0; flex: 1;" data-i18n="subtitle.gap">Отступ от заголовка</label>
             <input type="number" id="subtitleGap" value="-1" min="-20" max="20" step="0.5" data-state-key="subtitleGap" style="width: 80px;">
           </div>
         </div>
@@ -513,29 +627,31 @@
             <div class="form-group">
               <div class="checkbox-group">
                 <input type="checkbox" id="showLegal" checked data-state-key="showLegal">
-                <label style="margin: 0">Показывать юридический текст</label>
+                <label for="showLegal" style="margin: 0" data-i18n="legal.show">Показывать юридический текст</label>
               </div>
             </div>
           <div class="form-group">
-            
+            <label for="legal" data-i18n="legal.text">Текст</label>
             <textarea id="legal" data-state-key="legal">Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/</textarea>
             <div class="form-group" style="margin-top: 12px;">
-              
+              <label data-i18n="legal.transform">Трансформация</label>
               <div class="toggle-switch" id="legalTransformToggle" data-value="none" data-options="3">
                 <div class="toggle-switch-slider"></div>
                 <div class="toggle-switch-track">
-                  <div class="toggle-switch-option active" data-value="none">—</div>
-                  <div class="toggle-switch-option" data-value="uppercase">ААА</div>
-                  <div class="toggle-switch-option" data-value="lowercase">ааа</div>
+                  <div class="toggle-switch-option active" data-value="none" data-i18n="legal.transform.none">—</div>
+                  <div class="toggle-switch-option" data-value="uppercase" data-i18n="legal.transform.uppercase">ААА</div>
+                  <div class="toggle-switch-option" data-value="lowercase" data-i18n="legal.transform.lowercase">ааа</div>
                 </div>
               </div>
             </div>
           </div>
           <div class="form-group">
-            
+            <label data-i18n="legal.color">Цвет</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
-              <input type="color" id="legalColor" value="#ffffff" data-state-key="legalColor" data-update-handler="updateColorFromPicker" data-handler-param="legalColor" style="flex: 0 0 60px;">
-              <input type="text" id="legalColorHex" value="#ffffff" placeholder="#ffffff" data-state-key="legalColor" data-update-handler="updateColorFromHex" data-handler-param="legalColor" style="flex: 1;">
+              <label for="legalColor" class="sr-only" data-i18n="legal.color"></label>
+              <input type="color" id="legalColor" value="#ffffff" data-state-key="legalColor" data-update-handler="updateColorFromPicker" data-handler-param="legalColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.legalColor">
+              <label for="legalColorHex" class="sr-only" data-i18n="legal.color"></label>
+              <input type="text" id="legalColorHex" value="#ffffff" placeholder="#ffffff" data-state-key="legalColor" data-update-handler="updateColorFromHex" data-handler-param="legalColor" style="flex: 1;" data-i18n-aria-label="aria.legalColorHex">
             </div>
             <div class="gap-sm mt-md" style="display: flex; flex-wrap: wrap;">
               <button class="btn" data-function="updateColorFromPicker" data-params='["legalColor", "#FFFFFF"]' style="background: #FFFFFF; width: 32px; height: 32px; padding: 0; border-radius: 6px; border: none;" title="#FFFFFF"></button>
@@ -543,7 +659,7 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Непрозрачность</label>
+            <label for="legalOpacity" data-i18n="legal.opacity">Непрозрачность</label>
             <input type="range" id="legalOpacity" value="60" min="0" max="100" data-state-key="legalOpacity" data-update-handler="updateLegalOpacity">
             <div class="slider-value">
               <span>0%</span>
@@ -552,7 +668,7 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Размер шрифта</label>
+            <label for="legalSize" data-i18n="legal.size">Размер шрифта</label>
             <input type="range" id="legalSize" value="2" min="0.3" max="5" step="0.1" data-state-key="legalSize" data-update-handler="updateLegalSize">
             <div class="slider-value">
               <span>0.3%</span>
@@ -561,49 +677,49 @@
             </div>
           </div>
           <div class="form-group">
-           
+            <label data-i18n="legal.font">Шрифт</label>
             <div style="display: flex; gap: 8px;">
               <div class="custom-select-wrapper" style="flex: 1;">
                 <div class="custom-select-button" id="legalFontFamilyBtn">
-                  <span id="legalFontFamilyText">Выберите...</span>
+                  <span id="legalFontFamilyText" data-i18n="common.select">Выберите...</span>
                   <span class="custom-select-arrow">▼</span>
                 </div>
                 <div class="custom-select-dropdown" id="legalFontFamilyDropdown"></div>
               </div>
-              <button class="btn" data-action="trigger-file-input" data-input-id="legalFontUpload" style="flex: 0 0 auto;" title="Загрузить"><span class="material-icons">download</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="legalFontUpload" style="flex: 0 0 auto;" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
               <input type="file" id="legalFontUpload" accept=".woff,.woff2,.ttf,.otf" style="display: none;" data-handler="handleLegalFontUpload">
             </div>
             <div id="legalCustomFontInfo" class="theme-text-muted" style="display: none; margin-top: 8px; font-size: 12px;">
               <span id="legalCustomFontName"></span>
-              <button class="btn btn-small" data-function="clearLegalCustomFont" style="margin-left: 8px; padding: 2px 8px;" title="Удалить"><span class="material-icons" style="font-size: 16px;">delete</span></button>
+              <button class="btn btn-small" data-function="clearLegalCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 16px;">delete</span></button>
             </div>
           </div>
           <div class="form-group">
-       
+            <label data-i18n="legal.weight">Начертание</label>
             <div class="custom-select-wrapper">
               <div class="custom-select-button" id="legalWeightBtn">
-                <span id="legalWeightText">Regular — Обычный</span>
+                <span id="legalWeightText">Regular</span>
                 <span class="custom-select-arrow">▼</span>
               </div>
               <div class="custom-select-dropdown" id="legalWeightDropdown">
-                <div class="custom-select-option" data-value="Thin">Thin — Тонкий</div>
-                <div class="custom-select-option" data-value="ExtraLight">ExtraLight — Экстра-светлый</div>
-                <div class="custom-select-option" data-value="Light">Light — Светлый</div>
-                <div class="custom-select-option selected" data-value="Regular">Regular — Обычный</div>
-                <div class="custom-select-option" data-value="Medium">Medium — Средний</div>
-                <div class="custom-select-option" data-value="SemiBold">SemiBold — Полужирный</div>
-                <div class="custom-select-option" data-value="Bold">Bold — Жирный</div>
-                <div class="custom-select-option" data-value="Heavy">Heavy — Экстра-жирный</div>
-                <div class="custom-select-option" data-value="Black">Black — Чёрный</div>
+                <div class="custom-select-option" data-value="Thin">Thin</div>
+                <div class="custom-select-option" data-value="ExtraLight">ExtraLight</div>
+                <div class="custom-select-option" data-value="Light">Light</div>
+                <div class="custom-select-option selected" data-value="Regular">Regular</div>
+                <div class="custom-select-option" data-value="Medium">Medium</div>
+                <div class="custom-select-option" data-value="SemiBold">SemiBold</div>
+                <div class="custom-select-option" data-value="Bold">Bold</div>
+                <div class="custom-select-option" data-value="Heavy">Heavy</div>
+                <div class="custom-select-option" data-value="Black">Black</div>
               </div>
             </div>
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-            <label style="margin: 0; flex: 1;">Межбуквенное расстояние (px)</label>
-            <input type="number" id="legalLetterSpacing" value="0" step="0.5" data-state-key="legalLetterSpacing" style="width: 80px;">
+            <label for="legalLetterSpacing" style="margin: 0; flex: 1;" data-i18n="legal.letterSpacing">Межбуквенное расстояние</label>
+            <input type="number" id="legalLetterSpacing" value="0" step="0.1" data-state-key="legalLetterSpacing" style="width: 80px;">
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-            <label style="margin: 0; flex: 1;">Межстрочный интервал</label>
+            <label for="legalLineHeight" style="margin: 0; flex: 1;" data-i18n="legal.lineHeight">Межстрочный интервал</label>
             <input type="number" id="legalLineHeight" value="1.4" min="1.0" max="3.0" step="0.1" data-state-key="legalLineHeight" style="width: 80px;">
           </div>
           
@@ -611,15 +727,15 @@
             <div class="form-group">
               <div class="checkbox-group">
                 <input type="checkbox" id="showAge" checked data-state-key="showAge">
-                <label style="margin: 0">Показывать возраст</label>
+                <label for="showAge" style="margin: 0" data-i18n="legal.age.show">Показывать возраст</label>
               </div>
             </div>
             <div class="form-group">
-              
+              <label for="age" data-i18n="legal.age.text">Возраст</label>
               <input type="text" id="age" value="18+" data-state-key="age">
             </div>
             <div class="form-group">
-              <label>Размер шрифта</label>
+              <label for="ageSize" data-i18n="legal.age.size">Размер шрифта</label>
               <input type="range" id="ageSize" value="4" min="1" max="12" step="0.1" data-state-key="ageSize" data-update-handler="updateAgeSize">
               <div class="slider-value">
                 <span>1%</span>
@@ -629,26 +745,29 @@
              
             </div>
             <div class="form-group">
-              
+              <label data-i18n="legal.age.font">Шрифт</label>
               <div style="display: flex; gap: 8px;">
                 <div class="custom-select-wrapper" style="flex: 1;">
                   <div class="custom-select-button" id="ageFontFamilyBtn">
-                    <span id="ageFontFamilyText">Выберите...</span>
+                    <span id="ageFontFamilyText" data-i18n="common.select">Выберите...</span>
                     <span class="custom-select-arrow">▼</span>
                   </div>
                   <div class="custom-select-dropdown" id="ageFontFamilyDropdown"></div>
                 </div>
-                <button class="btn" data-action="trigger-file-input" data-input-id="ageFontUpload" style="flex: 0 0 auto;" title="Загрузить"><span class="material-icons">download</span></button>
+                <button class="btn" data-action="trigger-file-input" data-input-id="ageFontUpload" style="flex: 0 0 auto;" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
                 <input type="file" id="ageFontUpload" accept=".woff,.woff2,.ttf,.otf" style="display: none;" data-handler="handleAgeFontUpload">
               </div>
               <div id="ageCustomFontInfo" class="theme-text-muted" style="display: none; margin-top: 8px; font-size: 12px;">
                 <span id="ageCustomFontName"></span>
-                <button class="btn btn-small" data-function="clearAgeCustomFont" style="margin-left: 8px; padding: 2px 8px;" title="Удалить"><span class="material-icons" style="font-size: 16px;">delete</span></button>
+                <button class="btn btn-small" data-function="clearAgeCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 16px;">delete</span></button>
               </div>
             </div>
-            <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-              <label style="margin: 0; flex: 1;">Отступ от юридического текста (%)</label>
-              <input type="number" id="ageGapPercent" value="1" min="0" max="20" step="0.5" data-state-key="ageGapPercent" style="width: 80px;">
+            <div class="form-group">
+              <label for="ageGapPercent" style="margin: 0 0 8px 0; display: block;" data-i18n="legal.age.gap">Отступ от юридического текста</label>
+              <input type="range" id="ageGapPercent" value="1" min="0" max="20" step="0.5" data-state-key="ageGapPercent" data-update-handler="updateAgeGapPercent">
+              <div class="slider-value" style="display: flex; justify-content: center; margin-top: 4px;">
+                <span id="ageGapPercentValue">1%</span>
+              </div>
             </div>
 
           </div>
@@ -660,11 +779,11 @@
             <div class="form-group">
             <div class="checkbox-group">
               <input type="checkbox" id="showKV" checked data-state-key="showKV">
-              <label style="margin: 0">Показывать KV</label>
+              <label for="showKV" style="margin: 0" data-i18n="kv.show">Показывать</label>
             </div>
           </div>
           <div class="form-group">
-            <label>Скругление углов</label>
+            <label for="kvBorderRadius" data-i18n="kv.borderRadius">Скругление углов</label>
             <input type="range" id="kvBorderRadius" value="0" min="0" max="12" step="1" data-state-key="kvBorderRadius" data-update-handler="updateKVBorderRadius">
             <div class="slider-value">
               <span>0%</span>
@@ -673,13 +792,13 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Расположение KV</label>
+            <label data-i18n="kv.position">Расположение</label>
             <div class="toggle-switch" id="kvPositionToggle" data-value="center" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option" data-value="left" title="Слева"><span class="material-icons" style="font-size: 18px;">align_horizontal_left</span></div>
-                <div class="toggle-switch-option active" data-value="center" title="По центру"><span class="material-icons" style="font-size: 18px;">align_horizontal_center</span></div>
-                <div class="toggle-switch-option" data-value="right" title="Справа"><span class="material-icons" style="font-size: 18px;">align_horizontal_right</span></div>
+                <div class="toggle-switch-option" data-value="left" data-i18n-title="kv.position.left"><span class="material-icons" style="font-size: 18px;">align_horizontal_left</span></div>
+                <div class="toggle-switch-option active" data-value="center" data-i18n-title="kv.position.center"><span class="material-icons" style="font-size: 18px;">align_horizontal_center</span></div>
+                <div class="toggle-switch-option" data-value="right" data-i18n-title="kv.position.right"><span class="material-icons" style="font-size: 18px;">align_horizontal_right</span></div>
               </div>
             </div>
            
@@ -689,15 +808,15 @@
               <label id="kvActivePairLabel" class="form-label mb-sm" style="display: block;">KV 01</label>
               <div id="kvPreviewContainer" class="preview-container">
                 <img id="kvPreviewImg" src="" class="preview-img" style="display: none;">
-                <span id="kvPreviewPlaceholder" class="preview-placeholder">— Нет —</span>
+                <span id="kvPreviewPlaceholder" class="preview-placeholder" data-i18n="kv.none">— Нет —</span>
               </div>
               <div id="kvSelectModalOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); z-index: 10000; backdrop-filter: blur(2px);" data-action="close-modal" data-modal="kvSelectModal">
                 <div id="kvSelectPanel" class="theme-bg-secondary" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; max-width: 900px; max-height: 80vh; border: none; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); z-index: 10001;" data-action="stop-propagation">
                   <div class="modal-header">
-                    <span class="modal-title">Выбрать KV</span>
+                    <span class="modal-title" data-i18n="kv.selectModal.title">Выбрать KV</span>
                     <div class="modal-actions">
-                      <button class="btn" data-function="refreshKVColumns" data-action="stop-propagation" title="Обновить"><span class="material-icons">refresh</span></button>
-                      <button class="btn" data-function="closeKVSelectModal" data-action="stop-propagation" title="Закрыть"><span class="material-icons">close</span></button>
+                      <button class="btn" data-function="refreshKVColumns" data-action="stop-propagation" data-i18n-title="common.refresh"><span class="material-icons">refresh</span></button>
+                      <button class="btn" data-function="closeKVSelectModal" data-action="stop-propagation" data-i18n-title="common.close"><span class="material-icons">close</span></button>
                     </div>
                   </div>
                   <div style="display: grid; grid-template-columns: 150px 150px 1fr; height: calc(70vh - 50px); max-height: 550px;">
@@ -713,14 +832,14 @@
                   </div>
                 </div>
               </div>
-              <button class="btn btn-full mb-sm" id="kvSelectTrigger"><span id="kvSelectText">Выбрать</span></button>
+              <button class="btn btn-full mb-sm" id="kvSelectTrigger"><span id="kvSelectText" data-i18n="kv.select">Выбрать</span></button>
               <select id="kvSelect" style="display: none;" data-state-key="kvSelected" data-update-handler="selectPreloadedKV">
-                <option value="" selected>— Нет —</option>
+                <option value="" selected data-i18n="kv.none">— Нет —</option>
               </select>
               <div style="display: flex; gap: 8px; width: 100%;">
-                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" style="flex: 1; min-width: 0;" id="kvUploadBtn" title="Загрузить"><span class="material-icons">upload</span></button>
-                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" id="kvReplaceBtn" style="display: none; flex: 1; min-width: 0;" title="Заменить"><span class="material-icons">refresh</span></button>
-                <button class="btn btn-danger" id="kvRemoveBtn" data-function="clearKV" style="flex: 1; min-width: 0;" disabled title="Удалить"><span class="material-icons">delete</span></button>
+                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" style="flex: 1; min-width: 0;" id="kvUploadBtn" data-i18n-title="kv.upload"><span class="material-icons">upload</span></button>
+                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" id="kvReplaceBtn" style="display: none; flex: 1; min-width: 0;" data-i18n-title="kv.replace"><span class="material-icons">refresh</span></button>
+                <button class="btn btn-danger" id="kvRemoveBtn" data-function="clearKV" style="flex: 1; min-width: 0;" disabled data-i18n-title="kv.delete"><span class="material-icons">delete</span></button>
                 <input type="file" id="kvUpload" accept="image/*" style="display: none;" data-handler="handleKVUpload">
               </div>
             </div>
@@ -730,6 +849,10 @@
           </div>
         </div>
         <!-- End KV Section -->
+        
+        <!-- Figma Section -->
+        <div id="panel-section-figma-container"></div>
+        <!-- End Figma Section -->
         
       </div>
       
@@ -741,7 +864,7 @@
               <div>
                 <div class="custom-select-wrapper">
                   <div class="custom-select-button" id="previewSizeSelectNarrowBtn">
-                    <span id="previewSizeSelectNarrowText">Выберите...</span>
+                    <span id="previewSizeSelectNarrowText" data-i18n="export.preview.select">Выберите...</span>
                     <span class="custom-select-arrow">▼</span>
                   </div>
                   <div class="custom-select-dropdown" id="previewSizeSelectNarrowDropdown"></div>
@@ -750,7 +873,7 @@
               <div>
                 <div class="custom-select-wrapper">
                   <div class="custom-select-button" id="previewSizeSelectSquareBtn">
-                    <span id="previewSizeSelectSquareText">Выберите...</span>
+                    <span id="previewSizeSelectSquareText" data-i18n="export.preview.select">Выберите...</span>
                     <span class="custom-select-arrow">▼</span>
                   </div>
                   <div class="custom-select-dropdown" id="previewSizeSelectSquareDropdown"></div>
@@ -759,7 +882,7 @@
               <div>
                 <div class="custom-select-wrapper">
                   <div class="custom-select-button" id="previewSizeSelectWideBtn">
-                    <span id="previewSizeSelectWideText">Выберите...</span>
+                    <span id="previewSizeSelectWideText" data-i18n="export.preview.select">Выберите...</span>
                     <span class="custom-select-arrow">▼</span>
                   </div>
                   <div class="custom-select-dropdown" id="previewSizeSelectWideDropdown"></div>
@@ -767,20 +890,32 @@
               </div>
             </div>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; position: relative;">
+            <!-- Индикатор загрузки - показывается поверх всех canvas -->
+            <div id="loadingIndicator" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 100; pointer-events: none; min-width: 300px;">
+              <!-- Прогрессбар -->
+              <div style="width: 100%; max-width: 400px;">
+                <div style="width: 100%; height: 8px; background: var(--bg-secondary, #2a2a2a); border-radius: 4px; overflow: hidden; position: relative;">
+                  <div id="progressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-color, #027EF2), #00a8ff); border-radius: 4px; transition: width 0.3s ease; box-shadow: 0 0 10px rgba(2, 126, 242, 0.5);"></div>
+                </div>
+              </div>
+              
+              <!-- Сменяющийся текст -->
+              <div id="loadingMessage" style="display: none;"></div>
+            </div>
             <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
               <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
-                <canvas id="previewCanvasNarrow" style="max-width: 100%; max-height: 100%; height: auto; display: block;"></canvas>
+                <canvas id="previewCanvasNarrow" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
               </div>
             </div>
             <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
               <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
-                <canvas id="previewCanvasSquare" style="max-width: 100%; max-height: 100%; height: auto; display: block;"></canvas>
+                <canvas id="previewCanvasSquare" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
               </div>
             </div>
             <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
               <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
-                <canvas id="previewCanvasWide" style="max-width: 100%; max-height: 100%; height: auto; display: block;"></canvas>
+                <canvas id="previewCanvasWide" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
               </div>
             </div>
           </div>
@@ -790,52 +925,54 @@
 
       <!-- Right Panel -->
       <div class="panel">
+        <div class="panel-resizer" id="rightPanelResizer"></div>
         <div class="form-group">
-          <label>Название архива</label>
+          <label for="namePrefix" data-i18n="export.archiveName">Название архива</label>
           <input type="text" id="namePrefix" value="layout" data-state-key="namePrefix">
         </div>
         <div class="form-group">
-          <label>Масштаб</label>
+          <label data-i18n="export.scale">Масштаб</label>
           <div class="toggle-switch" id="exportScaleToggle" data-value="1" data-options="4">
             <div class="toggle-switch-slider"></div>
             <div class="toggle-switch-track">
-              <div class="toggle-switch-option active" data-value="1">×1</div>
-              <div class="toggle-switch-option" data-value="2">×2</div>
-              <div class="toggle-switch-option" data-value="3">×3</div>
-              <div class="toggle-switch-option" data-value="4">×4</div>
+              <div class="toggle-switch-option active" data-value="1" data-i18n="export.scale.1x">×1</div>
+              <div class="toggle-switch-option" data-value="2" data-i18n="export.scale.2x">×2</div>
+              <div class="toggle-switch-option" data-value="3" data-i18n="export.scale.3x">×3</div>
+              <div class="toggle-switch-option" data-value="4" data-i18n="export.scale.4x">×4</div>
             </div>
           </div>
           <div style="display: flex; gap: 8px; margin-top: 12px;">
-            <button class="btn primary" data-function="exportAllPNG" style="flex: 1;">Архив PNG</button>
-            <button class="btn" data-function="exportAllJPG" style="flex: 1;">Архив JPG</button>
+            <button class="btn primary" data-function="exportAllPNG" style="flex: 1;" data-i18n="export.png">Архив PNG</button>
+            <button class="btn" data-function="exportAllJPG" style="flex: 1;" data-i18n="export.jpg">Архив JPG</button>
           </div>
         </div>
         <div class="form-group-section">
           
           <div class="form-group">
             <div class="gap-sm mb-sm" style="display: flex; align-items: center;">
-                <input type="number" id="customWidth" class="theme-input" placeholder="Ш" min="1" data-action="update-add-size-button" style="flex: 1; padding: 8px 12px; border-radius: 6px; font-size: 13px;">
+                <label for="customWidth" class="sr-only" data-i18n="export.customSize.width">Ш</label>
+                <input type="number" id="customWidth" class="theme-input" data-i18n-placeholder="export.customSize.width" placeholder="Ш" min="1" data-action="update-add-size-button" style="flex: 1; padding: 8px 12px; border-radius: 6px; font-size: 13px;" data-i18n-aria-label="aria.customWidth">
                 <span class="theme-text-muted" style="font-size: 16px; padding: 0 4px;">×</span>
-                <input type="number" id="customHeight" class="theme-input" placeholder="В" min="1" data-action="update-add-size-button" style="flex: 1; padding: 8px 12px; border-radius: 6px; font-size: 13px;">
+                <label for="customHeight" class="sr-only" data-i18n="export.customSize.height">В</label>
+                <input type="number" id="customHeight" class="theme-input" data-i18n-placeholder="export.customSize.height" placeholder="В" min="1" data-action="update-add-size-button" style="flex: 1; padding: 8px 12px; border-radius: 6px; font-size: 13px;" data-i18n-aria-label="aria.customHeight">
             </div>
-            <button class="btn btn-full" id="addSizeButton" data-function="addCustomSizeFromInput" disabled><span class="material-icons" style="margin-right: 6px;">add</span>Добавить размер</button>
+            <button class="btn btn-full" id="addSizeButton" data-function="addCustomSizeFromInput" disabled><span class="material-icons" style="margin-right: 6px;">add</span><span data-i18n="export.customSize.add">Добавить размер</span></button>
           </div>
           <div class="form-group-section" id="customSizesSection" style="display: none;">
-            <label>Пользовательские</label>
+            <label data-i18n="export.customSize">Пользовательские</label>
             <div id="customSizesList"></div>
           </div>
           <div class="form-group-section">
-            <label>Предустановленные размеры</label>
+            <label data-i18n="export.presetSizes">Предустановленные размеры</label>
             <div id="content-preset-sizes">
               <div class="form-group">
                 <div class="gap-sm mb-md" style="display: flex;">
-                  <button class="btn btn-full" data-function="selectAllSizes" title="Выбрать все"><span class="material-icons">select_all</span></button>
-                  <button class="btn btn-full" data-function="deselectAllSizes" title="Снять выбор"><span class="material-icons">deselect</span></button>
-                  <button class="btn btn-full" data-function="showSizesAdmin" title="Админка размеров"><span class="material-icons">settings</span></button>
+                  <button class="btn btn-full" data-function="selectAllSizes" data-i18n-title="export.presetSizes.selectAll"><span class="material-icons">select_all</span></button>
+                  <button class="btn btn-full" data-function="deselectAllSizes" data-i18n-title="export.presetSizes.deselectAll"><span class="material-icons">deselect</span></button>
                 </div>
               </div>
               <div class="form-group">
-                <div id="sizesSummary" class="mb-md theme-text-muted" style="font-size: 13px; text-align: center;">Выбрано: 0 размеров</div>
+                <div id="sizesSummary" class="mb-md theme-text-muted" style="font-size: 13px; text-align: center;" data-i18n="export.presetSizes.selected">Выбрано: 0 размеров</div>
               </div>
               <div id="presetSizesList"></div>
             </div>
@@ -843,22 +980,160 @@
         </div>
 
         <div class="form-group-section">
-          <label>Настройки</label>
+          <label data-i18n="export.settings">Настройки</label>
           <div id="content-settings">
             <div class="form-group" style="display: flex; gap: 8px;">
-              <button class="btn btn-full" data-function="saveSettings" style="flex: 1;" title="Сохранить"><span class="material-icons">save</span></button>
-              <button class="btn btn-full" data-function="loadSettings" style="flex: 1;" title="Загрузить"><span class="material-icons">download</span></button>
+              <button class="btn btn-full" data-function="saveSettings" style="flex: 1;" data-i18n-title="export.settings.save"><span class="material-icons">save</span></button>
+              <button class="btn btn-full" data-function="loadSettings" style="flex: 1;" data-i18n-title="export.settings.load"><span class="material-icons">download</span></button>
             </div>
-            <div class="hint">Настройки сохраняются в состоянии приложения (без изображений)</div>
+            <div class="form-group" style="margin-top: 8px;">
+              <button class="btn btn-full" data-function="showSizesAdmin" data-i18n-title="export.settings.admin"><span class="material-icons">settings</span><span data-i18n="export.settings.admin">Все настройки</span></button>
+            </div>
+            <div class="form-group" style="margin-top: 8px;">
+              <button class="btn btn-full" data-function="showLogoAssetsAdmin" data-i18n-title="export.settings.media"><span class="material-icons">image</span><span data-i18n="export.settings.media">Медиа</span></button>
+            </div>
+            
           </div>
         </div>
       </div>
   </div>
 
+  <!-- Guide Modal -->
+  <div id="guideModalOverlay" class="guide-modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); z-index: 10000; backdrop-filter: blur(2px);" data-action="close-modal" data-modal="guideModal">
+    <div id="guideModalPanel" class="guide-modal-panel theme-bg-secondary" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 800px; max-height: 85vh; border: none; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); z-index: 10001;" data-action="stop-propagation">
+      <div class="modal-header">
+        <span class="modal-title" data-i18n="guide.title">Как это работает?</span>
+        <div class="modal-actions">
+          <button class="btn" id="closeGuideModal" data-function="closeGuideModal" data-action="stop-propagation" data-i18n-title="common.close"><span class="material-icons">close</span></button>
+        </div>
+      </div>
+      <div class="guide-modal-content" style="padding: 24px; overflow-y: auto; max-height: calc(85vh - 60px);">
+        <div class="guide-section">
+          <h2 class="guide-section-title" data-i18n="guide.welcome">Добро пожаловать в Генератор макетов Практикума!</h2>
+          <p class="guide-section-text" data-i18n="guide.intro">Этот инструмент поможет вам быстро создавать рекламные макеты для различных форматов и размеров.</p>
+        </div>
 
+        <div class="guide-section">
+          <h3 class="guide-section-subtitle">
+            <span class="material-icons" style="vertical-align: middle; margin-right: 8px; font-size: 20px;">palette</span>
+            <span data-i18n="guide.layout.title">Макет</span>
+          </h3>
+          <p class="guide-section-text" data-i18n="guide.layout.desc">Настройте базовые параметры макета:</p>
+          <ul class="guide-list">
+            <li><strong data-i18n="guide.layout.padding">Отступ от края — регулируйте отступы контента от краев макета</strong></li>
+            <li><strong data-i18n="guide.layout.bg">Фон — выберите цвет фона или загрузите изображение из библиотеки</strong></li>
+            <li><strong data-i18n="guide.layout.bgImage">Фоновое изображение — настройте расположение, размер и прозрачность подложки под текстом</strong></li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-subtitle">
+            <span class="material-icons" style="vertical-align: middle; margin-right: 8px; font-size: 20px;">image</span>
+            <span data-i18n="guide.logo.title">Логотип</span>
+          </h3>
+          <p class="guide-section-text" data-i18n="guide.logo.desc">Управляйте логотипом:</p>
+          <ul class="guide-list">
+            <li data-i18n="guide.logo.select">Выберите логотип из библиотеки или загрузите свой</li>
+            <li data-i18n="guide.logo.size">Настройте размер и позицию (слева или по центру)</li>
+            <li data-i18n="guide.logo.lang">Выберите язык (RU или KZ)</li>
+            <li data-i18n="guide.logo.partner">При необходимости добавьте логотип партнера</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-subtitle">
+            <span class="material-icons" style="vertical-align: middle; margin-right: 8px; font-size: 20px;">title</span>
+            <span data-i18n="guide.title.title">Заголовок</span>
+          </h3>
+          <p class="guide-section-text" data-i18n="guide.title.desc">Настройте заголовок:</p>
+          <ul class="guide-list">
+            <li data-i18n="guide.title.text">Введите текст заголовка</li>
+            <li data-i18n="guide.title.font">Выберите шрифт, начертание и размер</li>
+            <li data-i18n="guide.title.style">Настройте цвет, выравнивание и вертикальное положение</li>
+            <li data-i18n="guide.title.spacing">Регулируйте межбуквенное и межстрочное расстояние</li>
+            <li data-i18n="guide.title.pairs">Можно создать несколько пар заголовок/подзаголовок</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-subtitle">
+            <span class="material-icons" style="vertical-align: middle; margin-right: 8px; font-size: 20px;">subtitles</span>
+            <span data-i18n="guide.subtitle.title">Подзаголовок</span>
+          </h3>
+          <p class="guide-section-text" data-i18n="guide.subtitle.desc">Настройте подзаголовок:</p>
+          <ul class="guide-list">
+            <li data-i18n="guide.subtitle.text">Введите текст подзаголовка</li>
+            <li data-i18n="guide.subtitle.style">Настройте шрифт, размер, цвет и прозрачность</li>
+            <li data-i18n="guide.subtitle.hide">Можно скрыть подзаголовок на широких форматах</li>
+            <li data-i18n="guide.subtitle.gap">Настройте отступ от заголовка</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-subtitle">
+            <span class="material-icons" style="vertical-align: middle; margin-right: 8px; font-size: 20px;">gavel</span>
+            <span data-i18n="guide.legal.title">Лигал</span>
+          </h3>
+          <p class="guide-section-text" data-i18n="guide.legal.desc">Настройте юридический текст:</p>
+          <ul class="guide-list">
+            <li data-i18n="guide.legal.text">Введите юридический текст</li>
+            <li data-i18n="guide.legal.style">Настройте шрифт, размер, цвет и прозрачность</li>
+            <li data-i18n="guide.legal.age">При необходимости добавьте возрастное ограничение (18+)</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-subtitle">
+            <span class="material-icons" style="vertical-align: middle; margin-right: 8px; font-size: 20px;">photo</span>
+            <span data-i18n="guide.kv.title">Визуал</span>
+          </h3>
+          <p class="guide-section-text" data-i18n="guide.kv.desc">Добавьте визуальный элемент:</p>
+          <ul class="guide-list">
+            <li data-i18n="guide.kv.select">Выберите изображение из библиотеки или загрузите свое</li>
+            <li data-i18n="guide.kv.border">Настройте скругление углов</li>
+            <li data-i18n="guide.kv.position">Выберите расположение (слева, по центру, справа)</li>
+            <li data-i18n="guide.kv.pairs">Для каждой пары заголовок/подзаголовок можно задать свой визуал</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-subtitle">
+            <span class="material-icons" style="vertical-align: middle; margin-right: 8px; font-size: 20px;">download</span>
+            <span data-i18n="guide.export.title">Экспорт</span>
+          </h3>
+          <p class="guide-section-text" data-i18n="guide.export.desc">Экспортируйте макеты:</p>
+          <ul class="guide-list">
+            <li data-i18n="guide.export.sizes">Выберите размеры для экспорта (узкие, квадратные, широкие)</li>
+            <li data-i18n="guide.export.custom">Добавьте свои кастомные размеры при необходимости</li>
+            <li data-i18n="guide.export.scale">Выберите масштаб (×1, ×2, ×3, ×4)</li>
+            <li data-i18n="guide.export.format">Экспортируйте в PNG или JPG архив</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-subtitle">
+            <span class="material-icons" style="vertical-align: middle; margin-right: 8px; font-size: 20px;">settings</span>
+            <span data-i18n="guide.settings.title">Дополнительно</span>
+          </h3>
+          <ul class="guide-list">
+            <li><strong data-i18n="guide.settings.save">Сохранение настроек — сохраните текущие настройки для быстрого доступа</strong></li>
+            <li><strong data-i18n="guide.settings.load">Загрузка настроек — загрузите ранее сохраненные настройки</strong></li>
+            <li><strong data-i18n="guide.settings.admin">Все настройки — управление размерами макетов</strong></li>
+            <li><strong data-i18n="guide.settings.media">Медиа — управление логотипами и медиа-ресурсами</strong></li>
+          </ul>
+        </div>
+
+        <div class="guide-section" style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border-color);">
+          <p class="guide-section-text" style="color: var(--text-secondary); font-size: 13px; text-align: center;" data-i18n="guide.footer">
+            Все изменения применяются в реальном времени. Используйте превью для проверки результата перед экспортом.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
-  <script type="module" src="./src/main.js"></script>
+  <script type="module" src="./src/main.js?v=1.0.0"></script>
 </body>
 </html>

@@ -1,0 +1,44 @@
+{
+  "version": "1.0.0",
+  "exportDate": "2024-01-01T00:00:00.000Z",
+  "description": "Полная конфигурация сервиса для генерации макетов",
+  "sizesConfig": {
+    "Общие": [
+      { "width": 1080, "height": 1080, "checked": true },
+      { "width": 1080, "height": 1920, "checked": true },
+      { "width": 1920, "height": 720, "checked": true }
+    ],
+    "РСЯ": [
+      { "width": 1600, "height": 1200, "checked": true }
+    ]
+  },
+  "defaultValues": {
+    "logoSelected": "logo/white/ru/main.svg",
+    "kvSelected": "assets/3d/sign/01.webp",
+    "title": "Курс «Frontend-разработчик» от Практикума",
+    "subtitle": "Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев",
+    "legal": "Рекламодатель АНО ДПО «Образовательные технологии Яндекса»...",
+    "age": "18+",
+    "bgColor": "#1e1e1e",
+    "titleColor": "#ffffff",
+    "subtitleColor": "#e0e0e0",
+    "legalColor": "#ffffff",
+    "titleSize": 8,
+    "subtitleSize": 4,
+    "legalSize": 2,
+    "ageSize": 4,
+    "logoSize": 40,
+    "titleWeight": "Regular",
+    "subtitleWeight": "Regular",
+    "legalWeight": "Regular",
+    "ageWeight": "Regular"
+  },
+  "formatMultipliers": {
+    "square": 1.0,
+    "horizontal": 1.2,
+    "vertical": 0.8
+  },
+  "adminBackgrounds": [],
+  "theme": "dark"
+}
+

@@ -171,13 +171,50 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
       // Определяем направление по titleVPos
       const isTextAtTop = titleVPos === 'top' || (titleVPos === 'center' && (minY + maxY) / 2 < height / 2);
       
+      // Проверяем, есть ли только логотип (без заголовка и подзаголовка)
+      const hasOnlyLogo = logoBounds && !titleBounds && !subtitleBounds;
+      
+      // Когда текст снизу и есть логотип, нужно разделить градиент: для логотипа отдельно, для текста отдельно
+      const hasLogoAndTextAtBottom = !isTextAtTop && logoBounds && (titleBounds || subtitleBounds);
+      
       // Создаем область подложки от самого края canvas до конца текста
       // Увеличиваем область градиента - добавляем больший отступ сверху и снизу от текста
       const textHeight = maxY - minY;
-      const padding = Math.max(textHeight * 1.0, paddingPx * 3); // Увеличиваем отступ до 100% или минимум 3*paddingPx
-      const gradientStartY = isTextAtTop ? Math.max(0, minY - padding) : maxY; // Начинаем значительно выше текста
-      const gradientEndY = isTextAtTop ? Math.min(height, maxY + padding) : height; // Заканчиваем значительно ниже текста
-      const gradientHeight = Math.abs(gradientEndY - gradientStartY);
+      // Для текста внизу увеличиваем отступ до 200% высоты текста для лучшей читаемости
+      // Для текста сверху: если только логотип, уменьшаем отступ, иначе используем стандартный
+      const padding = isTextAtTop 
+        ? (hasOnlyLogo 
+          ? Math.max(textHeight * 0.3, paddingPx * 1.5) // Меньший отступ для одного логотипа
+          : Math.max(textHeight * 1.0, paddingPx * 3)) // Стандартный отступ для текста
+        : Math.max(textHeight * 2.0, paddingPx * 5); // Больше отступ снизу
+      
+      let gradientStartY, gradientEndY;
+      if (isTextAtTop) {
+        // Для текста сверху: градиент от верха canvas до конца текста
+        gradientStartY = Math.max(0, minY - padding); // Начинаем значительно выше текста
+        gradientEndY = Math.min(height, maxY + padding); // Заканчиваем значительно ниже текста
+      } else {
+        // Для текста внизу: градиент от самого низа canvas до начала текста
+        // Если есть логотип и текст, градиент только для текста (логотип обработаем отдельно)
+        if (hasLogoAndTextAtBottom) {
+          // Градиент только для текста, начинаем от низа до начала текста
+          const textMinY = Math.min(
+            titleBounds ? titleBounds.y : height,
+            subtitleBounds ? subtitleBounds.y : height
+          );
+          gradientStartY = height; // Начинаем от самого низа canvas
+          gradientEndY = Math.max(0, textMinY - padding); // Заканчиваем выше начала текста с отступом
+        } else {
+          // Нет логотипа или только логотип - стандартный градиент
+          gradientStartY = height; // Начинаем от самого низа canvas
+          gradientEndY = Math.max(0, minY - padding); // Заканчиваем выше начала текста с отступом
+        }
+        // Убеждаемся, что градиент не идет выше начала текста
+        if (gradientEndY > minY) {
+          gradientEndY = minY;
+        }
+      }
+      const gradientHeight = Math.abs(gradientStartY - gradientEndY);
       
       // Создаем вертикальный линейный градиент
       const gradient = ctx.createLinearGradient(
@@ -185,8 +222,8 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
         0, gradientEndY
       );
       
-      // Градиент от #1e1e1e 80% на краю до #1e1e1e 0% в конце области текста
-      const startOpacity = 0.8 * opacity;
+      // Для текста внизу увеличиваем непрозрачность до 95% для лучшей читаемости
+      const startOpacity = isTextAtTop ? 0.8 * opacity : 0.95 * opacity;
       const endOpacity = 0 * opacity;
       
       if (isTextAtTop) {
@@ -194,22 +231,84 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
         gradient.addColorStop(0, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${startOpacity})`);
         gradient.addColorStop(1, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${endOpacity})`);
       } else {
-        // Градиент снизу вверх: 80% внизу, 0% вверху
+        // Градиент снизу вверх: 95% внизу, 0% вверху (увеличена непрозрачность для лучшей читаемости)
+        // Добавляем промежуточные точки для более плавного перехода
         gradient.addColorStop(0, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${endOpacity})`);
+        gradient.addColorStop(0.2, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${startOpacity * 0.4})`);
+        gradient.addColorStop(0.5, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${startOpacity * 0.7})`);
+        gradient.addColorStop(0.8, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${startOpacity * 0.9})`);
         gradient.addColorStop(1, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${startOpacity})`);
       }
       
       // Рисуем градиент на всю ширину canvas
       ctx.save();
       ctx.fillStyle = gradient;
-      ctx.fillRect(0, gradientStartY, width, gradientHeight);
+      // Используем минимальную Y координату для начала прямоугольника
+      const rectY = Math.min(gradientStartY, gradientEndY);
+      ctx.fillRect(0, rectY, width, gradientHeight);
       ctx.restore();
       
-      // Если логотип отдельно от текста, рисуем отдельную подложку для логотипа
-      if (logoAndTextSeparate && logoArea) {
-        const logoPadding = Math.max(logoArea.height * 1.0, paddingPx * 3); // Увеличиваем отступ до 100% или минимум 3*paddingPx
+      // Если текст снизу и есть логотип, рисуем отдельный легкий градиент для логотипа
+      // Но только если логотип и текст не разделены (иначе обработаем в блоке logoAndTextSeparate)
+      if (hasLogoAndTextAtBottom && logoArea && !logoAndTextSeparate) {
+        const logoPadding = Math.max(logoArea.height * 0.2, paddingPx * 0.5); // Минимальный отступ
+        const logoOpacity = 0.8 * opacity * 0.3; // Очень легкое затемнение (30% от стандартного)
+        
         const logoGradientStartY = Math.max(0, logoArea.y - logoPadding);
         const logoGradientEndY = Math.min(height, logoArea.y + logoArea.height + logoPadding);
+        const logoGradientHeight = Math.abs(logoGradientEndY - logoGradientStartY);
+        
+        const logoGradient = ctx.createLinearGradient(
+          0, logoGradientStartY,
+          0, logoGradientEndY
+        );
+        
+        // Легкий градиент сверху вниз для логотипа
+        logoGradient.addColorStop(0, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${logoOpacity})`);
+        logoGradient.addColorStop(1, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, 0)`);
+        
+        ctx.save();
+        ctx.fillStyle = logoGradient;
+        ctx.fillRect(0, logoGradientStartY, width, logoGradientHeight);
+        ctx.restore();
+      }
+      
+      // Если логотип отдельно от текста, рисуем отдельную подложку для логотипа
+      // Важно: когда текст снизу, градиент для логотипа должен быть только под логотипом (сверху), а не на весь макет
+      if (logoAndTextSeparate && logoArea) {
+        // Если есть только логотип (без текста), уменьшаем отступ
+        const hasOnlyLogoForSeparate = !titleBounds && !subtitleBounds;
+        
+        // Когда текст снизу, значительно уменьшаем отступ и непрозрачность для логотипа
+        let logoPadding, logoOpacity;
+        if (isTextAtTop) {
+          logoPadding = hasOnlyLogoForSeparate
+            ? Math.max(logoArea.height * 0.3, paddingPx * 1.5) // Меньший отступ для одного логотипа
+            : Math.max(logoArea.height * 0.5, paddingPx * 2); // Стандартный отступ
+          logoOpacity = startOpacity; // Стандартная непрозрачность
+        } else {
+          // Текст снизу - значительно уменьшаем отступ и непрозрачность
+          logoPadding = hasOnlyLogoForSeparate
+            ? Math.max(logoArea.height * 0.2, paddingPx * 0.5) // Минимальный отступ
+            : Math.max(logoArea.height * 0.3, paddingPx * 1); // Уменьшенный отступ
+          logoOpacity = startOpacity * 0.4; // Уменьшаем непрозрачность до 40% от стандартной
+        }
+        
+        // Когда текст снизу, градиент для логотипа должен быть только под логотипом (сверху)
+        // Не растягиваем градиент на весь макет
+        let logoGradientStartY, logoGradientEndY;
+        if (isTextAtTop) {
+          // Текст сверху - градиент для логотипа идет от верха до конца логотипа
+          logoGradientStartY = Math.max(0, logoArea.y - logoPadding);
+          logoGradientEndY = Math.min(height, logoArea.y + logoArea.height + logoPadding);
+        } else {
+          // Текст снизу - градиент для логотипа только под логотипом (сверху), не на весь макет
+          logoGradientStartY = Math.max(0, logoArea.y - logoPadding);
+          // Ограничиваем градиент только областью логотипа + небольшой отступ
+          logoGradientEndY = Math.min(height, logoArea.y + logoArea.height + logoPadding);
+          // Не растягиваем градиент ниже, если текст внизу
+        }
+        
         const logoGradientHeight = Math.abs(logoGradientEndY - logoGradientStartY);
         
         const logoGradient = ctx.createLinearGradient(
@@ -220,11 +319,11 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
         // Определяем направление градиента для логотипа (обычно сверху вниз)
         const isLogoAtTop = logoArea.y < height / 2;
         if (isLogoAtTop) {
-          logoGradient.addColorStop(0, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${startOpacity})`);
+          logoGradient.addColorStop(0, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${logoOpacity})`);
           logoGradient.addColorStop(1, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${endOpacity})`);
         } else {
           logoGradient.addColorStop(0, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${endOpacity})`);
-          logoGradient.addColorStop(1, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${startOpacity})`);
+          logoGradient.addColorStop(1, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${logoOpacity})`);
         }
         
         ctx.save();
@@ -239,9 +338,11 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
   if (legalTextBounds || legalContentBounds) {
     const legalBounds = legalTextBounds || legalContentBounds;
     
-    // Увеличиваем область градиента для лигала - добавляем отступ сверху от текста лигала
+    // Увеличиваем область градиента для лигала - добавляем больший отступ сверху от текста лигала
+    // Когда текст внизу, нужно давать больше градиента снизу для читаемости
     const legalHeight = legalBounds.height || 0;
-    const legalPadding = Math.max(legalHeight * 1.0, paddingPx * 3); // Увеличиваем отступ до 100% или минимум 3*paddingPx
+    // Увеличиваем отступ до 200% высоты текста или минимум 5*paddingPx для лучшей читаемости
+    const legalPadding = Math.max(legalHeight * 2.0, paddingPx * 5);
     
     // Градиент для лигала всегда снизу вверх (от самого края снизу до начала лигала с отступом)
     const legalGradientStartY = height; // Начинаем от самого края снизу
@@ -254,11 +355,15 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
         0, legalGradientEndY
       );
       
-      // Градиент снизу вверх: 80% внизу (у края), 0% вверху (у начала лигала с отступом)
-      const legalStartOpacity = 0.8 * opacity;
+      // Градиент снизу вверх: увеличиваем непрозрачность внизу до 90% для лучшей читаемости
+      // и делаем более плавный переход
+      const legalStartOpacity = 0.9 * opacity; // Увеличиваем с 80% до 90%
       const legalEndOpacity = 0 * opacity;
       
+      // Добавляем промежуточную точку для более плавного перехода
       legalGradient.addColorStop(0, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${legalStartOpacity})`);
+      legalGradient.addColorStop(0.3, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${legalStartOpacity * 0.7})`);
+      legalGradient.addColorStop(0.7, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${legalStartOpacity * 0.3})`);
       legalGradient.addColorStop(1, `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${legalEndOpacity})`);
       
       // Рисуем градиент на всю ширину canvas

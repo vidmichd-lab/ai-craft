@@ -25,6 +25,7 @@ import {
 } from '../state/store.js';
 import { AVAILABLE_LOGOS, AVAILABLE_FONTS, AVAILABLE_KV, PRESET_BACKGROUND_COLORS, FONT_WEIGHT_TO_NAME, FONT_NAME_TO_WEIGHT, AVAILABLE_WEIGHTS } from '../constants.js';
 import { scanLogos, scanKV } from '../utils/assetScanner.js';
+import { loadImage as loadImageCached } from '../utils/imageCache.js';
 import {
   updateLogoUI,
   handleLogoUpload,
@@ -39,6 +40,7 @@ import {
 } from './components/logoSelector.js';
 import { renderer, clearTextMeasurementCache } from '../renderer.js';
 import { getDom } from './domCache.js';
+import { t } from '../utils/i18n.js';
 import {
   getAvailableWeightsForFamily,
   updateWeightDropdown,
@@ -90,7 +92,11 @@ import {
   refreshBGColumns,
   initializeBGDropdown,
   openBGSelectModal,
-  closeBGSelectModal
+  closeBGSelectModal,
+  updateBgGradientType,
+  updateBgGradientAngle,
+  addGradientStop,
+  removeGradientStop
 } from './components/backgroundSelector.js';
 import {
   updateSizesSummary,
@@ -167,10 +173,10 @@ export const syncFormFields = () => {
   }
   dom.titleColor.value = state.titleColor || '#ffffff';
   if (dom.titleColorHex) dom.titleColorHex.value = state.titleColor || '#ffffff';
-  const titleSize = state.titleSize ?? 7;
+  const titleSize = state.titleSize ?? 8;
   dom.titleSize.value = titleSize;
   if (dom.titleSizeValue) {
-    const titleSizeNum = typeof titleSize === 'number' && !isNaN(titleSize) ? titleSize : 7;
+    const titleSizeNum = typeof titleSize === 'number' && !isNaN(titleSize) ? titleSize : 8;
     dom.titleSizeValue.textContent = `${titleSizeNum}%`;
   }
   // Конвертируем вес из числа в название для обратной совместимости
@@ -192,8 +198,22 @@ export const syncFormFields = () => {
   const titleWeightDropdown = document.getElementById('titleWeightDropdown');
   if (titleWeightText && titleWeightDropdown) {
     const titleFontFamily = state.titleFontFamily || state.fontFamily || 'YS Text';
-    updateCustomWeightDropdown(titleWeightDropdown, titleWeightText, titleFontFamily, titleWeight, (value) => {
+    updateCustomWeightDropdown(titleWeightDropdown, titleWeightText, titleFontFamily, titleWeight, async (value) => {
+      clearTextMeasurementCache();
+      // Загружаем шрифт с новым начертанием
+      const weightValue = FONT_NAME_TO_WEIGHT[value] || '400';
+      const fontToLoad = AVAILABLE_FONTS.find(f => 
+        f.family === titleFontFamily && 
+        f.weight === weightValue && 
+        f.style === 'normal'
+      );
+      if (fontToLoad && fontToLoad.file) {
+        // Динамически импортируем loadFonts из main.js
+        const { loadFonts } = await import('../main.js');
+        await loadFonts([fontToLoad]);
+      }
       setKey('titleWeight', value);
+      renderer.render();
     });
   }
   
@@ -245,8 +265,22 @@ export const syncFormFields = () => {
   const subtitleWeightDropdown = document.getElementById('subtitleWeightDropdown');
   if (subtitleWeightText && subtitleWeightDropdown) {
     const subtitleFontFamily = state.subtitleFontFamily || state.fontFamily || 'YS Text';
-    updateCustomWeightDropdown(subtitleWeightDropdown, subtitleWeightText, subtitleFontFamily, subtitleWeight, (value) => {
+    updateCustomWeightDropdown(subtitleWeightDropdown, subtitleWeightText, subtitleFontFamily, subtitleWeight, async (value) => {
+      clearTextMeasurementCache();
+      // Загружаем шрифт с новым начертанием
+      const weightValue = FONT_NAME_TO_WEIGHT[value] || '400';
+      const fontToLoad = AVAILABLE_FONTS.find(f => 
+        f.family === subtitleFontFamily && 
+        f.weight === weightValue && 
+        f.style === 'normal'
+      );
+      if (fontToLoad && fontToLoad.file) {
+        // Динамически импортируем loadFonts из main.js
+        const { loadFonts } = await import('../main.js');
+        await loadFonts([fontToLoad]);
+      }
       setKey('subtitleWeight', value);
+      renderer.render();
     });
   }
   
@@ -299,8 +333,22 @@ export const syncFormFields = () => {
   const legalWeightDropdown = document.getElementById('legalWeightDropdown');
   if (legalWeightText && legalWeightDropdown) {
     const legalFontFamily = state.legalFontFamily || state.fontFamily || 'YS Text';
-    updateCustomWeightDropdown(legalWeightDropdown, legalWeightText, legalFontFamily, legalWeight, (value) => {
+    updateCustomWeightDropdown(legalWeightDropdown, legalWeightText, legalFontFamily, legalWeight, async (value) => {
+      clearTextMeasurementCache();
+      // Загружаем шрифт с новым начертанием
+      const weightValue = FONT_NAME_TO_WEIGHT[value] || '400';
+      const fontToLoad = AVAILABLE_FONTS.find(f => 
+        f.family === legalFontFamily && 
+        f.weight === weightValue && 
+        f.style === 'normal'
+      );
+      if (fontToLoad && fontToLoad.file) {
+        // Динамически импортируем loadFonts из main.js
+        const { loadFonts } = await import('../main.js');
+        await loadFonts([fontToLoad]);
+      }
       setKey('legalWeight', value);
+      renderer.render();
     });
   }
   
@@ -341,6 +389,10 @@ export const syncFormFields = () => {
     updateCustomFontInfo('age', state.ageCustomFontName);
   }
   if (dom.ageGapPercent) dom.ageGapPercent.value = state.ageGapPercent;
+  if (dom.ageGapPercentValue) {
+    const ageGapPercentNum = typeof state.ageGapPercent === 'number' && !isNaN(state.ageGapPercent) ? state.ageGapPercent : 1;
+    dom.ageGapPercentValue.textContent = `${ageGapPercentNum}%`;
+  }
 
   if (dom.showLogo) dom.showLogo.checked = state.showLogo !== false;
   if (dom.showSubtitle) dom.showSubtitle.checked = state.showSubtitle;
@@ -373,6 +425,32 @@ export const syncFormFields = () => {
 
   dom.bgColor.value = state.bgColor;
   if (dom.bgColorHex) dom.bgColorHex.value = state.bgColor;
+  
+  // Синхронизируем тип размещения фонового изображения
+  const bgSizeSelect = document.getElementById('bgSize');
+  if (bgSizeSelect) {
+    bgSizeSelect.value = state.bgSize || 'cover';
+    // Показываем/скрываем поле размера изображения
+    const bgImageSizeGroup = document.getElementById('bgImageSizeGroup');
+    if (bgImageSizeGroup) {
+      const bgSize = state.bgSize || 'cover';
+      if (bgSize === 'tile' || bgSize === 'cover' || bgSize === 'contain') {
+        bgImageSizeGroup.style.display = 'block';
+      } else {
+        bgImageSizeGroup.style.display = 'none';
+      }
+    }
+  }
+  // Синхронизируем размер изображения
+  const bgImageSizeInput = document.getElementById('bgImageSize');
+  const bgImageSizeValue = document.getElementById('bgImageSizeValue');
+  if (bgImageSizeInput) {
+    const size = state.bgImageSize ?? 100;
+    bgImageSizeInput.value = size;
+    if (bgImageSizeValue) {
+      bgImageSizeValue.textContent = `${Math.round(size)}%`;
+    }
+  }
   
   const textGradientOpacity = state.textGradientOpacity ?? 100;
   if (dom.textGradientOpacity) {
@@ -415,10 +493,10 @@ export const updatePreviewSizeSelect = () => {
     narrowDropdown.innerHTML = '';
     
     if (!categorized.narrow.length) {
-      narrowText.textContent = 'Нет узких форматов';
+      narrowText.textContent = t('export.preview.noNarrow');
       const emptyOption = document.createElement('div');
       emptyOption.className = 'custom-select-option';
-      emptyOption.textContent = 'Нет узких форматов';
+      emptyOption.textContent = t('export.preview.noNarrow');
       emptyOption.style.opacity = '0.5';
       emptyOption.style.cursor = 'not-allowed';
       narrowDropdown.appendChild(emptyOption);
@@ -462,10 +540,10 @@ export const updatePreviewSizeSelect = () => {
     wideDropdown.innerHTML = '';
     
     if (!categorized.wide.length) {
-      wideText.textContent = 'Нет широких форматов';
+      wideText.textContent = t('export.preview.noWide');
       const emptyOption = document.createElement('div');
       emptyOption.className = 'custom-select-option';
-      emptyOption.textContent = 'Нет широких форматов';
+      emptyOption.textContent = t('export.preview.noWide');
       emptyOption.style.opacity = '0.5';
       emptyOption.style.cursor = 'not-allowed';
       wideDropdown.appendChild(emptyOption);
@@ -511,10 +589,10 @@ export const updatePreviewSizeSelect = () => {
     squareDropdown.innerHTML = '';
     
     if (!categorized.square.length) {
-      squareText.textContent = 'Нет квадратных форматов';
+      squareText.textContent = t('export.preview.noSquare');
       const emptyOption = document.createElement('div');
       emptyOption.className = 'custom-select-option';
-      emptyOption.textContent = 'Нет квадратных форматов';
+      emptyOption.textContent = t('export.preview.noSquare');
       emptyOption.style.opacity = '0.5';
       emptyOption.style.cursor = 'not-allowed';
       squareDropdown.appendChild(emptyOption);
@@ -716,14 +794,67 @@ const readFileAsDataURL = (file) =>
     reader.readAsDataURL(file);
   });
 
-const loadImage = (src) =>
-  new Promise((resolve, reject) => {
+const loadImage = async (src) => {
+  // Для data URL используем обычную загрузку
+  if (src && src.startsWith('data:')) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = (error) => {
+        console.error(`Failed to load image: ${src}`, error);
+        reject(new Error(`Failed to load image: ${src}`));
+      };
+      img.src = src;
+    });
+  }
+  
+  // Для обычных URL используем кеширование с fallback
+  const absoluteUrl = src && !src.startsWith('http') && !src.startsWith('data:')
+    ? new URL(src, window.location.origin).href
+    : src;
+  
+  try {
+    const cached = await Promise.race([
+      loadImageCached(absoluteUrl, {
+        useCache: true,
+        showBlur: false
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+    ]);
+    
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-    img.src = src;
-  });
+    return new Promise((resolve, reject) => {
+      img.onload = () => resolve(img);
+      img.onerror = (error) => {
+        console.error(`Failed to load image from cache: ${absoluteUrl}`, error);
+        // Fallback на прямую загрузку
+        const fallbackImg = new Image();
+        fallbackImg.crossOrigin = 'anonymous';
+        fallbackImg.onload = () => resolve(fallbackImg);
+        fallbackImg.onerror = (err) => {
+          console.error(`Failed to load image: ${absoluteUrl}`, err);
+          reject(new Error(`Failed to load image: ${absoluteUrl}`));
+        };
+        fallbackImg.src = absoluteUrl;
+      };
+      img.src = cached.url;
+    });
+  } catch (error) {
+    console.warn('Ошибка загрузки изображения через кеш, используем fallback:', error);
+    // Fallback на обычную загрузку
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = (err) => {
+        console.error(`Failed to load image: ${absoluteUrl}`, err);
+        reject(new Error(`Failed to load image: ${absoluteUrl}`));
+      };
+      img.src = absoluteUrl;
+    });
+  }
+};
 
 const loadImageFile = async (file, target) => {
   try {
@@ -1048,17 +1179,22 @@ const updateBgVPositionToggle = (position) => {
     }
   });
   
-  // Принудительно обновляем CSS для слайдера (3 опции)
-  const slider = toggle.querySelector('.toggle-switch-slider');
-  if (slider) {
-    if (position === 'center') {
-      slider.style.transform = 'translateX(calc(33.333333% - 2.666667px))';
-    } else if (position === 'bottom') {
-      slider.style.transform = 'translateX(calc(66.666667% - 5.333334px))';
-    } else {
-      slider.style.transform = 'translateX(0)';
+  // Принудительно обновляем позицию слайдера через inline стили для гарантированного отображения
+  // Используем requestAnimationFrame для применения после reflow
+  requestAnimationFrame(() => {
+    const slider = toggle.querySelector('.toggle-switch-slider');
+    if (slider) {
+      // Используем те же значения, что и в CSS
+      if (position === 'center') {
+        slider.style.transform = 'translateX(calc(100% - 2.666667px))';
+      } else if (position === 'bottom') {
+        slider.style.transform = 'translateX(calc(200% - 5.333334px))';
+      } else {
+        // top (по умолчанию) - явно устанавливаем в 0
+        slider.style.transform = 'translateX(0)';
+      }
     }
-  }
+  });
 };
 
 export const toggleLogoPos = () => {
@@ -1206,6 +1342,20 @@ export const updateSubtitleSize = (value) => {
   renderer.render();
 };
 
+export const updateAgeGapPercent = (value) => {
+  const numeric = parseFloat(value);
+  if (isNaN(numeric)) {
+    console.warn('Некорректное значение для ageGapPercent:', value);
+    return;
+  }
+  setKey('ageGapPercent', numeric);
+  const dom = getDom();
+  if (dom.ageGapPercentValue) {
+    dom.ageGapPercentValue.textContent = `${numeric}%`;
+  }
+  renderer.render();
+};
+
 export const updateAgeSize = (value) => {
   const numeric = parseFloat(value);
   if (isNaN(numeric)) {
@@ -1317,6 +1467,31 @@ export const showSection = (sectionId) => {
     } else if (sectionId === 'background') {
       updateBgPositionToggle(state.bgPosition || 'center');
       updateBgVPositionToggle(state.bgVPosition || 'center');
+      // Синхронизируем тип размещения фонового изображения
+      const bgSizeSelect = document.getElementById('bgSize');
+      if (bgSizeSelect) {
+        bgSizeSelect.value = state.bgSize || 'cover';
+        // Показываем/скрываем поле размера изображения
+        const bgImageSizeGroup = document.getElementById('bgImageSizeGroup');
+        if (bgImageSizeGroup) {
+          const bgSize = state.bgSize || 'cover';
+          if (bgSize === 'tile' || bgSize === 'cover' || bgSize === 'contain') {
+            bgImageSizeGroup.style.display = 'block';
+          } else {
+            bgImageSizeGroup.style.display = 'none';
+          }
+        }
+      }
+      // Синхронизируем размер изображения
+      const bgImageSizeInput = document.getElementById('bgImageSize');
+      const bgImageSizeValue = document.getElementById('bgImageSizeValue');
+      if (bgImageSizeInput) {
+        const size = state.bgImageSize ?? 100;
+        bgImageSizeInput.value = size;
+        if (bgImageSizeValue) {
+          bgImageSizeValue.textContent = `${Math.round(size)}%`;
+        }
+      }
     } else if (sectionId === 'logo') {
       updateLogoPosToggle(state.logoPos || 'left');
       updateLogoToggle(state.logoLanguage || 'ru');
@@ -1377,6 +1552,7 @@ export const autoSelectLogoByTextColor = async (textColor) => {
   const normalizedColor = normalizeColor(textColor);
   const state = getState();
   const currentLogo = state.logoSelected || '';
+  const bgColor = normalizeColor(state.bgColor || '');
   
   // Определяем, какую папку использовать на основе яркости цвета
   let targetFolder = null;
@@ -1406,6 +1582,18 @@ export const autoSelectLogoByTextColor = async (textColor) => {
     return;
   }
   
+  // Для красных и оранжевых фонов используем white/ru/mono.svg
+  if (bgColor === '#E84033' || bgColor === '#FF6C26') {
+    const newLogoPath = 'logo/white/ru/mono.svg';
+    // Если путь не изменился, не обновляем
+    if (newLogoPath === currentLogo) {
+      return;
+    }
+    // Выбираем новый логотип
+    await selectPreloadedLogo(newLogoPath);
+    return;
+  }
+  
   // Используем выбранный язык из состояния
   const language = state.logoLanguage || 'ru';
   let logoType = 'main.svg'; // по умолчанию
@@ -1414,7 +1602,14 @@ export const autoSelectLogoByTextColor = async (textColor) => {
   if (currentLogo && currentLogo.startsWith('logo/')) {
     const parts = currentLogo.split('/');
     if (parts.length >= 4 && (parts[1] === 'black' || parts[1] === 'white')) {
-      logoType = parts[3]; // main.svg, main_mono.svg, long.svg
+      const currentLogoType = parts[3]; // main.svg, main_mono.svg, mono.svg, long.svg
+      // Если текущий логотип - mono.svg (был установлен для красного/оранжевого фона),
+      // возвращаемся к main.svg для других фонов
+      if (currentLogoType === 'mono.svg') {
+        logoType = 'main.svg';
+      } else {
+        logoType = currentLogoType; // Сохраняем текущий тип (main.svg, main_mono.svg, long.svg)
+      }
     }
   }
   
@@ -1481,8 +1676,8 @@ export const updateColorFromPicker = async (key, value) => {
   if (key === 'bgColor') {
     await updateTextColorsForBg(value);
   }
-  // Автоматически выбираем логотип на основе цвета текста
-  if (key === 'titleColor' || key === 'subtitleColor' || key === 'legalColor') {
+  // Автоматически выбираем логотип на основе цвета текста (только для заголовка и подзаголовка, не для лигала)
+  if (key === 'titleColor' || key === 'subtitleColor') {
     await autoSelectLogoByTextColor(value);
   }
   renderer.render();
@@ -1547,6 +1742,8 @@ export {
   togglePlatformSizes
 } from './components/sizeManager.js';
 export { showSizesAdmin } from './components/sizesAdmin.js';
+// Реэкспорт showLogoAssetsAdmin - должен быть после всех импортов
+export { showLogoAssetsAdmin } from './components/logoAssetsAdmin.js';
 
 export const togglePlatform = (platform) => {
   togglePlatformSizes(platform);
@@ -1574,6 +1771,13 @@ export const handlePresetContainerClick = (event) => {
 
 export const saveSettings = () => {
   savedSettings = saveSettingsSnapshot();
+  
+  // Сохраняем brandName в localStorage
+  const state = getState();
+  if (state.brandName) {
+    localStorage.setItem('brandName', state.brandName);
+  }
+  
   alert('Настройки сохранены (изображения исключены, выбор пресетов сохранён)');
 };
 
@@ -1592,6 +1796,18 @@ export const loadSettings = () => {
   ensurePresetSelection();
   setState({ logo: currentLogo, kv: currentKV, bgImage: currentBg });
 
+  // Сохраняем brandName в localStorage, если он был загружен
+  const state = getState();
+  if (state.brandName) {
+    localStorage.setItem('brandName', state.brandName);
+    
+    // Обновляем заголовок страницы
+    const pageTitle = document.querySelector('.header h1');
+    if (pageTitle) {
+      pageTitle.textContent = `Генератор макетов ${state.brandName}`;
+    }
+  }
+
   syncFormFields();
   renderPresetSizes();
   updatePreviewSizeSelect();
@@ -1604,7 +1820,8 @@ export const loadSettings = () => {
 };
 
 export const resetAll = () => {
-  if (!confirm('Сбросить все настройки к значениям по умолчанию?')) return;
+  if (!confirm('Вы уверены, что хотите сбросить все настройки к значениям по умолчанию?')) return;
+  if (!confirm('Точно сбросить? Это действие нельзя отменить.')) return;
   resetState();
   ensurePresetSelection();
   initializeLogoDropdown();
@@ -2070,6 +2287,7 @@ export const selectSubtitleTransform = (transformType) => {
 
 export const selectLegalTransform = (transformType) => {
   // Сохраняем выбор в состояние (текст в textarea не меняем)
+  clearTextMeasurementCache(); // Очищаем кэш измерений текста
   setKey('legalTransform', transformType);
   updateLegalTransformToggle(transformType);
   renderer.render();
@@ -2461,7 +2679,9 @@ const renderKVPairs = () => {
     const kvLabel = document.createElement('label');
     kvLabel.className = `form-label mb-sm ${isActive ? 'active' : ''}`;
     kvLabel.style.display = 'block';
-    kvLabel.textContent = `KV ${String(index + 1).padStart(2, '0')}${isActive ? ' (активен)' : ''}`;
+    kvLabel.textContent = isActive 
+      ? t('kv.label.active', { number: String(index + 1).padStart(2, '0') })
+      : t('kv.label', { number: String(index + 1).padStart(2, '0') });
     
     // Создаем кнопку для выбора KV (как для обычного KV - открывает модальное окно)
     const kvSelectBtn = document.createElement('button');
@@ -2605,7 +2825,9 @@ const renderTitleSubtitlePairs = () => {
     
     const titleLabel = document.createElement('label');
     titleLabel.className = `form-label ${isActive ? 'active' : ''}`;
-    titleLabel.textContent = `Заголовок ${String(index + 1).padStart(2, '0')}${isActive ? ' (активен)' : ''}`;
+    titleLabel.textContent = isActive
+      ? t('title.label.active', { number: String(index + 1).padStart(2, '0') })
+      : t('title.label', { number: String(index + 1).padStart(2, '0') });
     titleLabel.onclick = () => setActiveTitlePair(index);
     
     const titleButtons = document.createElement('div');
@@ -2655,7 +2877,9 @@ const renderTitleSubtitlePairs = () => {
     
     const subtitleLabel = document.createElement('label');
     subtitleLabel.className = `form-label ${isActive ? 'active' : ''}`;
-    subtitleLabel.textContent = `Подзаголовок ${String(index + 1).padStart(2, '0')}${isActive ? ' (активен)' : ''}`;
+    subtitleLabel.textContent = isActive
+      ? t('subtitle.label.active', { number: String(index + 1).padStart(2, '0') })
+      : t('subtitle.label', { number: String(index + 1).padStart(2, '0') });
     subtitleLabel.onclick = () => setActiveTitlePair(index);
     
     const subtitleButtons = document.createElement('div');
@@ -2715,7 +2939,7 @@ const renderTitleSubtitlePairs = () => {
         
         const addBtn = document.createElement('button');
         addBtn.className = 'btn btn-tiny';
-        addBtn.innerHTML = '<span class="material-icons" style="font-size: 16px; margin-right: 4px;">add</span>Добавить';
+        addBtn.innerHTML = `<span class="material-icons" style="font-size: 16px; margin-right: 4px;">add</span>${t('common.add')}`;
         addBtn.onclick = (e) => {
           e.stopPropagation();
           addTitleSubtitlePairAction();
@@ -2723,7 +2947,7 @@ const renderTitleSubtitlePairs = () => {
         
         const tooltip = document.createElement('div');
         tooltip.className = 'tooltip';
-        tooltip.textContent = 'Добавьте еще варианы для заголовка и подзаголовка с отдельным KV. Экспорт всех макетов за раз создаст несколько папок с ресайзами для разных заголовков и КВ';
+        tooltip.textContent = 'Добавьте еще варианы для заголовка и подзаголовка с отдельным Визуал. Экспорт всех макетов за раз создаст несколько папок с ресайзами для разных заголовков и Визуал';
         
         // Позиционирование tooltip при наведении
         tooltipWrapper.addEventListener('mouseenter', () => {
@@ -2840,12 +3064,21 @@ export const addTitleSubtitlePairAction = () => {
   const state = getState();
   const oldLength = (state.titleSubtitlePairs || []).length;
   addTitleSubtitlePair();
-  // Делаем новую пару активной (индекс последнего элемента = oldLength)
-  setActivePairIndex(oldLength);
-  renderTitleSubtitlePairs();
-  renderKVPairs();
-  syncFormFields();
-  renderer.render();
+  
+  // Используем requestAnimationFrame для отложенного обновления, чтобы не блокировать UI
+  requestAnimationFrame(() => {
+    const newState = getState();
+    if (newState.titleSubtitlePairs && newState.titleSubtitlePairs.length > oldLength) {
+      // Устанавливаем активный индекс - подписчик состояния автоматически обновит UI
+      // Не вызываем renderTitleSubtitlePairs и renderKVPairs здесь, так как подписчик сделает это
+      setState({ activePairIndex: oldLength });
+      
+      // Рендерим canvas в следующем кадре, чтобы не блокировать UI
+      requestAnimationFrame(() => {
+        renderer.render();
+      });
+    }
+  });
 };
 
 export const removeTitleSubtitlePairAction = (index) => {
@@ -2865,8 +3098,22 @@ export const initializeStateSubscribers = () => {
     return pairs.map((p, i) => `${i}:${p.id || ''}`).join('|');
   };
   
+  let lastBrandName = null;
+  
   subscribe(async (state) => {
     syncFormFields();
+    
+    // Сохраняем brandName в localStorage при изменении
+    if (state.brandName && state.brandName !== lastBrandName) {
+      localStorage.setItem('brandName', state.brandName);
+      lastBrandName = state.brandName;
+      
+      // Обновляем заголовок страницы
+      const pageTitle = document.querySelector('.header h1');
+      if (pageTitle) {
+        pageTitle.textContent = `Генератор макетов ${state.brandName}`;
+      }
+    }
     
     // Перерисовываем только если изменилась структура (количество/ID) пар или активный индекс
     // НЕ перерисовываем при изменении текста
@@ -2875,45 +3122,49 @@ export const initializeStateSubscribers = () => {
     const currentActiveIndex = state.activePairIndex || 0;
     
     // Если изменился активный индекс, загружаем KV и фоновое изображение для новой активной пары
+    // Делаем это асинхронно, чтобы не блокировать UI
     if (currentActiveIndex !== lastActiveIndex && currentActiveIndex >= 0 && currentActiveIndex < currentPairs.length) {
       const activePair = currentPairs[currentActiveIndex];
       
-      // Загружаем KV
-      if (activePair && activePair.kvSelected) {
-        try {
-          const img = await loadImage(activePair.kvSelected);
-          setState({ kv: img, kvSelected: activePair.kvSelected });
-          updateKVTriggerText(activePair.kvSelected);
-        } catch (error) {
-          console.error('Не удалось загрузить KV для активной пары:', error);
+      // Загружаем изображения асинхронно, не блокируя UI
+      requestAnimationFrame(async () => {
+        // Загружаем KV
+        if (activePair && activePair.kvSelected) {
+          try {
+            const img = await loadImage(activePair.kvSelected);
+            setState({ kv: img, kvSelected: activePair.kvSelected });
+            updateKVTriggerText(activePair.kvSelected);
+          } catch (error) {
+            console.error('Не удалось загрузить KV для активной пары:', error);
+            setState({ kv: null, kvSelected: '' });
+            updateKVTriggerText('');
+          }
+        } else {
           setState({ kv: null, kvSelected: '' });
           updateKVTriggerText('');
         }
-      } else {
-        setState({ kv: null, kvSelected: '' });
-        updateKVTriggerText('');
-      }
-      
-      // Устанавливаем фоновое изображение из активной пары
-      const bgImageSelected = activePair?.bgImageSelected || null;
-      if (bgImageSelected) {
-        if (typeof bgImageSelected === 'string') {
-          // Это путь к файлу, загружаем изображение
-          try {
-            const img = await loadImage(bgImageSelected);
-            setState({ bgImage: img });
-          } catch (error) {
-            console.error('Не удалось загрузить фоновое изображение для активной пары:', error);
-            setState({ bgImage: null });
+        
+        // Устанавливаем фоновое изображение из активной пары
+        const bgImageSelected = activePair?.bgImageSelected || null;
+        if (bgImageSelected) {
+          if (typeof bgImageSelected === 'string') {
+            // Это путь к файлу, загружаем изображение
+            try {
+              const img = await loadImage(bgImageSelected);
+              setState({ bgImage: img });
+            } catch (error) {
+              console.error('Не удалось загрузить фоновое изображение для активной пары:', error);
+              setState({ bgImage: null });
+            }
+          } else {
+            // Это уже объект Image
+            setState({ bgImage: bgImageSelected });
           }
         } else {
-          // Это уже объект Image
-          setState({ bgImage: bgImageSelected });
+          setState({ bgImage: null });
         }
-      } else {
-        setState({ bgImage: null });
-      }
-      updateBgUI();
+        updateBgUI();
+      });
     }
     
     if (currentPairsStructure !== lastPairsStructure || currentActiveIndex !== lastActiveIndex) {
@@ -2929,6 +3180,7 @@ export const initializeStateSubscribers = () => {
   const initialState = getState();
   lastPairsStructure = serializePairsStructure(initialState.titleSubtitlePairs || []);
   lastActiveIndex = initialState.activePairIndex || 0;
+  lastBrandName = initialState.brandName || null;
   renderTitleSubtitlePairs();
   renderKVPairs();
 };
@@ -2937,10 +3189,10 @@ export const initializeStateSubscribers = () => {
 export const refreshAllAssets = async () => {
   // Показываем индикатор загрузки
   const refreshBtn = document.querySelector('[onclick="refreshAllAssets()"]');
-  const originalText = refreshBtn ? refreshBtn.textContent : 'Обновить';
+  const originalText = refreshBtn ? refreshBtn.textContent : t('common.refresh');
   if (refreshBtn) {
     refreshBtn.disabled = true;
-    refreshBtn.textContent = 'Обновление...';
+    refreshBtn.textContent = t('common.refreshing');
   }
   
   try {
@@ -2969,7 +3221,7 @@ export const refreshAllAssets = async () => {
     
     // Показываем уведомление об успехе
     if (refreshBtn) {
-      refreshBtn.textContent = '✓ Обновлено';
+      refreshBtn.textContent = t('common.refreshed');
       setTimeout(() => {
         refreshBtn.textContent = originalText;
         refreshBtn.disabled = false;
@@ -2978,7 +3230,7 @@ export const refreshAllAssets = async () => {
   } catch (error) {
     console.error('Ошибка при обновлении ассетов:', error);
     if (refreshBtn) {
-      refreshBtn.textContent = 'Ошибка';
+      refreshBtn.textContent = t('common.error');
       setTimeout(() => {
         refreshBtn.textContent = originalText;
         refreshBtn.disabled = false;
@@ -2987,5 +3239,32 @@ export const refreshAllAssets = async () => {
     alert('Произошла ошибка при обновлении. Попробуйте еще раз.');
   }
 };
+
+/**
+ * Открывает модальное окно с гайдом
+ */
+export const openGuideModal = () => {
+  const overlay = document.getElementById('guideModalOverlay');
+  if (overlay) {
+    overlay.style.display = 'block';
+    // Блокируем скролл body
+    document.body.style.overflow = 'hidden';
+  }
+};
+
+/**
+ * Закрывает модальное окно с гайдом
+ */
+export const closeGuideModal = () => {
+  const overlay = document.getElementById('guideModalOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    // Разблокируем скролл body
+    document.body.style.overflow = '';
+  }
+};
+
+// Экспортируем функции градиента
+export { updateBgGradientType, updateBgGradientAngle, addGradientStop, removeGradientStop };
 
 
