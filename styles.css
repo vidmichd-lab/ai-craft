@@ -1510,6 +1510,8 @@ input[type="range"]::-moz-range-thumb:hover {
 
 .size-checkbox-item input[type="checkbox"] {
   margin: 0;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 
@@ -1518,6 +1520,7 @@ input[type="range"]::-moz-range-thumb:hover {
   font-size: var(--font-size-sm);
   font-family: var(--font-family-base);
   cursor: pointer;
+  pointer-events: auto;
   flex: 1;
   color: var(--text-secondary);
   font-weight: 500;

@@ -747,6 +747,8 @@ const initialize = async () => {
       const savedFavicon = localStorage.getItem('favicon');
       if (savedFavicon) {
         link.href = savedFavicon;
+        const { getState, setKey } = await import('./state/store.js');
+        if (!getState().favicon) setKey('favicon', savedFavicon);
       } else {
         // Используем фавиконку из папки fav по умолчанию
         link.href = 'fav/favicon.png';

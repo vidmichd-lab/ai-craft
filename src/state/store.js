@@ -28,12 +28,26 @@ const createTitleSubtitlePair = (index = 0, baseState = null) => {
   // Визуальные свойства новой пары — всегда из admin defaults (savedDefaults)
   const bgColor = savedDefaults.bgColor !== undefined ? savedDefaults.bgColor : '#1e1e1e';
 
+  // Для новой пары (index > 0) наследуем KV и фон от текущей активной пары, чтобы при переключении ничего не слетало
+  let kvSelected = index === 0 ? defaultKV : '';
+  let bgImageSelected = index === 0 ? null : null;
+  if (index > 0 && baseState && baseState.titleSubtitlePairs && baseState.titleSubtitlePairs.length > 0) {
+    const activeIdx = baseState.activePairIndex ?? 0;
+    const currentPair = baseState.titleSubtitlePairs[activeIdx];
+    if (currentPair) {
+      kvSelected = currentPair.kvSelected || baseState.kvSelected || defaultKV;
+      bgImageSelected = currentPair.bgImageSelected != null
+        ? currentPair.bgImageSelected
+        : (baseState.bgImage && baseState.bgImage.src ? baseState.bgImage.src : null);
+    }
+  }
+
   return {
     id: `pair-${Date.now()}-${index}`,
     title: index === 0 ? defaultTitle : '',
     subtitle: index === 0 ? defaultSubtitle : '',
-    kvSelected: index === 0 ? defaultKV : '',
-    bgImageSelected: null,
+    kvSelected,
+    bgImageSelected,
     bgColor
   };
 };
@@ -48,6 +62,13 @@ const createInitialState = () => {
       return {};
     }
   })();
+  // Миграция: старые названия платформ в safeAreas
+  if (savedDefaults.safeAreas && typeof savedDefaults.safeAreas === 'object') {
+    if (savedDefaults.safeAreas['Я.Директ']) {
+      savedDefaults.safeAreas['РСЯ'] = savedDefaults.safeAreas['РСЯ'] || savedDefaults.safeAreas['Я.Директ'];
+      delete savedDefaults.safeAreas['Я.Директ'];
+    }
+  }
   const d = (key, fallback) => savedDefaults[key] !== undefined ? savedDefaults[key] : fallback;
 
   // Получаем размеры из конфига (или дефолтные, если еще не загружены)
@@ -80,6 +101,12 @@ const createInitialState = () => {
     } catch (e) {
       console.warn('Ошибка при загрузке logoSizeMultipliers из localStorage:', e);
     }
+  }
+
+  // Фавиконка: при загрузке берём из localStorage (в state не хранится в default-values)
+  let initialFavicon = '';
+  if (typeof localStorage !== 'undefined') {
+    initialFavicon = localStorage.getItem('favicon') || '';
   }
 
   return {
@@ -151,7 +178,18 @@ const createInitialState = () => {
     showBlocks: false,
     showGuides: false,
     logo: null,
-    logoSelected: d('logoSelected', 'logo/white/ru/main.svg'),
+    logoSelected: (() => {
+      const pro = d('proMode', false);
+      const lang = d('logoLanguage', 'ru');
+      if (pro && savedDefaults.defaultLogoPRO) return savedDefaults.defaultLogoPRO;
+      if (lang === 'kz' && savedDefaults.defaultLogoKZ) return savedDefaults.defaultLogoKZ;
+      if (savedDefaults.defaultLogoRU) return savedDefaults.defaultLogoRU;
+      return d('logoSelected', 'logo/white/ru/main.svg');
+    })(),
+    defaultLogoRU: d('defaultLogoRU', null),
+    defaultLogoKZ: d('defaultLogoKZ', null),
+    defaultLogoPRO: d('defaultLogoPRO', null),
+    logoDefaultMode: d('logoDefaultMode', 'single'), // 'single' | 'perVariant'
     logoSize: d('logoSize', 40),
     logoOffsetTopPx: d('logoOffsetTopPx', 0),
     logoOffsetBottomPx: d('logoOffsetBottomPx', 0),
@@ -192,6 +230,7 @@ const createInitialState = () => {
     kvCanvasHeight: null,
     exportScale: 1, // Масштаб экспорта: 1, 2, 3 или 4
     brandName: brandName, // Название бренда для использования в интерфейсе
+    favicon: initialFavicon, // фавиконка из localStorage (для превью в админке)
     layoutMode: d('layoutMode', 'auto'),
     // Настройки веса файла при экспорте
     maxFileSizeUnit: d('maxFileSizeUnit', 'KB'), // 'KB' или 'MB'
@@ -204,9 +243,6 @@ const createInitialState = () => {
       'Ozon': {
         '2832x600': { width: 2100, height: 570 },
         '1080x450': { width: 1020, height: 405 }
-      },
-      'Я.Директ': {
-        '1600x1200': { width: 900, height: 900 }
       },
       'РСЯ': {
         '1600x1200': { width: 900, height: 900 }
@@ -300,6 +336,22 @@ const applyDerivedState = (state, delta) => {
     } else if (logoLanguage === 'ru') {
       const legalRU = 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/';
       next.legal = legalRU;
+    }
+    // При смене языка подставляем логотип по умолчанию для этого варианта (если задан)
+    if (state.defaultLogoRU || state.defaultLogoKZ) {
+      const defPath = logoLanguage === 'kz' ? state.defaultLogoKZ : state.defaultLogoRU;
+      if (defPath) next.logoSelected = defPath;
+    }
+  }
+
+  // При включении/выключении PRO подставляем логотип по умолчанию для PRO (если задан)
+  if ('proMode' in deltaKeys && state.defaultLogoPRO) {
+    if (delta.proMode) {
+      next.logoSelected = state.defaultLogoPRO;
+    } else {
+      const lang = state.logoLanguage || 'ru';
+      const defPath = lang === 'kz' ? state.defaultLogoKZ : state.defaultLogoRU;
+      if (defPath) next.logoSelected = defPath;
     }
   }
 
@@ -436,6 +488,10 @@ export const getDefaultValues = () => {
         // Возвращаем значения из localStorage, если они есть
         return {
           logoSelected: savedDefaults.logoSelected,
+          defaultLogoRU: savedDefaults.defaultLogoRU,
+          defaultLogoKZ: savedDefaults.defaultLogoKZ,
+          defaultLogoPRO: savedDefaults.defaultLogoPRO,
+          logoDefaultMode: savedDefaults.logoDefaultMode,
           kvSelected: savedDefaults.kvSelected,
           title: savedDefaults.title,
           subtitle: savedDefaults.subtitle,
@@ -495,6 +551,10 @@ export const getDefaultValues = () => {
   // Возвращаем только те значения, которые используются в админке
   return {
     logoSelected: initialState.logoSelected,
+    defaultLogoRU: initialState.defaultLogoRU,
+    defaultLogoKZ: initialState.defaultLogoKZ,
+    defaultLogoPRO: initialState.defaultLogoPRO,
+    logoDefaultMode: initialState.logoDefaultMode,
     kvSelected: initialState.kvSelected,
     title: initialState.title,
     subtitle: initialState.subtitle,

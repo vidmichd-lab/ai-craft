@@ -391,7 +391,8 @@ export const initEventDelegation = () => {
         },
         'exportScaleToggle': () => {
           if (typeof window.updateState === 'function') {
-            window.updateState('exportScale', parseInt(value, 10));
+            const scale = Math.min(2, Math.max(1, parseInt(value, 10) || 1));
+            window.updateState('exportScale', scale);
           }
         },
         'titleTransformToggle': () => {

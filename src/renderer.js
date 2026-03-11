@@ -88,11 +88,6 @@ const renderToCanvas = (canvas, width, height, state) => {
       '2832x600': { width: 2100, height: 570, hideLegal: false, hideAge: false, titleAlign: 'left' },
       '1080x450': { width: 1020, height: 405, hideLegal: false, hideAge: false, titleAlign: 'left' }
     },
-    // Перформанс‑форматы Я.Директ (РСЯ + Поиск)
-    'Я.Директ': {
-      '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center', logoPos: 'center' }
-    },
-    // Обратная совместимость со старыми сохранёнными конфигами (платформа "РСЯ")
     'РСЯ': {
       '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center', logoPos: 'center' }
     }

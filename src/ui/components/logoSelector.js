@@ -175,6 +175,19 @@ export const clearLogo = () => {
 export const selectPreloadedLogo = async (logoFile) => {
   const dom = getDom();
   
+  // Если выбор из медиа-админки для варианта RU/KZ/PRO — сохраняем только дефолт для варианта
+  const variant = window._adminDefaultLogoVariant;
+  if (variant && (variant === 'ru' || variant === 'kz' || variant === 'pro')) {
+    window._adminDefaultLogoVariant = null;
+    const key = variant === 'ru' ? 'defaultLogoRU' : variant === 'kz' ? 'defaultLogoKZ' : 'defaultLogoPRO';
+    setKey(key, logoFile || '');
+    if (typeof window.updateLogoAssetsPreview === 'function') {
+      window.updateLogoAssetsPreview();
+    }
+    closeLogoSelectModal();
+    return;
+  }
+  
   // Закрываем модальное окно выбора
   closeLogoSelectModal();
   

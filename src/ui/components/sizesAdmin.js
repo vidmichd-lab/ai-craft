@@ -2313,8 +2313,8 @@ const openSizesAdmin = async () => {
   // Принудительно загружаем размеры из файла, если они еще не загружены
   let sizes = getPresetSizes();
   
-  // Проверяем, есть ли платформа Я.Директ (перформанс‑форматы)
-  if (!sizes['Я.Директ']) {
+  // Проверяем, есть ли платформа РСЯ (перформанс‑форматы)
+  if (!sizes['РСЯ']) {
     console.log('Размеры неполные, загружаем из файла...');
     try {
       sizes = await loadSizesConfig();
@@ -2759,8 +2759,8 @@ const renderAdminPlatforms = (sizes) => {
       '2832x600': { width: 2100, height: 570, hideLegal: false, hideAge: false, titleAlign: 'left' },
       '1080x450': { width: 1020, height: 405, hideLegal: false, hideAge: false, titleAlign: 'left' }
     },
-    // Перформанс‑форматы Я.Директ (РСЯ + Поиск)
-    'Я.Директ': {
+    // Перформанс‑форматы РСЯ + Поиск
+    'РСЯ': {
       '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center' }
     },
     // Обратная совместимость со старыми сохранёнными конфигами (платформа "РСЯ")
@@ -3513,8 +3513,8 @@ const setupAdminHandlers = (initialSizes) => {
             '2832x600': { width: 2100, height: 570, hideLegal: false, hideAge: false, titleAlign: 'left' },
             '1080x450': { width: 1020, height: 405, hideLegal: false, hideAge: false, titleAlign: 'left' }
           },
-          // Перформанс‑форматы Я.Директ (РСЯ + Поиск)
-          'Я.Директ': {
+          // Перформанс‑форматы РСЯ + Поиск
+          'РСЯ': {
             '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center' }
           },
           // Обратная совместимость со старыми сохранёнными конфигами (платформа "РСЯ")

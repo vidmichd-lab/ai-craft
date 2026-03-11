@@ -10,13 +10,13 @@ const DEFAULT_PRESET_SIZES = {
     { width: 1080, height: 1920, checked: true },
     { width: 1920, height: 720, checked: true }
   ],
-  // Перформанс-форматы Я.Директ (РСЯ + Поиск)
-  'Я.Директ': [
+  // Перформанс-форматы РСЯ + Поиск
+  'РСЯ': [
     { width: 1600, height: 1200, checked: true },
     { width: 240, height: 400, checked: true }
   ],
-  // Графические форматы Я.Директ (редко используемые размеры)
-  'Я.Директ Графические': [
+  // Графические форматы Яндекс Директ
+  'Яндекс Директ': [
     { width: 160, height: 600, checked: true },
     { width: 240, height: 600, checked: true },
     { width: 300, height: 250, checked: true },
@@ -80,6 +80,15 @@ export const loadSizesConfig = async () => {
     if (savedSizes) {
       try {
         const parsed = JSON.parse(savedSizes);
+        // Миграция старых названий платформ
+        if (parsed['Я.Директ']) {
+          parsed['РСЯ'] = parsed['РСЯ'] || parsed['Я.Директ'];
+          delete parsed['Я.Директ'];
+        }
+        if (parsed['Я.Директ Графические']) {
+          parsed['Яндекс Директ'] = parsed['Яндекс Директ'] || parsed['Я.Директ Графические'];
+          delete parsed['Я.Директ Графические'];
+        }
         currentPresetSizes = parsed;
         console.log('Размеры загружены из localStorage');
         return parsed;
@@ -92,6 +101,15 @@ export const loadSizesConfig = async () => {
     const response = await fetch('/sizes-config.json');
     if (response.ok) {
       const config = await response.json();
+      // Миграция старых названий платформ
+      if (config['Я.Директ']) {
+        config['РСЯ'] = config['РСЯ'] || config['Я.Директ'];
+        delete config['Я.Директ'];
+      }
+      if (config['Я.Директ Графические']) {
+        config['Яндекс Директ'] = config['Яндекс Директ'] || config['Я.Директ Графические'];
+        delete config['Я.Директ Графические'];
+      }
       currentPresetSizes = config;
       console.log('Размеры загружены из sizes-config.json');
       return config;

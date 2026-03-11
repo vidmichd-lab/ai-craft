@@ -1214,8 +1214,13 @@ export const selectLogoLanguage = async (language) => {
   // Обновляем тумблер сразу, чтобы визуально было видно изменение
   updateLogoToggle(language);
   
-  // Если есть выбранный логотип, обновляем его путь на новый язык
-  if (state.logoSelected && state.logoSelected.startsWith('logo/')) {
+  // Если заданы дефолты по вариантам (RU/KZ), после setKey applyDerivedState уже подставил logoSelected — загружаем его
+  const nextState = getState();
+  if (nextState.defaultLogoRU || nextState.defaultLogoKZ) {
+    if (nextState.logoSelected) {
+      await selectPreloadedLogo(nextState.logoSelected);
+    }
+  } else if (state.logoSelected && state.logoSelected.startsWith('logo/')) {
     const parts = state.logoSelected.split('/');
     if (parts.length >= 4 && (parts[1] === 'black' || parts[1] === 'white')) {
       const targetFolder = parts[1]; // black или white
@@ -1516,8 +1521,11 @@ export const selectProMode = async (enabled) => {
       }
     }
     
-    // Восстанавливаем логотип в зависимости от языка
-    if (state.logoLanguage === 'kz') {
+    // Восстанавливаем логотип: из дефолтов по варианту (defaultLogoRU/KZ) или фиксированный путь
+    const s = getState();
+    if (s.logoSelected) {
+      await selectPreloadedLogo(s.logoSelected);
+    } else if (state.logoLanguage === 'kz') {
       await selectPreloadedLogo('logo/white/kz/main.svg');
     } else {
       await selectPreloadedLogo('logo/white/ru/main.svg');
@@ -2109,13 +2117,15 @@ export const handlePresetContainerClick = (event) => {
     return;
   }
 
-  const checkbox = event.target.closest('input[type="checkbox"]');
+  // Клик по чекбоксу или по его label (label связан через for=id, поэтому чекбокс мог переключиться — синхронизируем состояние)
+  let checkbox = event.target.closest('input[type="checkbox"]');
+  if (!checkbox && event.target.tagName === 'LABEL' && event.target.getAttribute('for')) {
+    checkbox = document.getElementById(event.target.getAttribute('for'));
+  }
   if (checkbox) {
-    if (checkbox.dataset.platform) {
-      // Обычный размер
+    if (checkbox.dataset.platform !== undefined) {
       toggleSize(checkbox.dataset.platform, Number(checkbox.dataset.index));
     } else if (checkbox.dataset.customId) {
-      // Кастомный размер
       toggleCustomSizeAction(checkbox.dataset.customId);
     }
   }
@@ -2292,31 +2302,21 @@ export const initializeBgVPositionToggle = () => {
 const updateExportScaleToggle = (scale) => {
   const toggle = document.getElementById('exportScaleToggle');
   if (!toggle) return;
-  
-  // Устанавливаем значение масштаба
-  toggle.setAttribute('data-value', String(scale));
-  
-  // Обновляем опции
+  const clamped = scale === 2 ? 2 : 1;
+  toggle.setAttribute('data-value', String(clamped));
   const options = toggle.querySelectorAll('.toggle-switch-option');
   options.forEach(option => {
-    if (option.dataset.value === String(scale)) {
+    if (option.dataset.value === String(clamped)) {
       option.classList.add('active');
     } else {
       option.classList.remove('active');
     }
   });
-  
-  // Принудительно обновляем CSS для слайдера (4 опции)
-  // Используем процентные значения как в CSS для точного позиционирования
+  // Принудительно обновляем CSS для слайдера (2 опции: ×1 и ×2)
   const slider = toggle.querySelector('.toggle-switch-slider');
   if (slider) {
-    // Используем те же значения, что и в CSS
     if (scale === 2) {
       slider.style.transform = 'translateX(calc(100% - 3px))';
-    } else if (scale === 3) {
-      slider.style.transform = 'translateX(calc(200% - 6px))';
-    } else if (scale === 4) {
-      slider.style.transform = 'translateX(calc(300% - 9px))';
     } else {
       slider.style.transform = 'translateX(0)';
     }
@@ -2330,7 +2330,7 @@ export const initializeExportScaleToggle = () => {
   // Обработчики событий обрабатываются через делегирование в eventHandler.js
   // Здесь только инициализируем визуальное состояние
   const state = getState();
-  updateExportScaleToggle(state.exportScale || 1);
+  updateExportScaleToggle(state.exportScale === 2 ? 2 : 1);
 };
 
 // Функция initializeLogoDropdown теперь импортируется из ./components/logoSelector.js

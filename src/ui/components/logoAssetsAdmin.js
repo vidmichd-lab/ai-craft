@@ -7,7 +7,6 @@ import { renderFileManager, initFileManager } from './fileManager.js';
 import { getState, setKey, getDefaultValues } from '../../state/store.js';
 import { openLogoSelectModal, closeLogoSelectModal, selectPreloadedLogo } from './logoSelector.js';
 import { openKVSelectModal, closeKVSelectModal, selectPreloadedKV } from './kvSelector.js';
-import { handleLogoUpload, handleKVUpload } from '../ui.js';
 import { getPassword, checkPassword, setPassword, hasPassword } from '../../utils/passwordManager.js';
 import { t } from '../../utils/i18n.js';
 
@@ -229,12 +228,18 @@ const updateDefaultsPreview = () => {
     }
   }
   
-  // Обновляем превью фавиконки
+  // Обновляем превью фавиконки (источник: state, localStorage или текущий <link rel="icon">)
   const faviconPreviewImg = document.getElementById('logoAssetsDefaultFaviconPreviewImg');
   const faviconPreviewPlaceholder = document.getElementById('logoAssetsDefaultFaviconPreviewPlaceholder');
   const faviconClearBtn = document.getElementById('logoAssetsDefaultFaviconClear');
   if (faviconPreviewImg && faviconPreviewPlaceholder) {
-    const favicon = state.favicon || localStorage.getItem('favicon') || '';
+    let favicon = state.favicon || localStorage.getItem('favicon') || '';
+    if (!favicon) {
+      const link = document.querySelector("link[rel~='icon']");
+      if (link && link.href && link.href !== '' && !link.href.endsWith('fav/favicon.png')) {
+        favicon = link.href;
+      }
+    }
     if (favicon) {
       faviconPreviewImg.src = favicon;
       faviconPreviewImg.style.display = 'block';
@@ -243,6 +248,7 @@ const updateDefaultsPreview = () => {
         faviconClearBtn.style.display = 'block';
       }
     } else {
+      faviconPreviewImg.src = '';
       faviconPreviewImg.style.display = 'none';
       faviconPreviewPlaceholder.style.display = 'flex';
       if (faviconClearBtn) {
@@ -254,6 +260,47 @@ const updateDefaultsPreview = () => {
   // НЕ обновляем значения в полях ввода при изменении state извне
   // Поля ввода обновляются только при открытии админки
   // Это позволяет пользователю редактировать значения в админке без перезаписи при изменениях в макете
+
+  // Превью логотипов по вариантам (RU / KZ / PRO)
+  const variantRuImg = document.getElementById('logoAssetsVariantRuPreviewImg');
+  const variantRuPh = document.getElementById('logoAssetsVariantRuPlaceholder');
+  if (variantRuImg && variantRuPh) {
+    const path = state.defaultLogoRU || state.logoSelected || '';
+    if (path) {
+      variantRuImg.src = path;
+      variantRuImg.style.display = 'block';
+      variantRuPh.style.display = 'none';
+    } else {
+      variantRuImg.style.display = 'none';
+      variantRuPh.style.display = 'flex';
+    }
+  }
+  const variantKzImg = document.getElementById('logoAssetsVariantKzPreviewImg');
+  const variantKzPh = document.getElementById('logoAssetsVariantKzPlaceholder');
+  if (variantKzImg && variantKzPh) {
+    const path = state.defaultLogoKZ || '';
+    if (path) {
+      variantKzImg.src = path;
+      variantKzImg.style.display = 'block';
+      variantKzPh.style.display = 'none';
+    } else {
+      variantKzImg.style.display = 'none';
+      variantKzPh.style.display = 'flex';
+    }
+  }
+  const variantProImg = document.getElementById('logoAssetsVariantProPreviewImg');
+  const variantProPh = document.getElementById('logoAssetsVariantProPlaceholder');
+  if (variantProImg && variantProPh) {
+    const path = state.defaultLogoPRO || '';
+    if (path) {
+      variantProImg.src = path;
+      variantProImg.style.display = 'block';
+      variantProPh.style.display = 'none';
+    } else {
+      variantProImg.style.display = 'none';
+      variantProPh.style.display = 'flex';
+    }
+  }
 };
 
 // Экспортируем функцию для обновления извне
@@ -416,13 +463,12 @@ const openLogoAssetsAdmin = async () => {
                 <span id="logoAssetsDefaultLogoPreviewPlaceholder" class="preview-placeholder">${t('common.none')}</span>
               </div>
               <div class="input-group" style="display: flex; gap: 8px; margin-top: 8px;">
-                <button class="btn btn-full" id="logoAssetsDefaultLogoUpload" style="flex: 1;">
-                  ${t('admin.logoAssets.defaults.upload')}
+                <button type="button" class="btn btn-full" id="logoAssetsDefaultLogoSelect" style="flex: 1;">
+                  ${t('admin.logoAssets.defaults.select')}
                 </button>
-                <button class="btn btn-danger" id="logoAssetsDefaultLogoClear" style="display: ${hasLogo ? 'block' : 'none'};" title="${t('admin.logoAssets.defaults.reset')}">
+                <button type="button" class="btn btn-danger" id="logoAssetsDefaultLogoClear" style="display: ${hasLogo ? 'block' : 'none'};" title="${t('admin.logoAssets.defaults.reset')}">
                   ${t('admin.logoAssets.defaults.reset')}
                 </button>
-                <input type="file" id="logoAssetsDefaultLogoUploadFile" accept="image/*,.svg" style="display: none;">
               </div>
             </div>
             
@@ -436,13 +482,12 @@ const openLogoAssetsAdmin = async () => {
                 <span id="logoAssetsDefaultKVPreviewPlaceholder" class="preview-placeholder" style="display: ${state.kvSelected ? 'none' : 'block'};">${t('common.none')}</span>
               </div>
               <div class="input-group" style="display: flex; gap: 8px; margin-top: 8px;">
-                <button class="btn btn-full" id="logoAssetsDefaultKVUpload" style="flex: 1;">
-                  ${t('admin.logoAssets.defaults.upload')}
+                <button type="button" class="btn btn-full" id="logoAssetsDefaultKVSelect" style="flex: 1;">
+                  ${t('admin.logoAssets.defaults.select')}
                 </button>
-                <button class="btn btn-danger" id="logoAssetsDefaultKVClear" style="display: ${hasKV ? 'block' : 'none'};" title="${t('admin.logoAssets.defaults.reset')}">
+                <button type="button" class="btn btn-danger" id="logoAssetsDefaultKVClear" style="display: ${hasKV ? 'block' : 'none'};" title="${t('admin.logoAssets.defaults.reset')}">
                   ${t('admin.logoAssets.defaults.reset')}
                 </button>
-                <input type="file" id="logoAssetsDefaultKVUploadFile" accept="image/*" style="display: none;">
               </div>
             </div>
             
@@ -491,6 +536,14 @@ const openLogoAssetsAdmin = async () => {
               <div style="font-size: 12px; color: ${textSecondary}; margin-top: 2px;">${t('admin.logoAssets.logoSettings.desc')}</div>
             </div>
           </div>
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; color: ${textSecondary}; font-size: 14px;">${t('admin.logoAssets.logoSettings.modeLabel')}</label>
+            <select id="logoAssetsDefaultLogoMode" class="theme-input">
+              <option value="single" ${(state.logoDefaultMode || 'single') === 'single' ? 'selected' : ''}>${t('admin.logoAssets.logoSettings.modeSingle')}</option>
+              <option value="perVariant" ${state.logoDefaultMode === 'perVariant' ? 'selected' : ''}>${t('admin.logoAssets.logoSettings.modePerVariant')}</option>
+            </select>
+          </div>
+          <div id="logoAssetsLogoModeSingle" style="display: ${(state.logoDefaultMode || 'single') === 'single' ? 'block' : 'none'};">
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
             <div class="form-group">
               <label style="display: block; margin-bottom: 8px; color: ${textSecondary}; font-size: 14px;">${t('admin.logoAssets.logoSettings.size')}</label>
@@ -517,6 +570,41 @@ const openLogoAssetsAdmin = async () => {
                 <option value="false" ${!state.proMode ? 'selected' : ''}>${t('admin.logoAssets.logoSettings.proMode.off')}</option>
                 <option value="true" ${state.proMode ? 'selected' : ''}>${t('admin.logoAssets.logoSettings.proMode.on')}</option>
               </select>
+            </div>
+          </div>
+          </div>
+          <div id="logoAssetsLogoModePerVariant" style="display: ${state.logoDefaultMode === 'perVariant' ? 'block' : 'none'}; margin-top: 16px;">
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="form-group" style="padding: 12px; background: ${hexToRgba(colorLogo, 0.05)}; border-radius: 8px;">
+                <label style="font-weight: 600; margin-bottom: 8px; color: ${textPrimary};">${t('admin.logoAssets.logoSettings.variant.ru')}</label>
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                  <div id="logoAssetsVariantRuPreview" class="preview-container" style="width: 80px; height: 40px; min-width: 80px;">
+                    <img id="logoAssetsVariantRuPreviewImg" src="${state.defaultLogoRU || state.logoSelected || ''}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: ${state.defaultLogoRU || state.logoSelected ? 'block' : 'none'};">
+                    <span id="logoAssetsVariantRuPlaceholder" class="preview-placeholder" style="display: ${state.defaultLogoRU || state.logoSelected ? 'none' : 'flex'};">—</span>
+                  </div>
+                  <button type="button" class="btn" id="logoAssetsVariantRuSelect">${t('admin.logoAssets.defaults.select')}</button>
+                </div>
+              </div>
+              <div class="form-group" style="padding: 12px; background: ${hexToRgba(colorLogo, 0.05)}; border-radius: 8px;">
+                <label style="font-weight: 600; margin-bottom: 8px; color: ${textPrimary};">${t('admin.logoAssets.logoSettings.variant.kz')}</label>
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                  <div id="logoAssetsVariantKzPreview" class="preview-container" style="width: 80px; height: 40px; min-width: 80px;">
+                    <img id="logoAssetsVariantKzPreviewImg" src="${state.defaultLogoKZ || ''}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: ${state.defaultLogoKZ ? 'block' : 'none'};">
+                    <span id="logoAssetsVariantKzPlaceholder" class="preview-placeholder" style="display: ${state.defaultLogoKZ ? 'none' : 'flex'};">—</span>
+                  </div>
+                  <button type="button" class="btn" id="logoAssetsVariantKzSelect">${t('admin.logoAssets.defaults.select')}</button>
+                </div>
+              </div>
+              <div class="form-group" style="padding: 12px; background: ${hexToRgba(colorLogo, 0.05)}; border-radius: 8px;">
+                <label style="font-weight: 600; margin-bottom: 8px; color: ${textPrimary};">${t('admin.logoAssets.logoSettings.variant.pro')}</label>
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                  <div id="logoAssetsVariantProPreview" class="preview-container" style="width: 80px; height: 40px; min-width: 80px;">
+                    <img id="logoAssetsVariantProPreviewImg" src="${state.defaultLogoPRO || ''}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: ${state.defaultLogoPRO ? 'block' : 'none'};">
+                    <span id="logoAssetsVariantProPlaceholder" class="preview-placeholder" style="display: ${state.defaultLogoPRO ? 'none' : 'flex'};">—</span>
+                  </div>
+                  <button type="button" class="btn" id="logoAssetsVariantProSelect">${t('admin.logoAssets.defaults.select')}</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -931,19 +1019,21 @@ const setupHandlers = () => {
   const saveBtn = document.getElementById('logoAssetsAdminSave');
   if (saveBtn) {
     saveBtn.addEventListener('click', () => {
+      const state = getState();
       // Сохраняем настройки логотипа
       const logoSize = document.getElementById('logoAssetsDefaultLogoSize');
       const logoPos = document.getElementById('logoAssetsDefaultLogoPos');
       const logoLanguage = document.getElementById('logoAssetsDefaultLogoLanguage');
       const proMode = document.getElementById('logoAssetsDefaultProMode');
+      const logoMode = document.getElementById('logoAssetsDefaultLogoMode');
       
       if (logoSize) setKey('logoSize', parseFloat(logoSize.value));
       if (logoPos) setKey('logoPos', logoPos.value);
       if (logoLanguage) setKey('logoLanguage', logoLanguage.value);
+      if (logoMode) setKey('logoDefaultMode', logoMode.value);
       if (proMode) {
         const proModeValue = proMode.value === 'true';
         setKey('proMode', proModeValue);
-        // Применяем PRO режим если включен
         if (typeof window.selectProMode === 'function') {
           window.selectProMode(proModeValue);
         }
@@ -956,41 +1046,44 @@ const setupHandlers = () => {
       if (kvBorderRadius) setKey('kvBorderRadius', parseFloat(kvBorderRadius.value));
       if (kvPosition) setKey('kvPosition', kvPosition.value);
       
+      // Записываем медиа-дефолты в localStorage default-values
+      const nextState = getState();
+      try {
+        const saved = JSON.parse(localStorage.getItem('default-values') || '{}');
+        const updated = {
+          ...saved,
+          logoSelected: nextState.logoSelected,
+          kvSelected: nextState.kvSelected,
+          defaultLogoRU: nextState.defaultLogoRU || undefined,
+          defaultLogoKZ: nextState.defaultLogoKZ || undefined,
+          defaultLogoPRO: nextState.defaultLogoPRO || undefined,
+          logoDefaultMode: nextState.logoDefaultMode || 'single',
+          logoSize: nextState.logoSize,
+          logoPos: nextState.logoPos,
+          logoLanguage: nextState.logoLanguage,
+          proMode: nextState.proMode,
+          kvBorderRadius: nextState.kvBorderRadius,
+          kvPosition: nextState.kvPosition
+        };
+        localStorage.setItem('default-values', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Не удалось сохранить default-values:', e);
+      }
+      
       closeLogoAssetsAdmin();
     });
   }
   
-  // Загрузка логотипа
-  const logoUploadBtn = document.getElementById('logoAssetsDefaultLogoUpload');
-  const logoUploadFile = document.getElementById('logoAssetsDefaultLogoUploadFile');
-  if (logoUploadBtn && logoUploadFile) {
-    logoUploadBtn.addEventListener('click', () => {
-      logoUploadFile.click();
-    });
-    logoUploadFile.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        try {
-          await handleLogoUpload(e);
-          // Обновляем только state и превью; default-values пишет только админка при явном сохранении
-          const state = getState();
-          if (state.logoSelected) {
-            setKey('logoSelected', state.logoSelected);
-          }
-          updateDefaultsPreview();
-          // Показываем кнопку очистки
-          const logoClearBtn = document.getElementById('logoAssetsDefaultLogoClear');
-          if (logoClearBtn) {
-            logoClearBtn.style.display = 'block';
-          }
-        } catch (error) {
-          console.error('Ошибка при загрузке логотипа:', error);
-          alert('Не удалось загрузить логотип. Проверьте консоль для деталей.');
-        }
-      }
+  // Выбор логотипа по умолчанию из библиотеки
+  const logoSelectBtn = document.getElementById('logoAssetsDefaultLogoSelect');
+  if (logoSelectBtn) {
+    logoSelectBtn.addEventListener('click', async () => {
+      window._adminDefaultLogoVariant = null; // общий логотип по умолчанию
+      await openLogoSelectModal();
     });
   }
   
-  // Очистка логотипа
+  // Очистка логотипа по умолчанию
   const logoClearBtn = document.getElementById('logoAssetsDefaultLogoClear');
   if (logoClearBtn) {
     logoClearBtn.addEventListener('click', () => {
@@ -1000,43 +1093,57 @@ const setupHandlers = () => {
     });
   }
   
-  // Загрузка KV
-  const kvUploadBtn = document.getElementById('logoAssetsDefaultKVUpload');
-  const kvUploadFile = document.getElementById('logoAssetsDefaultKVUploadFile');
-  if (kvUploadBtn && kvUploadFile) {
-    kvUploadBtn.addEventListener('click', () => {
-      kvUploadFile.click();
-    });
-    kvUploadFile.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        try {
-          await handleKVUpload(e);
-          // Обновляем только state и превью; default-values пишет только админка при явном сохранении
-          const state = getState();
-          if (state.kvSelected) {
-            setKey('kvSelected', state.kvSelected);
-          }
-          updateDefaultsPreview();
-          // Показываем кнопку очистки
-          const kvClearBtn = document.getElementById('logoAssetsDefaultKVClear');
-          if (kvClearBtn) {
-            kvClearBtn.style.display = 'block';
-          }
-        } catch (error) {
-          console.error('Ошибка при загрузке KV:', error);
-          alert('Не удалось загрузить изображение. Проверьте консоль для деталей.');
-        }
-      }
+  // Выбор KV по умолчанию из библиотеки
+  const kvSelectBtn = document.getElementById('logoAssetsDefaultKVSelect');
+  if (kvSelectBtn) {
+    kvSelectBtn.addEventListener('click', async () => {
+      await openKVSelectModal();
     });
   }
   
-  // Очистка KV
+  // Очистка KV по умолчанию
   const kvClearBtn = document.getElementById('logoAssetsDefaultKVClear');
   if (kvClearBtn) {
     kvClearBtn.addEventListener('click', () => {
       setKey('kvSelected', defaults.kvSelected);
       updateDefaultsPreview();
       kvClearBtn.style.display = 'none';
+    });
+  }
+  
+  // Режим настройки логотипа: один для всех / отдельно RU-KZ-PRO
+  const logoModeSelect = document.getElementById('logoAssetsDefaultLogoMode');
+  if (logoModeSelect) {
+    logoModeSelect.addEventListener('change', () => {
+      const mode = logoModeSelect.value;
+      setKey('logoDefaultMode', mode);
+      const singleBlock = document.getElementById('logoAssetsLogoModeSingle');
+      const perVariantBlock = document.getElementById('logoAssetsLogoModePerVariant');
+      if (singleBlock) singleBlock.style.display = mode === 'single' ? 'block' : 'none';
+      if (perVariantBlock) perVariantBlock.style.display = mode === 'perVariant' ? 'block' : 'none';
+    });
+  }
+  
+  // Выбор логотипа для варианта RU
+  const variantRuSelect = document.getElementById('logoAssetsVariantRuSelect');
+  if (variantRuSelect) {
+    variantRuSelect.addEventListener('click', async () => {
+      window._adminDefaultLogoVariant = 'ru';
+      await openLogoSelectModal();
+    });
+  }
+  const variantKzSelect = document.getElementById('logoAssetsVariantKzSelect');
+  if (variantKzSelect) {
+    variantKzSelect.addEventListener('click', async () => {
+      window._adminDefaultLogoVariant = 'kz';
+      await openLogoSelectModal();
+    });
+  }
+  const variantProSelect = document.getElementById('logoAssetsVariantProSelect');
+  if (variantProSelect) {
+    variantProSelect.addEventListener('click', async () => {
+      window._adminDefaultLogoVariant = 'pro';
+      await openLogoSelectModal();
     });
   }
   

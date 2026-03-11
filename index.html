@@ -30,21 +30,21 @@
   <!-- Версия приложения для обхода кеша -->
   <!-- ⚠️ ALSO UPDATE CACHE_VERSION in sw.js -->
   <script>
-    window.APP_VERSION = '1.0.2';
+    window.APP_VERSION = '1.0.3';
     window.APP_BUILD_TIME = new Date().toISOString();
   </script>
   
   <!-- Preload критических ресурсов -->
-  <link rel="preload" href="styles.css?v=1.0.2" as="style">
-  <link rel="modulepreload" href="src/main.js?v=1.0.2">
-  <link rel="modulepreload" href="src/constants.js?v=1.0.2">
-  <link rel="modulepreload" href="src/state/store.js?v=1.0.2">
+  <link rel="preload" href="styles.css?v=1.0.3" as="style">
+  <link rel="modulepreload" href="src/main.js?v=1.0.3">
+  <link rel="modulepreload" href="src/constants.js?v=1.0.3">
+  <link rel="modulepreload" href="src/state/store.js?v=1.0.3">
   <!-- Do not preload or script-load renderer.js; it must load only via import from main.js (ES module) -->
-  <link rel="prefetch" href="sizes-config.json?v=1.0.2" as="fetch" crossorigin>
-  <link rel="modulepreload" href="src/utils/assetScanner.js?v=1.0.2">
-  <link rel="modulepreload" href="src/utils/imageCache.js?v=1.0.2">
+  <link rel="prefetch" href="sizes-config.json?v=1.0.3" as="fetch" crossorigin>
+  <link rel="modulepreload" href="src/utils/assetScanner.js?v=1.0.3">
+  <link rel="modulepreload" href="src/utils/imageCache.js?v=1.0.3">
   
-  <link rel="stylesheet" href="styles.css?v=1.0.2">
+  <link rel="stylesheet" href="styles.css?v=1.0.3">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script>
     // Инициализация темы до загрузки страницы (избегаем мерцания)
@@ -942,13 +942,11 @@
         </div>
         <div class="form-group">
           <label data-i18n="export.scale">Масштаб</label>
-          <div class="toggle-switch" id="exportScaleToggle" data-value="1" data-options="4">
+          <div class="toggle-switch" id="exportScaleToggle" data-value="1" data-options="2">
             <div class="toggle-switch-slider"></div>
             <div class="toggle-switch-track">
               <div class="toggle-switch-option active" data-value="1" data-i18n="export.scale.1x">×1</div>
               <div class="toggle-switch-option" data-value="2" data-i18n="export.scale.2x">×2</div>
-              <div class="toggle-switch-option" data-value="3" data-i18n="export.scale.3x">×3</div>
-              <div class="toggle-switch-option" data-value="4" data-i18n="export.scale.4x">×4</div>
             </div>
           </div>
           <div style="display: flex; gap: 8px; margin-top: 12px;">
@@ -1143,6 +1141,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
   <!-- Единственная точка входа приложения: только как ES module -->
-  <script type="module" src="./src/main.js?v=1.0.2"></script>
+  <script type="module" src="./src/main.js?v=1.0.3"></script>
 </body>
 </html>

@@ -153,16 +153,6 @@ export const handleBgImageUpload = (event) => {
       // Обновляем фоновое изображение для активной пары
       updatePairBgImage(activePairIndex, img);
       
-      // При загрузке фонового изображения автоматически выключаем Визуал и очищаем дефолтный Визуал
-      setKey('showKV', false);
-      setKey('kvSelected', '');
-      
-      // Обновляем чекбокс "Показывать Визуал" сразу
-      const dom = getDom();
-      if (dom.showKV) {
-        dom.showKV.checked = false;
-      }
-      
       updateBgUI();
       // Синхронизируем остальные поля UI (после обновления чекбокса)
       syncFormFields();
@@ -856,16 +846,6 @@ export const selectPreloadedBG = async (bgFile) => {
     }
   }
   
-  // При выборе фонового изображения автоматически выключаем Визуал и очищаем дефолтный Визуал
-  setKey('showKV', false);
-  setKey('kvSelected', '');
-  
-  // Обновляем чекбокс "Показывать Визуал" сразу
-  const dom = getDom();
-  if (dom.showKV) {
-    dom.showKV.checked = false;
-  }
-  
   try {
     const img = await loadImage(bgFile);
     setState({ bgImage: img });
@@ -926,16 +906,6 @@ export const selectPairBG = async (pairIndex, bgFile) => {
             domGradient.textGradientOpacityValue.textContent = '100%';
           }
         }
-      }
-      
-      // При выборе фонового изображения автоматически выключаем Визуал и очищаем дефолтный Визуал
-      setKey('showKV', false);
-      setKey('kvSelected', '');
-      
-      // Обновляем чекбокс "Показывать Визуал" сразу
-      const dom = getDom();
-      if (dom.showKV) {
-        dom.showKV.checked = false;
       }
       
       try {

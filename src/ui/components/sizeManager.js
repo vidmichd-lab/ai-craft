@@ -106,7 +106,7 @@ export const renderPresetSizes = () => {
         <div class="size-checkbox-item">
           <input type="checkbox" id="${id}" data-platform="${platform}" data-index="${index}" ${
             size.checked ? 'checked' : ''
-          } onchange="toggleSizeAction('${platform}', ${index})">
+          }>
           <label for="${id}">${size.width} × ${size.height}</label>
         </div>
       `;
@@ -141,7 +141,7 @@ export const renderCustomSizes = () => {
         <div class="size-checkbox-item" style="position: relative;">
           <input type="checkbox" id="${id}" data-custom-id="${size.id}" ${
             size.checked ? 'checked' : ''
-          } onchange="toggleCustomSizeAction('${size.id}')">
+          }>
           <label for="${id}" style="flex: 1;">${size.width} × ${size.height}</label>
           <button onclick="removeCustomSizeAction('${size.id}')" class="btn-small btn-danger" style="border: none; cursor: pointer; font-size: 16px; line-height: 1; opacity: 0.7; transition: opacity 0.2s; padding: 4px 8px;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'" title="Удалить"><span class="material-icons" style="font-size: 16px;">close</span></button>
         </div>

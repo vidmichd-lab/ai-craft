@@ -431,7 +431,8 @@ export const scanKV = async () => {
     }
     
     // Используем умную проверку файлов с ранней остановкой для числовых файлов
-    return await checkFilesSmart(basePath, 1, 99, 5);
+    // Ограничиваем 01–35 и останавливаемся после 3 подряд 404 — меньше шума в консоли
+    return await checkFilesSmart(basePath, 1, 35, 3);
   };
   
   
@@ -598,55 +599,61 @@ export const scanFonts = async () => {
   // Сканируем каждую папку
   for (const folder of fontFolders) {
     const fontFamily = folder;
-    // Один запрос на папку: если папки нет на сервере — пропускаем (меньше 404 в консоли)
-    const canonicalPath = `font/${folder}/${fontFamily}-Regular.woff2`;
-    const folderExists = await checkFileExists(canonicalPath);
-    if (!folderExists) {
+    // Один пробный запрос (только woff2): если 404 — сразу пропускаем папку (меньше 404 в консоли)
+    const probePath = `font/${folder}/${fontFamily}-Regular.woff2`;
+    if (!(await checkFileExists(probePath))) {
       const fallbackPath = `font/${folder}/${fontFamily}-Regular.ttf`;
       if (!(await checkFileExists(fallbackPath))) {
         continue;
       }
     }
 
-    // Сканируем файлы в папке
-    // Проверяем только формат с дефисом (как в проекте): "YS Text-Regular.woff2"
-    const fontPromises = [];
-    
-    // Формат с дефисом: "YS Text-Regular.woff2"
+    // Сканируем файлы в папке батчами; при 3 подряд 404 прекращаем (меньше запросов и 404 в консоли)
+    const candidates = [];
     for (const weightName of allKnownWeights) {
       for (const ext of fontExtensions) {
-        const fileName = `${fontFamily}-${weightName}.${ext}`;
-        const filePath = `font/${folder}/${fileName}`;
-        fontPromises.push(
-          checkFileExists(filePath).then(exists => ({
-            exists,
-            fileName,
-            filePath,
-            weightName,
-            ext,
-            format: 'hyphen'
-          }))
-        );
+        candidates.push({
+          fileName: `${fontFamily}-${weightName}.${ext}`,
+          filePath: `font/${folder}/${fontFamily}-${weightName}.${ext}`,
+          weightName,
+          ext,
+          format: 'hyphen'
+        });
       }
     }
-    
-    // Также проверяем файлы без начертания в названии (только имя семейства)
     for (const ext of fontExtensions) {
-      const fileName = `${fontFamily}.${ext}`;
-      const filePath = `font/${folder}/${fileName}`;
-      fontPromises.push(
-        checkFileExists(filePath).then(exists => ({
-          exists,
-          fileName,
-          filePath,
-          weightName: 'Regular',
-          ext,
-          format: 'name-only'
+      candidates.push({
+        fileName: `${fontFamily}.${ext}`,
+        filePath: `font/${folder}/${fontFamily}.${ext}`,
+        weightName: 'Regular',
+        ext,
+        format: 'name-only'
+      });
+    }
+
+    const fontResults = [];
+    const batchSize = 5;
+    let consecutiveMisses = 0;
+    for (let i = 0; i < candidates.length; i += batchSize) {
+      const batch = candidates.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (c) => ({
+          ...c,
+          exists: await checkFileExists(c.filePath)
         }))
       );
+      for (const r of batchResults) {
+        fontResults.push(r);
+        if (r.exists) {
+          consecutiveMisses = 0;
+        } else {
+          consecutiveMisses++;
+        }
+      }
+      if (consecutiveMisses >= 3) {
+        break;
+      }
     }
-    
-    const fontResults = await Promise.all(fontPromises);
     
     // Обрабатываем найденные шрифты
     const foundFonts = new Map(); // Используем Map для избежания дубликатов
