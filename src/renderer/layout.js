@@ -275,6 +275,14 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
   
   if (!state.showLogo || !state.logo) return null;
 
+  // Размеры логотипа: naturalWidth/naturalHeight надёжны для Image (у SVG/вне DOM могут быть 0 — используем width/height)
+  const logoW = state.logo.naturalWidth || state.logo.width || 0;
+  const logoH = state.logo.naturalHeight || state.logo.height || 0;
+  if (!logoW || !logoH) return null;
+
+  const partnerW = state.partnerLogo ? (state.partnerLogo.naturalWidth || state.partnerLogo.width || 0) : 0;
+  const partnerH = state.partnerLogo ? (state.partnerLogo.naturalHeight || state.partnerLogo.height || 0) : 0;
+
   // Учитываем партнерский логотип при расчете общей ширины
   const hasPartnerLogo = state.partnerLogo && state.showLogo;
   const separatorWidth = hasPartnerLogo ? 48 : 0; // Ширина разделителя "|" (24px до разделителя + 24px после)
@@ -290,20 +298,20 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
     mainLogoWidth = availableWidth / 2;
   }
   
-  let logoScale = mainLogoWidth / state.logo.width;
-  let logoHeight = state.logo.height * logoScale;
+  let logoScale = mainLogoWidth / logoW;
+  let logoHeight = logoH * logoScale;
 
   if (isSuperWide) {
     // Для супер-широких форматов логотип всегда вверху, независимо от titleVPos
     const availableHeight = Math.max(0, height - paddingPx * 2);
-    logoHeight = Math.min(availableHeight * 0.3, state.logo.height * logoScale);
-    logoScale = logoHeight / state.logo.height;
-    mainLogoWidth = state.logo.width * logoScale;
+    logoHeight = Math.min(availableHeight * 0.3, logoH * logoScale);
+    logoScale = logoHeight / logoH;
+    mainLogoWidth = logoW * logoScale;
     
     // Пересчитываем для партнерского логотипа
-    if (hasPartnerLogo) {
-      const partnerLogoScale = logoHeight / state.partnerLogo.height;
-      const partnerLogoWidth = state.partnerLogo.width * partnerLogoScale;
+    if (hasPartnerLogo && partnerH > 0) {
+      const partnerLogoScale = logoHeight / partnerH;
+      const partnerLogoWidth = partnerW * partnerLogoScale;
       totalLogoWidth = mainLogoWidth + separatorWidth + partnerLogoWidth;
     } else {
       totalLogoWidth = mainLogoWidth;
@@ -327,14 +335,14 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
     };
   } else if (isUltraWide) {
     const availableHeight = Math.max(0, height - paddingPx * 2);
-    logoHeight = Math.min(availableHeight * 0.3, state.logo.height * logoScale);
-    logoScale = logoHeight / state.logo.height;
-    mainLogoWidth = state.logo.width * logoScale;
+    logoHeight = Math.min(availableHeight * 0.3, logoH * logoScale);
+    logoScale = logoHeight / logoH;
+    mainLogoWidth = logoW * logoScale;
     
     // Пересчитываем для партнерского логотипа
-    if (hasPartnerLogo) {
-      const partnerLogoScale = logoHeight / state.partnerLogo.height;
-      const partnerLogoWidth = state.partnerLogo.width * partnerLogoScale;
+    if (hasPartnerLogo && partnerH > 0) {
+      const partnerLogoScale = logoHeight / partnerH;
+      const partnerLogoWidth = partnerW * partnerLogoScale;
       totalLogoWidth = mainLogoWidth + separatorWidth + partnerLogoWidth;
     } else {
       totalLogoWidth = mainLogoWidth;
@@ -366,23 +374,23 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
       const maxLogoHeight = Math.min(height * 0.4, height - paddingPx * 2);
       if (logoHeight > maxLogoHeight) {
         logoHeight = maxLogoHeight;
-        logoScale = logoHeight / state.logo.height;
-        mainLogoWidth = state.logo.width * logoScale;
+        logoScale = logoHeight / logoH;
+        mainLogoWidth = logoW * logoScale;
       }
     } else if (isMediumHeight) {
       // Для средних форматов ограничиваем логотип, чтобы оставить больше места для текста
       const maxLogoHeight = Math.min(height * 0.25, height - paddingPx * 3);
       if (logoHeight > maxLogoHeight) {
         logoHeight = maxLogoHeight;
-        logoScale = logoHeight / state.logo.height;
-        mainLogoWidth = state.logo.width * logoScale;
+        logoScale = logoHeight / logoH;
+        mainLogoWidth = logoW * logoScale;
       }
     }
     
     // Пересчитываем для партнерского логотипа
-    if (hasPartnerLogo) {
-      const partnerLogoScale = logoHeight / state.partnerLogo.height;
-      const partnerLogoWidth = state.partnerLogo.width * partnerLogoScale;
+    if (hasPartnerLogo && partnerH > 0) {
+      const partnerLogoScale = logoHeight / partnerH;
+      const partnerLogoWidth = partnerW * partnerLogoScale;
       totalLogoWidth = mainLogoWidth + separatorWidth + partnerLogoWidth;
     } else {
       totalLogoWidth = mainLogoWidth;
@@ -412,9 +420,9 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
     const finalLogoPos = (state.titleAlign === 'center' && logoPosForSize === null) ? 'center' : effectiveLogoPos;
     
     // Пересчитываем для партнерского логотипа (нужно сделать это раньше для правильного центрирования)
-    if (hasPartnerLogo) {
-      const partnerLogoScale = logoHeight / state.partnerLogo.height;
-      const partnerLogoWidth = state.partnerLogo.width * partnerLogoScale;
+    if (hasPartnerLogo && partnerH > 0) {
+      const partnerLogoScale = logoHeight / partnerH;
+      const partnerLogoWidth = partnerW * partnerLogoScale;
       totalLogoWidth = mainLogoWidth + separatorWidth + partnerLogoWidth;
     } else {
       totalLogoWidth = mainLogoWidth;

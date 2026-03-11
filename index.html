@@ -30,21 +30,21 @@
   <!-- Версия приложения для обхода кеша -->
   <!-- ⚠️ ALSO UPDATE CACHE_VERSION in sw.js -->
   <script>
-    window.APP_VERSION = '1.0.3';
+    window.APP_VERSION = '1.0.4';
     window.APP_BUILD_TIME = new Date().toISOString();
   </script>
   
   <!-- Preload критических ресурсов -->
-  <link rel="preload" href="styles.css?v=1.0.3" as="style">
-  <link rel="modulepreload" href="src/main.js?v=1.0.3">
-  <link rel="modulepreload" href="src/constants.js?v=1.0.3">
-  <link rel="modulepreload" href="src/state/store.js?v=1.0.3">
+  <link rel="preload" href="styles.css?v=1.0.4" as="style">
+  <link rel="modulepreload" href="src/main.js?v=1.0.4">
+  <link rel="modulepreload" href="src/constants.js?v=1.0.4">
+  <link rel="modulepreload" href="src/state/store.js?v=1.0.4">
   <!-- Do not preload or script-load renderer.js; it must load only via import from main.js (ES module) -->
-  <link rel="prefetch" href="sizes-config.json?v=1.0.3" as="fetch" crossorigin>
-  <link rel="modulepreload" href="src/utils/assetScanner.js?v=1.0.3">
-  <link rel="modulepreload" href="src/utils/imageCache.js?v=1.0.3">
+  <link rel="prefetch" href="sizes-config.json?v=1.0.4" as="fetch" crossorigin>
+  <link rel="modulepreload" href="src/utils/assetScanner.js?v=1.0.4">
+  <link rel="modulepreload" href="src/utils/imageCache.js?v=1.0.4">
   
-  <link rel="stylesheet" href="styles.css?v=1.0.3">
+  <link rel="stylesheet" href="styles.css?v=1.0.4">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script>
     // Инициализация темы до загрузки страницы (избегаем мерцания)
@@ -1141,6 +1141,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
   <!-- Единственная точка входа приложения: только как ES module -->
-  <script type="module" src="./src/main.js?v=1.0.3"></script>
+  <script type="module" src="./src/main.js?v=1.0.4"></script>
 </body>
 </html>

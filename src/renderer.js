@@ -1805,7 +1805,7 @@ const renderToCanvas = (canvas, width, height, state) => {
     canvasWidth: width,
     canvasHeight: height
   };
-};
+  };
 
 // Функция doRender перенесена в canvasManager
 // Используем canvasManager.doRender() напрямую
