@@ -1,0 +1,47 @@
+name: Deploy to Yandex Cloud
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+
+      - name: Install s3cmd
+        run: pip install s3cmd
+
+      - name: Get changed files
+        id: changed
+        run: |
+          git diff --name-only HEAD~1 HEAD > changed_files.txt
+          cat changed_files.txt
+
+      - name: Deploy changed files to Yandex Cloud S3
+        run: |
+          while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              echo "Uploading: $file"
+              s3cmd put "$file" "s3://${{ secrets.YC_BUCKET_NAME }}/$file" \
+                --host=storage.yandexcloud.net \
+                --host-bucket="%(bucket)s.storage.yandexcloud.net" \
+                --access_key=${{ secrets.YC_ACCESS_KEY_ID }} \
+                --secret_key=${{ secrets.YC_SECRET_ACCESS_KEY }} \
+                --acl-public \
+                --guess-mime-type \
+                --no-mime-magic
+            else
+              echo "Deleted: $file — removing from bucket"
+              s3cmd del "s3://${{ secrets.YC_BUCKET_NAME }}/$file" \
+                --host=storage.yandexcloud.net \
+                --host-bucket="%(bucket)s.storage.yandexcloud.net" \
+                --access_key=${{ secrets.YC_ACCESS_KEY_ID }} \
+                --secret_key=${{ secrets.YC_SECRET_ACCESS_KEY }}
+            fi
+          done < changed_files.txt
