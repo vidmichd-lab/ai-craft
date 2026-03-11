@@ -36,9 +36,14 @@ const createTitleSubtitlePair = (index = 0, baseState = null) => {
     const currentPair = baseState.titleSubtitlePairs[activeIdx];
     if (currentPair) {
       kvSelected = currentPair.kvSelected || baseState.kvSelected || defaultKV;
-      bgImageSelected = currentPair.bgImageSelected != null
-        ? currentPair.bgImageSelected
-        : (baseState.bgImage && baseState.bgImage.src ? baseState.bgImage.src : null);
+      const getBgPath = (value) => {
+        if (!value) return null;
+        if (typeof value === 'string') return value;
+        if (value.src) return value.src;
+        return null;
+      };
+      const inherited = getBgPath(currentPair.bgImageSelected);
+      bgImageSelected = inherited !== null ? inherited : getBgPath(baseState.bgImage);
     }
   }
 
@@ -664,6 +669,7 @@ export const removeTitleSubtitlePair = (index) => {
 };
 
 export const setActivePairIndex = async (index) => {
+  const expectedIndex = index;
   const state = getState();
   if (index >= 0 && index < state.titleSubtitlePairs.length) {
     const activePair = state.titleSubtitlePairs[index];
@@ -686,8 +692,10 @@ export const setActivePairIndex = async (index) => {
           // Загружаем изображение асинхронно
           try {
             const imageCacheModule = await import('../utils/imageCache.js');
+            if (getState().activePairIndex !== expectedIndex) return;
             const loadImageCached = imageCacheModule.loadImage;
             const img = await loadImageCached(bgImageSelected, { useCache: true, showBlur: false });
+            if (getState().activePairIndex !== expectedIndex) return;
             if (img && img.url) {
               // Обновляем bgImage на загруженный объект
               const imgObj = new Image();
@@ -697,13 +705,16 @@ export const setActivePairIndex = async (index) => {
                 imgObj.onerror = reject;
                 imgObj.src = img.url;
               });
+              if (getState().activePairIndex !== expectedIndex) return;
               // Обновляем пару с загруженным изображением
               const currentState = getState();
               const newPairs = [...currentState.titleSubtitlePairs];
               if (newPairs[index]) {
+                if (getState().activePairIndex !== expectedIndex) return;
                 newPairs[index] = { ...newPairs[index], bgImageSelected: imgObj };
                 setState({ titleSubtitlePairs: newPairs });
               }
+              if (getState().activePairIndex !== expectedIndex) return;
               setKey('bgImage', imgObj);
             }
           } catch (e) {
@@ -723,8 +734,11 @@ export const setActivePairIndex = async (index) => {
     // Импортируем функции обновления UI
     try {
       const { updateBgUI } = await import('../ui/components/backgroundSelector.js');
+      if (getState().activePairIndex !== expectedIndex) return;
       const { syncFormFields } = await import('../ui/ui.js');
+      if (getState().activePairIndex !== expectedIndex) return;
       const { renderer } = await import('../renderer.js');
+      if (getState().activePairIndex !== expectedIndex) return;
       updateBgUI();
       syncFormFields();
       renderer.render();
@@ -924,5 +938,3 @@ export const applySavedSettings = (snapshot) => {
   
   store.setState({ ...current, ...snapshot });
 };
-
-

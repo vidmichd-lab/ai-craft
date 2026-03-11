@@ -329,39 +329,16 @@ export const scanKV = async () => {
     
     // Специальная обработка для папки bg (файлы с особыми именами)
     if (folder2 === 'bg') {
-      // Проверяем известные файлы фонов PRO
-      const bgFileNames = [
-        'shape=triangle, inside=green, theme=dark',
-        'shape=triangle, inside=green, theme=light',
-        'shape=triangle, inside=black, theme=dark',
-        'shape=triangle, inside=white, theme=light',
-        'shape=circle, inside=green, theme=dark',
-        'shape=circle, inside=green, theme=light',
-        'shape=circle, inside=black, theme=dark',
-        'shape=circle, inside=white, theme=light',
-        'shape=square, inside=green, theme=dark',
-        'shape=square, inside=green, theme=light',
-        'shape=square, inside=black, theme=dark',
-        'shape=square, inside=white, theme=light',
-        'shape=8, inside=green, theme=dark',
-        'shape=8, inside=green, theme=light',
-        'shape=8, inside=black, theme=dark',
-        'shape=8, inside=white, theme=light'
-      ];
-      
-      const bgCheckPromises = bgFileNames.map(name => 
-        Promise.all([
-          checkFileExists(`${basePath}/${name}.webp`),
-          checkFileExists(`${basePath}/${name}.png`)
-        ])
-      );
-      
-      const bgResults = await Promise.all(bgCheckPromises);
-      for (const results of bgResults) {
-        if (results[0] || results[1]) {
-          return true;
-        }
-      }
+      const probeUrl = `${basePath}/shape=triangle, inside=green, theme=dark.webp`;
+      if (await checkFileExists(probeUrl)) return true;
+
+      const fallbackResults = await Promise.all([
+        checkFileExists(`${basePath}/shape=circle, inside=green, theme=dark.webp`),
+        checkFileExists(`${basePath}/shape=square, inside=green, theme=dark.webp`)
+      ]);
+      if (fallbackResults.some(Boolean)) return true;
+
+      return false;
     }
     
     // Проверяем только первые 3 файла параллельно для быстрой проверки (только .webp — в assets нет .jpg)
@@ -702,4 +679,3 @@ export const scanFonts = async () => {
   
   return fonts;
 };
-

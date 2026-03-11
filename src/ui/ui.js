@@ -1521,15 +1521,11 @@ export const selectProMode = async (enabled) => {
       }
     }
     
-    // Восстанавливаем логотип: из дефолтов по варианту (defaultLogoRU/KZ) или фиксированный путь
-    const s = getState();
-    if (s.logoSelected) {
-      await selectPreloadedLogo(s.logoSelected);
-    } else if (state.logoLanguage === 'kz') {
-      await selectPreloadedLogo('logo/white/kz/main.svg');
-    } else {
-      await selectPreloadedLogo('logo/white/ru/main.svg');
-    }
+    // Восстанавливаем логотип: явно берём путь Reskill по языку (не s.logoSelected — он может ещё быть PRO)
+    const reskillLogoPath = state.logoLanguage === 'kz'
+      ? (state.defaultLogoKZ || defaults.defaultLogoKZ || 'logo/white/kz/main.svg')
+      : (state.defaultLogoRU || defaults.defaultLogoRU || 'logo/white/ru/main.svg');
+    await selectPreloadedLogo(reskillLogoPath);
     
     // Восстанавливаем фон из дефолтных значений
     if (defaults.bgImage) {
@@ -3495,18 +3491,36 @@ export const initializeStateSubscribers = () => {
       
       // Загружаем изображения асинхронно, не блокируя UI
       requestAnimationFrame(async () => {
+        const expectedPairId = activePair.id;
+        const expectedPairIndex = getState().activePairIndex;
+
         // Загружаем KV
         if (activePair && activePair.kvSelected) {
           try {
             const img = await loadImage(activePair.kvSelected);
+            const current = getState();
+            if (current.activePairIndex !== expectedPairIndex ||
+                current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
+              return;
+            }
             setState({ kv: img, kvSelected: activePair.kvSelected });
             updateKVTriggerText(activePair.kvSelected);
           } catch (error) {
             console.error('Не удалось загрузить KV для активной пары:', error);
+            const current = getState();
+            if (current.activePairIndex !== expectedPairIndex ||
+                current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
+              return;
+            }
             setState({ kv: null, kvSelected: '' });
             updateKVTriggerText('');
           }
         } else {
+          const current = getState();
+          if (current.activePairIndex !== expectedPairIndex ||
+              current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
+            return;
+          }
           setState({ kv: null, kvSelected: '' });
           updateKVTriggerText('');
         }
@@ -3518,16 +3532,36 @@ export const initializeStateSubscribers = () => {
             // Это путь к файлу, загружаем изображение
             try {
               const img = await loadImage(bgImageSelected);
+              const current = getState();
+              if (current.activePairIndex !== expectedPairIndex ||
+                  current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
+                return;
+              }
               setState({ bgImage: img });
             } catch (error) {
               console.error('Не удалось загрузить фоновое изображение для активной пары:', error);
+              const current = getState();
+              if (current.activePairIndex !== expectedPairIndex ||
+                  current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
+                return;
+              }
               setState({ bgImage: null });
             }
           } else {
             // Это уже объект Image
+            const current = getState();
+            if (current.activePairIndex !== expectedPairIndex ||
+                current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
+              return;
+            }
             setState({ bgImage: bgImageSelected });
           }
         } else {
+          const current = getState();
+          if (current.activePairIndex !== expectedPairIndex ||
+              current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
+            return;
+          }
           setState({ bgImage: null });
         }
         updateBgUI();
@@ -3633,5 +3667,4 @@ export const closeGuideModal = () => {
 
 // Экспортируем функции градиента
 export { updateBgGradientType, updateBgGradientAngle, addGradientStop, removeGradientStop };
-
 

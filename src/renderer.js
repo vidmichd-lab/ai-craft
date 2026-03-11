@@ -316,8 +316,11 @@ const renderToCanvas = (canvas, width, height, state) => {
   if (useSafeArea) {
     textArea.left += horizontalPadding;
     textArea.right += horizontalPadding;
-    textArea.top += verticalPadding;
-    textArea.bottom += verticalPadding;
+  }
+  // Для горизонтального/широкого формата гарантируем минимальную ширину области текста, иначе клип «схлопывается» и контент не виден
+  if ((isHorizontalLayout || isUltraWide || isSuperWide) && (textArea.right <= textArea.left || textArea.right - textArea.left < 50)) {
+    textArea.left = useSafeArea ? (horizontalPadding + paddingPx) : paddingPx;
+    textArea.right = Math.min(width - paddingPx, textArea.left + Math.max(50, (useSafeArea ? safeAreaWidth : width) - paddingPx * 2 - 200));
   }
   maxTextWidth = textAreaResult.maxTextWidth || Math.max(50, textArea.right - textArea.left);
 
@@ -493,14 +496,14 @@ const renderToCanvas = (canvas, width, height, state) => {
         
         // Обновляем bounds с правильной шириной
         legalContentBounds = {
-          x: effectiveHorizontalPadding,
+          x: useSafeArea ? (horizontalPadding + paddingPx) : effectivePaddingPx,
           y: Math.max(effectiveVerticalPadding, legalTop),
           width: legalMaxWidthForFlex,
           height: legalHeight
         };
         
         legalTextBounds = {
-          x: effectiveHorizontalPadding,
+          x: useSafeArea ? (horizontalPadding + paddingPx) : effectivePaddingPx,
           y: legalContentBounds.y,
           width: legalMaxWidthForFlex,
           height: legalHeight
@@ -874,7 +877,10 @@ const renderToCanvas = (canvas, width, height, state) => {
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(textArea.left, 0, textArea.right - textArea.left, height);
+  // Область отсечения: не допускаем нулевую/отрицательную ширину, иначе на широком превью ничего не видно
+  const clipLeft = Math.max(0, Math.min(textArea.left, width - 1));
+  const clipW = Math.max(1, Math.min(textArea.right, width) - clipLeft);
+  ctx.rect(clipLeft, 0, clipW, height);
   ctx.clip();
   
   titleLines.forEach((line, index) => {
@@ -1159,6 +1165,7 @@ const renderToCanvas = (canvas, width, height, state) => {
     const { r, g, b } = hexToRgb(legalColor);
     ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${legalOpacity})`;
     ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
 
     // Для широких форматов учитываем KV, чтобы legal не залезал на него
     // Для широких форматов age будет справа от legal, поэтому не вычитаем его ширину из maxLegalWidth
@@ -1225,7 +1232,9 @@ const renderToCanvas = (canvas, width, height, state) => {
       const kvLeft = kvPlannedMeta.kvX;
       const gap = Math.max(paddingPx * 0.5, effectiveWidth * 0.01);
       const maxLegalWidthWithKV = Math.max(0, kvLeft - drawX - gap - ageWidth);
-      maxLegalWidth = Math.min(maxLegalWidth, maxLegalWidthWithKV);
+      // Не допускаем нулевую ширину — иначе legal не рисуется на широком превью
+      const minLegalWidth = 50;
+      maxLegalWidth = Math.min(maxLegalWidth, Math.max(minLegalWidth, maxLegalWidthWithKV));
       
       // Пересчитываем legalLines с учетом ограниченной ширины
       const legalText = applyTextTransform(state.legal, state.legalTransform);
@@ -1319,7 +1328,7 @@ const renderToCanvas = (canvas, width, height, state) => {
     // Use clipping to ensure text doesn't go beyond the allowed area
     // Ограничиваем clipping границами canvas
     const clippedX = Math.max(0, Math.min(drawX, width));
-    const clippedWidth = Math.max(0, Math.min(maxLegalWidth, width - clippedX));
+    const clippedWidth = Math.max(1, Math.min(maxLegalWidth, width - clippedX));
     ctx.save();
     ctx.beginPath();
     ctx.rect(clippedX, 0, clippedWidth, height);
@@ -1401,6 +1410,7 @@ const renderToCanvas = (canvas, width, height, state) => {
     const opacity = 0.8; // Всегда 80% для 18+
     ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
     ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
     // Draw age at the same baseline as legal's last line
     // Используем правильный commonBaselineY (уже вычислен выше)
     // Ограничиваем commonBaselineY границами canvas
@@ -1725,13 +1735,24 @@ const renderToCanvas = (canvas, width, height, state) => {
     // Выключаем KV только если максимально возможный размер стал почти 0
     // Это происходит когда текст занимает почти все место из-за увеличения кегля
     if (maxKvW < criticalMinSize || maxKvH < criticalMinSize) {
+      const renderWidth = width;
+      const renderHeight = height;
+      const renderPairIndex = getState().activePairIndex;
       // Используем setTimeout, чтобы избежать изменения состояния во время рендеринга
       setTimeout(() => {
         const currentState = getState();
-        // Проверяем, что KV все еще включен (чтобы не выключать его многократно)
-        if (currentState.showKV) {
-          setState({ showKV: false });
-        }
+        if (
+          !currentState.showKV ||
+          currentState.activePairIndex !== renderPairIndex
+        ) return;
+
+        const checkedSizes = getCheckedSizes();
+        const isStillActiveSize = checkedSizes.some(
+          s => s.width === renderWidth && s.height === renderHeight
+        );
+        if (!isStillActiveSize) return;
+
+        setState({ showKV: false });
       }, 0);
     }
   }
@@ -1806,6 +1827,7 @@ const renderToCanvas = (canvas, width, height, state) => {
     canvasHeight: height
   };
   };
+  };
 
 // Функция doRender перенесена в canvasManager
 // Используем canvasManager.doRender() напрямую
@@ -1855,5 +1877,3 @@ export const renderer = {
 renderer.__unsafe_getRenderToCanvas = () => ({ renderToCanvas });
 
 // clearTextMeasurementCache экспортируется из ./renderer/text.js
-
-
