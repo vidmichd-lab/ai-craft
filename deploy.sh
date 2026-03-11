@@ -23,6 +23,38 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
+DEPLOY_ERRORS=0
+
+mark_deploy_error() {
+    local message="$1"
+    echo -e "${RED}❌ ${message}${NC}"
+    DEPLOY_ERRORS=$((DEPLOY_ERRORS + 1))
+}
+
+s3_cp_with_meta() {
+    local local_file="$1"
+    local remote_path="$2"
+    local content_type="$3"
+    local cache_control="$4"
+
+    if ! aws --endpoint-url=${ENDPOINT_URL} s3 cp "${local_file}" "${remote_path}" \
+        --content-type "${content_type}" \
+        --cache-control "${cache_control}" \
+        --metadata-directive REPLACE 2>/dev/null; then
+        mark_deploy_error "Не удалось загрузить ${local_file} -> ${remote_path}"
+        return 1
+    fi
+    return 0
+}
+
+s3_rm_safe() {
+    local remote_path="$1"
+    if ! aws --endpoint-url=${ENDPOINT_URL} s3 rm "${remote_path}" 2>/dev/null; then
+        mark_deploy_error "Не удалось удалить ${remote_path}"
+        return 1
+    fi
+    return 0
+}
 
 echo -e "${GREEN}🚀 Начинаем деплой в Yandex Object Storage${NC}"
 echo "Бакет: ${BUCKET_NAME}"
@@ -309,11 +341,8 @@ upload_with_content_type() {
     local content_type=$(get_content_type "$file")
     local cache_control=$(get_cache_control "$file")
     local s3_path="s3://${BUCKET_NAME}/${file}"
-    
-    aws --endpoint-url=${ENDPOINT_URL} s3 cp "${file}" "${s3_path}" \
-        --content-type "${content_type}" \
-        --cache-control "${cache_control}" \
-        --metadata-directive REPLACE 2>/dev/null || true
+
+    s3_cp_with_meta "${file}" "${s3_path}" "${content_type}" "${cache_control}"
 }
 
 # Получаем список изменённых файлов через --dryrun
@@ -428,27 +457,24 @@ if [ "$UPLOAD_COUNT" -gt 0 ] || [ "$DELETE_COUNT" -gt 0 ]; then
     # Загружаем изменённые файлы с правильным Content-Type
     if [ "$UPLOAD_COUNT" -gt 0 ]; then
         echo "  Загрузка изменённых файлов с правильным Content-Type..."
-        echo "$UPLOAD_FILES" | grep -v '^$' | while read -r file; do
+        while read -r file; do
             if [ -n "$file" ] && [ -f "$file" ]; then
                 content_type=$(get_content_type "$file")
                 cache_control=$(get_cache_control "$file")
                 echo "    📤 Загружаем: ${file}"
-                aws --endpoint-url=${ENDPOINT_URL} s3 cp "${file}" "s3://${BUCKET_NAME}/${file}" \
-                    --content-type "${content_type}" \
-                    --cache-control "${cache_control}" \
-                    --metadata-directive REPLACE 2>/dev/null || true
+                s3_cp_with_meta "${file}" "s3://${BUCKET_NAME}/${file}" "${content_type}" "${cache_control}" || true
             fi
-        done
+        done < <(echo "$UPLOAD_FILES" | grep -v '^$')
     fi
     
     # Удаляем файлы, которые были удалены локально
     if [ "$DELETE_COUNT" -gt 0 ]; then
         echo "  Удаление файлов..."
-        echo "$DELETE_FILES" | grep -v '^$' | while read -r file; do
+        while read -r file; do
             if [ -n "$file" ]; then
-                aws --endpoint-url=${ENDPOINT_URL} s3 rm "s3://${BUCKET_NAME}/${file}" 2>/dev/null || true
+                s3_rm_safe "s3://${BUCKET_NAME}/${file}" || true
             fi
-        done
+        done < <(echo "$DELETE_FILES" | grep -v '^$')
     fi
     
     echo "  ✅ Синхронизация завершена (загружены только изменённые файлы)"
@@ -560,17 +586,14 @@ else
   if [ "$UPLOAD_COUNT" -gt 0 ]; then
     echo "  Найдено изменений: $UPLOAD_COUNT файлов для загрузки"
     echo "  Загрузка изменённых файлов с правильным Content-Type..."
-    echo "$UPLOAD_FILES" | grep -v '^$' | while read -r file; do
+    while read -r file; do
       if [ -n "$file" ] && [ -f "$file" ]; then
         content_type=$(get_content_type "$file")
         cache_control=$(get_cache_control "$file")
         echo "    📤 Загружаем: ${file}"
-        aws --endpoint-url=${ENDPOINT_URL} s3 cp "${file}" "s3://${BUCKET_NAME}/${file}" \
-          --content-type "${content_type}" \
-          --cache-control "${cache_control}" \
-          --metadata-directive REPLACE 2>/dev/null || true
+        s3_cp_with_meta "${file}" "s3://${BUCKET_NAME}/${file}" "${content_type}" "${cache_control}" || true
       fi
-    done
+    done < <(echo "$UPLOAD_FILES" | grep -v '^$')
     echo "  ✅ Синхронизация завершена (загружены только изменённые файлы)"
   else
     echo "  Изменений не обнаружено, всё актуально"
@@ -604,7 +627,7 @@ if command -v aws &> /dev/null; then
             # Более надежная проверка существования файла в S3
             if aws --endpoint-url=${ENDPOINT_URL} s3api head-object --bucket "${BUCKET_NAME}" --key "${webp_file}" &>/dev/null; then
                 # WebP версия существует, удаляем старый файл
-                aws --endpoint-url=${ENDPOINT_URL} s3 rm "s3://${BUCKET_NAME}/${old_file}" 2>/dev/null && \
+                s3_rm_safe "s3://${BUCKET_NAME}/${old_file}" && \
                     echo "    ✓ Удалён: ${old_file} (есть WebP версия)"
             fi
         done
@@ -617,6 +640,11 @@ else
 fi
 
 echo ""
+if [ "$DEPLOY_ERRORS" -gt 0 ]; then
+    echo -e "${RED}❌ Деплой завершён с ошибками: ${DEPLOY_ERRORS}${NC}"
+    exit 1
+fi
+
 echo -e "${GREEN}✅ Деплой завершён успешно!${NC}"
 echo ""
 echo "🌐 Ваш сайт доступен по адресу:"
@@ -625,4 +653,3 @@ echo ""
 echo "📋 Или через прямой URL бакета:"
 echo "   https://${BUCKET_NAME}.storage.yandexcloud.net"
 echo ""
-

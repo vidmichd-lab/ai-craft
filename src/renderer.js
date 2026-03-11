@@ -134,12 +134,23 @@ const renderToCanvas = (canvas, width, height, state) => {
   let safeAreaHeight = height;
   
   if (safeArea) {
-    // Вычисляем отступы для центрирования охранной области
-    horizontalPadding = (width - safeArea.width) / 2;
-    verticalPadding = (height - safeArea.height) / 2;
-    safeAreaWidth = safeArea.width;
-    safeAreaHeight = safeArea.height;
-    useSafeArea = true;
+    const rawSafeAreaWidth = Number(safeArea.width);
+    const rawSafeAreaHeight = Number(safeArea.height);
+    const safeAreaWidthIsValid = Number.isFinite(rawSafeAreaWidth) && rawSafeAreaWidth > 0;
+    const safeAreaHeightIsValid = Number.isFinite(rawSafeAreaHeight) && rawSafeAreaHeight > 0;
+
+    if (safeAreaWidthIsValid && safeAreaHeightIsValid) {
+      // Не даем охранной области выйти за пределы canvas.
+      safeAreaWidth = Math.min(width, rawSafeAreaWidth);
+      safeAreaHeight = Math.min(height, rawSafeAreaHeight);
+      // Вычисляем отступы для центрирования охранной области
+      horizontalPadding = (width - safeAreaWidth) / 2;
+      verticalPadding = (height - safeAreaHeight) / 2;
+      useSafeArea = true;
+    } else {
+      // Если размеры охранной области повреждены, рендерим по полному canvas.
+      useSafeArea = false;
+    }
   }
   
   // Для расчетов используем размер охранной области (если есть), иначе полный размер

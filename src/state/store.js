@@ -5,6 +5,65 @@ const TITLE_SUBTITLE_RATIO = 1 / 2;
 
 const cloneDeep = (value) => JSON.parse(JSON.stringify(value));
 
+const sanitizeFiniteNumber = (value, fallback, { min = -Infinity, max = Infinity } = {}) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+};
+
+const DEFAULT_SAFE_AREAS = {
+  'Ozon': {
+    '2832x600': { width: 2100, height: 570 },
+    '1080x450': { width: 1020, height: 405 }
+  },
+  'РСЯ': {
+    '1600x1200': { width: 900, height: 900 }
+  }
+};
+
+const sanitizeSafeAreas = (value, fallback = DEFAULT_SAFE_AREAS) => {
+  const result = {};
+  const source = value && typeof value === 'object' ? cloneDeep(value) : {};
+
+  // Backward compatibility for legacy platform key.
+  if (source['Я.Директ'] && !source['РСЯ']) {
+    source['РСЯ'] = source['Я.Директ'];
+  }
+
+  for (const [platform, sizes] of Object.entries(source)) {
+    if (!sizes || typeof sizes !== 'object') continue;
+    for (const [sizeKey, safeArea] of Object.entries(sizes)) {
+      if (!safeArea || typeof safeArea !== 'object') continue;
+      const width = sanitizeFiniteNumber(safeArea.width, NaN, { min: 1 });
+      const height = sanitizeFiniteNumber(safeArea.height, NaN, { min: 1 });
+      if (!Number.isFinite(width) || !Number.isFinite(height)) continue;
+      if (!result[platform]) result[platform] = {};
+      result[platform][sizeKey] = {
+        ...safeArea,
+        width,
+        height
+      };
+    }
+  }
+
+  return Object.keys(result).length ? result : cloneDeep(fallback);
+};
+
+const sanitizeLogoSizeMultipliers = (value) => {
+  if (!value || typeof value !== 'object') return {};
+  const result = {};
+  for (const [platform, sizes] of Object.entries(value)) {
+    if (!sizes || typeof sizes !== 'object') continue;
+    for (const [sizeKey, multiplier] of Object.entries(sizes)) {
+      const numericMultiplier = sanitizeFiniteNumber(multiplier, NaN, { min: 0.1, max: 10 });
+      if (!Number.isFinite(numericMultiplier)) continue;
+      if (!result[platform]) result[platform] = {};
+      result[platform][sizeKey] = numericMultiplier;
+    }
+  }
+  return result;
+};
+
 const createTitleSubtitlePair = (index = 0, baseState = null) => {
   const brandName = (baseState && baseState.brandName) || 'Практикума';
 
@@ -68,13 +127,12 @@ const createInitialState = () => {
     }
   })();
   // Миграция: старые названия платформ в safeAreas
-  if (savedDefaults.safeAreas && typeof savedDefaults.safeAreas === 'object') {
-    if (savedDefaults.safeAreas['Я.Директ']) {
-      savedDefaults.safeAreas['РСЯ'] = savedDefaults.safeAreas['РСЯ'] || savedDefaults.safeAreas['Я.Директ'];
-      delete savedDefaults.safeAreas['Я.Директ'];
-    }
+  if (savedDefaults.safeAreas && typeof savedDefaults.safeAreas === 'object' && savedDefaults.safeAreas['Я.Директ']) {
+    savedDefaults.safeAreas['РСЯ'] = savedDefaults.safeAreas['РСЯ'] || savedDefaults.safeAreas['Я.Директ'];
+    delete savedDefaults.safeAreas['Я.Директ'];
   }
   const d = (key, fallback) => savedDefaults[key] !== undefined ? savedDefaults[key] : fallback;
+  const dn = (key, fallback, options) => sanitizeFiniteNumber(d(key, fallback), fallback, options);
 
   // Получаем размеры из конфига (или дефолтные, если еще не загружены)
   const sizes = getPresetSizes();
@@ -114,8 +172,12 @@ const createInitialState = () => {
     initialFavicon = localStorage.getItem('favicon') || '';
   }
 
+  const safeAreasFromDefaults = sanitizeSafeAreas(d('safeAreas', DEFAULT_SAFE_AREAS), DEFAULT_SAFE_AREAS);
+  const safeAreas = userSafeAreas ? sanitizeSafeAreas(userSafeAreas, safeAreasFromDefaults) : safeAreasFromDefaults;
+  const normalizedLogoSizeMultipliers = sanitizeLogoSizeMultipliers(logoSizeMultipliers || d('logoSizeMultipliers', {}));
+
   return {
-    paddingPercent: d('paddingPercent', 5),
+    paddingPercent: dn('paddingPercent', 5, { min: 0, max: 30 }),
     // Массивы заголовков и подзаголовков
     titleSubtitlePairs: [createTitleSubtitlePair(0, { brandName })],
     activePairIndex: 0, // Индекс активной пары для отображения на превью
@@ -123,7 +185,7 @@ const createInitialState = () => {
     titleColor: d('titleColor', '#ffffff'),
     titleAlign: d('titleAlign', 'left'),
     titleVPos: d('titleVPos', 'top'),
-    titleSize: d('titleSize', 8),
+    titleSize: dn('titleSize', 8, { min: 0.1, max: 100 }),
     titleSizeBeforePro: d('titleSizeBeforePro', null), // Сохраняем исходный размер заголовка перед увеличением в PRO режиме
     titleWeight: d('titleWeight', 'Regular'), // Используем название начертания вместо цифр
     titleLetterSpacing: d('titleLetterSpacing', 0),
@@ -137,12 +199,12 @@ const createInitialState = () => {
     subtitleColor: d('subtitleColor', '#e0e0e0'),
     subtitleOpacity: d('subtitleOpacity', 90),
     subtitleAlign: d('subtitleAlign', 'left'),
-    subtitleSize: d('subtitleSize', 4),
+    subtitleSize: dn('subtitleSize', 4, { min: 0.1, max: 100 }),
     subtitleWeight: d('subtitleWeight', 'Regular'), // Используем название начертания вместо цифр
     subtitleLetterSpacing: d('subtitleLetterSpacing', 0),
     subtitleLineHeight: d('subtitleLineHeight', 1.2),
-    subtitleGap: d('subtitleGap', -1),
-    titleSubtitleRatio: d('titleSubtitleRatio', 0.5), // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
+    subtitleGap: dn('subtitleGap', -1, { min: -20, max: 50 }),
+    titleSubtitleRatio: dn('titleSubtitleRatio', 0.5, { min: 0.05, max: 3 }), // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
     subtitleFontFamily: d('subtitleFontFamily', null) || d('fontFamily', 'YS Text'),
     subtitleFontFamilyFile: null,
     subtitleCustomFont: null,
@@ -154,15 +216,15 @@ const createInitialState = () => {
     legal: d('legal', 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/'),
     legalKZ: '*Жарнама / Реклама. ТОО "Y. Izdeu men Jarnama", регистрационный номер:170240015454 Сайт: https://practicum.yandex.kz/.',
     legalColor: d('legalColor', '#ffffff'),
-    legalOpacity: d('legalOpacity', 60),
+    legalOpacity: dn('legalOpacity', 60, { min: 0, max: 100 }),
     legalAlign: d('legalAlign', 'left'),
-    legalSize: d('legalSize', 2),
+    legalSize: dn('legalSize', 2, { min: 0.1, max: 100 }),
     legalTransform: 'none', // Преобразование регистра юридического текста
     legalWeight: d('legalWeight', 'Regular'), // Используем название начертания вместо цифр
     legalLetterSpacing: d('legalLetterSpacing', 0),
-    legalLineHeight: d('legalLineHeight', 1.4),
+    legalLineHeight: dn('legalLineHeight', 1.4, { min: 0.5, max: 3 }),
     age: d('age', '18+'),
-    ageGapPercent: d('ageGapPercent', 1),
+    ageGapPercent: dn('ageGapPercent', 1, { min: 0, max: 50 }),
     // Вертикальные отступы для элементов (в пикселях)
     titleOffsetTopPx: d('titleOffsetTopPx', 0),
     titleOffsetBottomPx: d('titleOffsetBottomPx', 0),
@@ -172,7 +234,7 @@ const createInitialState = () => {
     legalOffsetBottomPx: d('legalOffsetBottomPx', 0),
     ageOffsetTopPx: d('ageOffsetTopPx', 0),
     ageOffsetBottomPx: d('ageOffsetBottomPx', 0),
-    ageSize: d('ageSize', 4),
+    ageSize: dn('ageSize', 4, { min: 0.1, max: 100 }),
     ageWeight: d('ageWeight', 'Regular'), // Используем название начертания вместо цифр
     showLogo: true,
     showSubtitle: true,
@@ -195,7 +257,7 @@ const createInitialState = () => {
     defaultLogoKZ: d('defaultLogoKZ', null),
     defaultLogoPRO: d('defaultLogoPRO', null),
     logoDefaultMode: d('logoDefaultMode', 'single'), // 'single' | 'perVariant'
-    logoSize: d('logoSize', 40),
+    logoSize: dn('logoSize', 40, { min: 0.1, max: 100 }),
     logoOffsetTopPx: d('logoOffsetTopPx', 0),
     logoOffsetBottomPx: d('logoOffsetBottomPx', 0),
     logoLanguage: d('logoLanguage', 'ru'), // ru или kz
@@ -213,8 +275,8 @@ const createInitialState = () => {
     bgSize: d('bgSize', 'cover'),
     bgPosition: d('bgPosition', 'center'),
     bgVPosition: d('bgVPosition', 'center'), // 'top', 'center', 'bottom' - вертикальная позиция фона
-    bgImageSize: d('bgImageSize', 100), // Размер изображения в процентах (10-500)
-    textGradientOpacity: d('textGradientOpacity', 100), // Прозрачность градиентной подложки под текстом (0-100)
+    bgImageSize: dn('bgImageSize', 100, { min: 10, max: 500 }), // Размер изображения в процентах (10-500)
+    textGradientOpacity: dn('textGradientOpacity', 100, { min: 0, max: 100 }), // Прозрачность градиентной подложки под текстом (0-100)
     centerTextOverlayOpacity: 20, // Прозрачность подложки для центрированного текста (0-100)
     logoPos: d('logoPos', 'left'),
     fontFamily: d('fontFamily', 'YS Text'), // Общая гарнитура (для обратной совместимости)
@@ -239,22 +301,14 @@ const createInitialState = () => {
     layoutMode: d('layoutMode', 'auto'),
     // Настройки веса файла при экспорте
     maxFileSizeUnit: d('maxFileSizeUnit', 'KB'), // 'KB' или 'MB'
-    maxFileSizeValue: d('maxFileSizeValue', 150), // Значение (например, 1 для 1MB или 150 для 150KB)
+    maxFileSizeValue: dn('maxFileSizeValue', 150, { min: 1, max: 100000 }), // Значение (например, 1 для 1MB или 150 для 150KB)
     // Настройки рамки для Хабра
     habrBorderEnabled: d('habrBorderEnabled', false), // Включена ли рамка для Хабра
     habrBorderColor: d('habrBorderColor', '#D5DDDF'), // Цвет рамки для Хабра
     // Охранные области для специфичных платформ (игнорируют paddingPercent)
-    safeAreas: userSafeAreas || d('safeAreas', {
-      'Ozon': {
-        '2832x600': { width: 2100, height: 570 },
-        '1080x450': { width: 1020, height: 405 }
-      },
-      'РСЯ': {
-        '1600x1200': { width: 900, height: 900 }
-      }
-    }),
+    safeAreas,
     // Множители размера логотипа для конкретных размеров
-    logoSizeMultipliers: logoSizeMultipliers || d('logoSizeMultipliers', {})
+    logoSizeMultipliers: normalizedLogoSizeMultipliers
   };
 };
 
@@ -886,6 +940,7 @@ export const saveSettingsSnapshot = () => {
 
 export const applySavedSettings = (snapshot) => {
   const current = store.getState();
+  const nextSnapshot = { ...(snapshot || {}) };
   
   // Конвертируем числовые веса в названия для обратной совместимости
   const convertWeight = (weight) => {
@@ -896,45 +951,73 @@ export const applySavedSettings = (snapshot) => {
   };
   
   // Конвертируем веса в snapshot
-  if (snapshot.titleWeight !== undefined) {
-    snapshot.titleWeight = convertWeight(snapshot.titleWeight);
+  if (nextSnapshot.titleWeight !== undefined) {
+    nextSnapshot.titleWeight = convertWeight(nextSnapshot.titleWeight);
   }
-  if (snapshot.subtitleWeight !== undefined) {
-    snapshot.subtitleWeight = convertWeight(snapshot.subtitleWeight);
+  if (nextSnapshot.subtitleWeight !== undefined) {
+    nextSnapshot.subtitleWeight = convertWeight(nextSnapshot.subtitleWeight);
   }
-  if (snapshot.legalWeight !== undefined) {
-    snapshot.legalWeight = convertWeight(snapshot.legalWeight);
+  if (nextSnapshot.legalWeight !== undefined) {
+    nextSnapshot.legalWeight = convertWeight(nextSnapshot.legalWeight);
   }
-  if (snapshot.ageWeight !== undefined) {
-    snapshot.ageWeight = convertWeight(snapshot.ageWeight);
+  if (nextSnapshot.ageWeight !== undefined) {
+    nextSnapshot.ageWeight = convertWeight(nextSnapshot.ageWeight);
   }
   
   // Устанавливаем правильный лигал в зависимости от языка логотипа
-  const logoLanguage = snapshot.logoLanguage || current.logoLanguage || 'ru';
+  const logoLanguage = nextSnapshot.logoLanguage || current.logoLanguage || 'ru';
   if (logoLanguage === 'kz') {
-    const legalKZ = snapshot.legalKZ || current.legalKZ || '*Жарнама / Реклама. ТОО "Y. Izdeu men Jarnama", регистрационный номер:170240015454 Сайт: https://practicum.yandex.kz/.';
-    snapshot.legal = legalKZ;
+    const legalKZ = nextSnapshot.legalKZ || current.legalKZ || '*Жарнама / Реклама. ТОО "Y. Izdeu men Jarnama", регистрационный номер:170240015454 Сайт: https://practicum.yandex.kz/.';
+    nextSnapshot.legal = legalKZ;
   } else if (logoLanguage === 'ru') {
     const legalRU = 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/';
-    snapshot.legal = legalRU;
+    nextSnapshot.legal = legalRU;
   }
   
   // Заменяем 'system-ui' на 'YS Text' для всех полей шрифтов
-  if (snapshot.fontFamily === 'system-ui') {
-    snapshot.fontFamily = 'YS Text';
+  if (nextSnapshot.fontFamily === 'system-ui') {
+    nextSnapshot.fontFamily = 'YS Text';
   }
-  if (snapshot.titleFontFamily === 'system-ui') {
-    snapshot.titleFontFamily = 'YS Text';
+  if (nextSnapshot.titleFontFamily === 'system-ui') {
+    nextSnapshot.titleFontFamily = 'YS Text';
   }
-  if (snapshot.subtitleFontFamily === 'system-ui') {
-    snapshot.subtitleFontFamily = 'YS Text';
+  if (nextSnapshot.subtitleFontFamily === 'system-ui') {
+    nextSnapshot.subtitleFontFamily = 'YS Text';
   }
-  if (snapshot.legalFontFamily === 'system-ui') {
-    snapshot.legalFontFamily = 'YS Text';
+  if (nextSnapshot.legalFontFamily === 'system-ui') {
+    nextSnapshot.legalFontFamily = 'YS Text';
   }
-  if (snapshot.ageFontFamily === 'system-ui') {
-    snapshot.ageFontFamily = 'YS Text';
+  if (nextSnapshot.ageFontFamily === 'system-ui') {
+    nextSnapshot.ageFontFamily = 'YS Text';
   }
-  
-  store.setState({ ...current, ...snapshot });
+
+  const numericFieldsToSanitize = [
+    ['paddingPercent', 5, { min: 0, max: 30 }],
+    ['titleSize', current.titleSize, { min: 0.1, max: 100 }],
+    ['subtitleSize', current.subtitleSize, { min: 0.1, max: 100 }],
+    ['titleSubtitleRatio', current.titleSubtitleRatio, { min: 0.05, max: 3 }],
+    ['legalSize', current.legalSize, { min: 0.1, max: 100 }],
+    ['ageSize', current.ageSize, { min: 0.1, max: 100 }],
+    ['logoSize', current.logoSize, { min: 0.1, max: 100 }],
+    ['bgImageSize', current.bgImageSize, { min: 10, max: 500 }],
+    ['textGradientOpacity', current.textGradientOpacity, { min: 0, max: 100 }],
+    ['legalOpacity', current.legalOpacity, { min: 0, max: 100 }],
+    ['ageGapPercent', current.ageGapPercent, { min: 0, max: 50 }],
+    ['maxFileSizeValue', current.maxFileSizeValue, { min: 1, max: 100000 }]
+  ];
+
+  for (const [key, fallback, options] of numericFieldsToSanitize) {
+    if (nextSnapshot[key] !== undefined) {
+      nextSnapshot[key] = sanitizeFiniteNumber(nextSnapshot[key], fallback, options);
+    }
+  }
+
+  if (nextSnapshot.safeAreas !== undefined) {
+    nextSnapshot.safeAreas = sanitizeSafeAreas(nextSnapshot.safeAreas, current.safeAreas || DEFAULT_SAFE_AREAS);
+  }
+  if (nextSnapshot.logoSizeMultipliers !== undefined) {
+    nextSnapshot.logoSizeMultipliers = sanitizeLogoSizeMultipliers(nextSnapshot.logoSizeMultipliers);
+  }
+
+  store.setState({ ...current, ...nextSnapshot });
 };
