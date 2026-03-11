@@ -371,20 +371,20 @@ export const scanKV = async () => {
       const insides = ['green', 'black', 'white'];
       const themes = ['dark', 'light'];
 
-      const bgCandidateUrls = [];
+      const bgCombinations = [];
       for (const shape of shapes) {
         for (const inside of insides) {
           for (const theme of themes) {
             const fileName = `shape=${shape}, inside=${inside}, theme=${theme}`;
-            bgCandidateUrls.push(`${basePath}/${fileName}.webp`);
-            bgCandidateUrls.push(`${basePath}/${fileName}.png`);
+            bgCombinations.push({ fileName });
           }
         }
       }
-      const bgFoundUrls = await checkFilesParallel(bgCandidateUrls, 10);
 
       const byKey = {};
-      for (const url of bgFoundUrls) {
+      const webpCandidateUrls = bgCombinations.map(({ fileName }) => `${basePath}/${fileName}.webp`);
+      const webpFoundUrls = await checkFilesParallel(webpCandidateUrls, 10);
+      for (const url of webpFoundUrls) {
         const filePart = url.split('/').pop();
         const [baseName, ext] = filePart.split('.');
         const key = baseName;
@@ -392,6 +392,22 @@ export const scanKV = async () => {
           byKey[key] = ext;
         }
       }
+
+      // Проверяем PNG только для тех комбинаций, где не найден WEBP
+      const missingPngCandidateUrls = bgCombinations
+        .filter(({ fileName }) => !byKey[fileName])
+        .map(({ fileName }) => `${basePath}/${fileName}.png`);
+      if (missingPngCandidateUrls.length > 0) {
+        const pngFoundUrls = await checkFilesParallel(missingPngCandidateUrls, 10);
+        for (const url of pngFoundUrls) {
+          const filePart = url.split('/').pop();
+          const [baseName, ext] = filePart.split('.');
+          if (!byKey[baseName]) {
+            byKey[baseName] = ext;
+          }
+        }
+      }
+
       for (const [fileName, ext] of Object.entries(byKey)) {
         const parts = fileName.split(', ');
         const shape = parts[0] ? parts[0].split('=')[1] || '' : '';
@@ -564,14 +580,9 @@ export const scanFonts = async () => {
     'Yandex Serif Display'
   ];
   
-  // Известные расширения шрифтов (только woff2 для оптимизации, ttf как fallback)
-  // Проверяем сначала woff2 (оптимальный формат), затем ttf если woff2 нет
-  const fontExtensions = ['woff2', 'ttf'];
-  
   // Известные начертания для проверки
   const knownWeights = ['Thin', 'Light', 'Regular', 'Medium', 'Bold', 'Heavy', 'Black'];
   const knownItalicWeights = knownWeights.map(w => w + ' Italic');
-  const allKnownWeights = [...knownWeights, ...knownItalicWeights];
   
   // Сканируем каждую папку
   for (const folder of fontFolders) {
@@ -585,28 +596,35 @@ export const scanFonts = async () => {
       }
     }
 
-    // Сканируем файлы в папке батчами; при 3 подряд 404 прекращаем (меньше запросов и 404 в консоли)
-    const candidates = [];
-    for (const weightName of allKnownWeights) {
-      for (const ext of fontExtensions) {
-        candidates.push({
-          fileName: `${fontFamily}-${weightName}.${ext}`,
-          filePath: `font/${folder}/${fontFamily}-${weightName}.${ext}`,
-          weightName,
-          ext,
-          format: 'hyphen'
-        });
+    // Проверяем, есть ли курсивные начертания; если нет, не сканируем их
+    let hasItalicVariants = false;
+    const italicProbeWoff2 = `font/${folder}/${fontFamily}-Regular Italic.woff2`;
+    if (await checkFileExists(italicProbeWoff2)) {
+      hasItalicVariants = true;
+    } else {
+      const italicProbeTtf = `font/${folder}/${fontFamily}-Regular Italic.ttf`;
+      if (await checkFileExists(italicProbeTtf)) {
+        hasItalicVariants = true;
       }
     }
-    for (const ext of fontExtensions) {
+
+    // Сканируем файлы в папке батчами; при 3 подряд 404 прекращаем (меньше запросов и 404 в консоли)
+    const weightsToScan = hasItalicVariants ? [...knownWeights, ...knownItalicWeights] : knownWeights;
+    const candidates = [];
+    for (const weightName of weightsToScan) {
       candidates.push({
-        fileName: `${fontFamily}.${ext}`,
-        filePath: `font/${folder}/${fontFamily}.${ext}`,
-        weightName: 'Regular',
-        ext,
-        format: 'name-only'
+        fileNameBase: `${fontFamily}-${weightName}`,
+        filePathBase: `font/${folder}/${fontFamily}-${weightName}`,
+        weightName,
+        format: 'hyphen'
       });
     }
+    candidates.push({
+      fileNameBase: `${fontFamily}`,
+      filePathBase: `font/${folder}/${fontFamily}`,
+      weightName: 'Regular',
+      format: 'name-only'
+    });
 
     const fontResults = [];
     const batchSize = 5;
@@ -614,10 +632,37 @@ export const scanFonts = async () => {
     for (let i = 0; i < candidates.length; i += batchSize) {
       const batch = candidates.slice(i, i + batchSize);
       const batchResults = await Promise.all(
-        batch.map(async (c) => ({
-          ...c,
-          exists: await checkFileExists(c.filePath)
-        }))
+        batch.map(async (c) => {
+          const woff2Path = `${c.filePathBase}.woff2`;
+          if (await checkFileExists(woff2Path)) {
+            return {
+              ...c,
+              fileName: `${c.fileNameBase}.woff2`,
+              filePath: woff2Path,
+              ext: 'woff2',
+              exists: true
+            };
+          }
+
+          const ttfPath = `${c.filePathBase}.ttf`;
+          if (await checkFileExists(ttfPath)) {
+            return {
+              ...c,
+              fileName: `${c.fileNameBase}.ttf`,
+              filePath: ttfPath,
+              ext: 'ttf',
+              exists: true
+            };
+          }
+
+          return {
+            ...c,
+            fileName: `${c.fileNameBase}.woff2`,
+            filePath: woff2Path,
+            ext: null,
+            exists: false
+          };
+        })
       );
       for (const r of batchResults) {
         fontResults.push(r);

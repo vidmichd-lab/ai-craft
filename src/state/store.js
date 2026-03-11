@@ -673,6 +673,8 @@ export const setActivePairIndex = async (index) => {
   const state = getState();
   if (index >= 0 && index < state.titleSubtitlePairs.length) {
     const activePair = state.titleSubtitlePairs[index];
+    // Обновляем активный индекс сразу, до любых await
+    setKey('activePairIndex', index);
     // Синхронизируем фон из активной пары с основным state
     if (activePair) {
       // Обновляем bgColor из пары
@@ -728,8 +730,6 @@ export const setActivePairIndex = async (index) => {
         }
       }
     }
-    setKey('activePairIndex', index);
-    
     // Обновляем UI после переключения пары
     // Импортируем функции обновления UI
     try {

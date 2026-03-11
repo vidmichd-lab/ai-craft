@@ -1737,6 +1737,7 @@ const renderToCanvas = (canvas, width, height, state) => {
     if (maxKvW < criticalMinSize || maxKvH < criticalMinSize) {
       const renderWidth = width;
       const renderHeight = height;
+      const renderPlatform = platform;
       const renderPairIndex = getState().activePairIndex;
       // Используем setTimeout, чтобы избежать изменения состояния во время рендеринга
       setTimeout(() => {
@@ -1748,7 +1749,9 @@ const renderToCanvas = (canvas, width, height, state) => {
 
         const checkedSizes = getCheckedSizes();
         const isStillActiveSize = checkedSizes.some(
-          s => s.width === renderWidth && s.height === renderHeight
+          s => s.width === renderWidth &&
+               s.height === renderHeight &&
+               (s.platform || 'unknown') === renderPlatform
         );
         if (!isStillActiveSize) return;
 
