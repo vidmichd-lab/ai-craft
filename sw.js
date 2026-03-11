@@ -3,7 +3,8 @@
  */
 
 // Версия кеша - обновлять при каждом деплое
-const CACHE_VERSION = '1.0.0';
+// ⚠️ MUST MATCH APP_VERSION in index.html
+const CACHE_VERSION = '1.0.2';
 const CACHE_NAME = `practicum-banners-v${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `practicum-banners-static-v${CACHE_VERSION}`;
 const IMAGE_CACHE_NAME = `practicum-banners-images-v${CACHE_VERSION}`;
@@ -58,10 +59,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          // Удаляем старые кеши
-          if (cacheName !== CACHE_NAME && 
-              cacheName !== STATIC_CACHE_NAME && 
-              cacheName !== IMAGE_CACHE_NAME) {
+          // Удаляем все старые кеши, которые не соответствуют текущей версии
+          if (!cacheName.includes(`v${CACHE_VERSION}`)) {
             console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
@@ -87,6 +86,11 @@ self.addEventListener('fetch', (event) => {
 
   // Пропускаем chrome-extension и другие протоколы
   if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // Не перехватываем запросы к аналитике/трекингу — пусть идут в сеть без SW (избегаем 408 при блокировке)
+  if (isAnalyticsOrTracking(request.url)) {
     return;
   }
 
@@ -117,6 +121,21 @@ self.addEventListener('fetch', (event) => {
   // Для остальных - network first
   event.respondWith(networkFirst(request));
 });
+
+/**
+ * Проверка, является ли URL аналитикой/трекингом (не перехватываем — иначе при блокировке получаем 408)
+ */
+function isAnalyticsOrTracking(url) {
+  try {
+    const urlObj = new URL(url);
+    const host = urlObj.hostname.toLowerCase();
+    return host.includes('mc.yandex.ru') || host.includes('yandex.ru/metrika') ||
+           host.includes('google-analytics.com') || host.includes('googletagmanager.com') ||
+           host.includes('doubleclick.net') || host.includes('facebook.com/tr');
+  } catch (e) {
+    return false;
+  }
+}
 
 /**
  * Проверка, является ли ресурс статическим
@@ -153,6 +172,24 @@ function isFont(url) {
 }
 
 /**
+ * Проверка, является ли URL внешним CDN
+ */
+function isExternalCDN(url) {
+  const externalDomains = [
+    'cdn.jsdelivr.net',
+    'cdnjs.cloudflare.com',
+    'unpkg.com',
+    'cdn.skypack.dev'
+  ];
+  try {
+    const urlObj = new URL(url);
+    return externalDomains.some(domain => urlObj.hostname.includes(domain));
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Стратегия Cache First
  */
 async function cacheFirst(request, cacheName) {
@@ -164,7 +201,11 @@ async function cacheFirst(request, cacheName) {
       return cached;
     }
     
-    const response = await fetch(request);
+    // Для внешних CDN не используем credentials
+    const fetchOptions = isExternalCDN(request.url) 
+      ? { credentials: 'omit' }
+      : {};
+    const response = await fetch(request, fetchOptions);
     
     if (response.ok) {
       cache.put(request, response.clone());
@@ -198,7 +239,11 @@ async function cacheFirstWithExpiry(request, cacheName) {
       }
     }
     
-    const response = await fetch(request);
+    // Для внешних CDN не используем credentials
+    const fetchOptions = isExternalCDN(request.url) 
+      ? { credentials: 'omit' }
+      : {};
+    const response = await fetch(request, fetchOptions);
     
     if (response.ok) {
       // Добавляем заголовок с датой кеширования
@@ -240,7 +285,10 @@ async function cacheFirstWithExpiry(request, cacheName) {
  */
 async function networkFirst(request) {
   try {
-    const response = await fetch(request);
+    const fetchOptions = isExternalCDN(request.url)
+      ? { credentials: 'omit' }
+      : {};
+    const response = await fetch(request, fetchOptions);
     return response;
   } catch (error) {
     const cache = await caches.open(CACHE_NAME);
@@ -248,7 +296,9 @@ async function networkFirst(request) {
     if (cached) {
       return cached;
     }
-    throw error;
+    // Не пробрасываем ошибку — возвращаем пустой ответ, чтобы не ломать приложение
+    console.warn('[SW] networkFirst fetch failed, no cache:', request.url, error.message);
+    return new Response('', { status: 408, statusText: 'Request Timeout' });
   }
 }
 
@@ -257,33 +307,45 @@ async function networkFirst(request) {
  */
 async function networkFirstWithCache(request, cacheName) {
   try {
-    // Сначала пытаемся загрузить с сети, игнорируя кеш браузера
-    const url = new URL(request.url);
-    // Добавляем timestamp для обхода кеша браузера
-    url.searchParams.set('_t', Date.now().toString());
-    const networkRequest = new Request(url, {
+    // Всегда пытаемся загрузить с сети, игнорируя кеш
+    // Для внешних CDN не используем credentials
+    const credentials = isExternalCDN(request.url) ? 'omit' : request.credentials;
+    
+    const networkRequest = new Request(request.url, {
       method: request.method,
       headers: request.headers,
-      cache: 'no-cache',
-      credentials: request.credentials,
+      cache: 'no-store', // Не кешируем в браузере
+      credentials: credentials,
       redirect: request.redirect
     });
     
     const response = await fetch(networkRequest);
     
     if (response.ok) {
-      // Кешируем успешный ответ (с оригинальным URL без timestamp)
+      // Обновляем кеш только если получили успешный ответ
       const cache = await caches.open(cacheName);
+      // Удаляем старую версию из кеша перед добавлением новой
+      await cache.delete(request);
       cache.put(request, response.clone());
     }
     
     return response;
   } catch (error) {
-    // Если сеть недоступна, используем кеш
+    // Если сеть недоступна, используем кеш, но только если он не старше 5 минут
     const cache = await caches.open(cacheName);
     const cached = await cache.match(request);
     if (cached) {
-      return cached;
+      const cachedDate = cached.headers.get('sw-cached-date');
+      if (cachedDate) {
+        const age = Date.now() - parseInt(cachedDate);
+        // Если кеш старше 5 минут, не используем его
+        if (age < 5 * 60 * 1000) {
+          return cached;
+        }
+      } else {
+        // Если нет даты, используем кеш (старая версия)
+        return cached;
+      }
     }
     throw error;
   }
@@ -335,8 +397,19 @@ self.addEventListener('message', (event) => {
     event.waitUntil(
       caches.keys().then((cacheNames) => {
         return Promise.all(
-          cacheNames.map((cacheName) => caches.delete(cacheName))
+          cacheNames.map((cacheName) => {
+            console.log('[SW] Clearing cache:', cacheName);
+            return caches.delete(cacheName);
+          })
         );
+      }).then(() => {
+        console.log('[SW] All caches cleared');
+        // Уведомляем клиентов об очистке кеша
+        return self.clients.matchAll().then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: 'CACHE_CLEARED' });
+          });
+        });
       })
     );
   }

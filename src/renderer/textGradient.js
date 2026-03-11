@@ -113,11 +113,14 @@ export const drawTextGradient = (ctx, width, height, state, logoBounds, titleBou
     
     if (isActuallyCentered) {
       // Для центрированного текста рисуем однородную подложку на весь макет
-      const overlayColor = `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${centerOverlayOpacity})`;
-      ctx.save();
-      ctx.fillStyle = overlayColor;
-      ctx.fillRect(0, 0, width, height);
-      ctx.restore();
+      // Но только если opacity > 0 (если textGradientOpacity = 0, не рисуем вообще)
+      if (opacity > 0) {
+        const overlayColor = `rgba(${gradientColor.r}, ${gradientColor.g}, ${gradientColor.b}, ${centerOverlayOpacity * opacity})`;
+        ctx.save();
+        ctx.fillStyle = overlayColor;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
     } else if (isWideFormat) {
       // Для широких форматов градиент идет слева направо
       const textWidth = maxX - minX;

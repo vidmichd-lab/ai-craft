@@ -36,9 +36,44 @@ const closeAllPreviewDropdowns = () => {
  */
 export const updateSizesSummary = () => {
   const dom = getDom();
-  if (!dom.sizesSummary) return;
+  if (!dom.sizesSummary) {
+    console.warn('sizesSummary element not found in DOM');
+    return;
+  }
   const sizes = getCheckedSizes();
-  dom.sizesSummary.textContent = t('export.presetSizes.selected', { count: sizes.length });
+  const count = sizes.length;
+  
+  // Формируем правильный текст с учетом множественного числа
+  let text = '';
+  if (count === 0) {
+    text = 'Не выбрано размеров';
+  } else if (count === 1) {
+    text = 'Выбрано: 1 размер';
+  } else if (count >= 2 && count <= 4) {
+    text = `Выбрано: ${count} размера`;
+  } else {
+    text = `Выбрано: ${count} размеров`;
+  }
+  
+  // Используем функцию перевода с параметром
+  let translatedText;
+  try {
+    translatedText = t('export.presetSizes.selected', { count });
+  } catch (error) {
+    console.warn('Ошибка при переводе sizesSummary:', error);
+    translatedText = text;
+  }
+  
+  // Если перевод не сработал (вернул ключ или содержит {count}), используем наш текст
+  if (!translatedText || translatedText === 'export.presetSizes.selected' || translatedText.includes('{count}')) {
+    dom.sizesSummary.textContent = text;
+  } else {
+    // Перевод сработал, используем его
+    dom.sizesSummary.textContent = translatedText;
+  }
+  
+  // Убираем data-i18n атрибут, чтобы updateUI() не перезаписывал текст
+  dom.sizesSummary.removeAttribute('data-i18n');
 };
 
 /**
@@ -48,16 +83,22 @@ export const renderPresetSizes = () => {
   const state = getState();
   const dom = getDom();
   if (!dom.presetSizesList) return;
-  
+
+  const expandedPlatforms = new Set();
+  dom.presetSizesList.querySelectorAll('.platform-sizes:not(.collapsed)').forEach((el) => {
+    expandedPlatforms.add(el.id.replace('sizes-', ''));
+  });
+
   let html = '';
   Object.keys(state.presetSizes).forEach((platform) => {
+    const isExpanded = expandedPlatforms.has(platform);
     html += `
       <div class="platform-group" id="platform-group-${platform}">
         <div class="platform-header" onclick="togglePlatformSizes('${platform}')">
           <span>${platform}</span>
           <span class="toggle-icon">▼</span>
         </div>
-        <div class="platform-sizes collapsed" id="sizes-${platform}">
+        <div class="platform-sizes ${isExpanded ? '' : 'collapsed'}" id="sizes-${platform}">
     `;
     state.presetSizes[platform].forEach((size, index) => {
       const id = `size-${platform}-${index}`;
@@ -75,11 +116,9 @@ export const renderPresetSizes = () => {
       </div>
     `;
   });
-  
+
   dom.presetSizesList.innerHTML = html;
   updateSizesSummary();
-  
-  // Также обновляем кастомные размеры
   renderCustomSizes();
 };
 
@@ -144,25 +183,42 @@ export const updatePreviewSizeSelect = () => {
         ? categorized.narrow[currentIndex] 
         : null;
       
-      // Если индекс равен 0 (начальное значение) и размер из "Общие" найден, устанавливаем его
-      // Также устанавливаем, если текущий размер не из "Общие" и индекс 0
-      if (defaultIndex >= 0 && currentIndex === 0) {
-        renderer.setCategoryIndex('narrow', defaultIndex, false);
-        indices = renderer.getCategoryIndices(); // Получаем обновленные индексы
-      }
-      
-      // Используем текущий выбранный индекс (не перезаписываем, если он уже установлен)
+      // Используем текущий выбранный индекс из renderer
       let selectedIndex = indices.narrow;
-      
-      // Если индекс равен 0 (начальное значение) и размер из "Общие" найден, устанавливаем его
-      // Но только если индекс действительно равен 0 (не был установлен пользователем)
-      if (defaultIndex >= 0 && selectedIndex === 0) {
-        selectedIndex = defaultIndex;
-      }
       
       // Проверяем валидность индекса
       if (selectedIndex < 0 || selectedIndex >= categorized.narrow.length) {
-        selectedIndex = defaultIndex >= 0 ? defaultIndex : 0;
+        // Если индекс невалидный, устанавливаем дефолтный или 0
+        if (defaultIndex >= 0) {
+          selectedIndex = defaultIndex;
+          renderer.setCategoryIndex('narrow', defaultIndex, false);
+        } else {
+          selectedIndex = 0;
+          renderer.setCategoryIndex('narrow', 0, false);
+        }
+        // Получаем обновленные индексы
+        indices = renderer.getCategoryIndices();
+        selectedIndex = indices.narrow;
+      }
+      
+      // Если индекс равен 0 и есть дефолтный размер, устанавливаем его только один раз при инициализации
+      // Проверяем, был ли индекс уже установлен ранее (сохранен в localStorage)
+      const savedNarrowIndex = localStorage.getItem('previewSizeNarrowIndex');
+      if (savedNarrowIndex !== null) {
+        const savedIndex = parseInt(savedNarrowIndex, 10);
+        if (savedIndex >= 0 && savedIndex < categorized.narrow.length) {
+          selectedIndex = savedIndex;
+          renderer.setCategoryIndex('narrow', savedIndex, false);
+          indices = renderer.getCategoryIndices();
+          selectedIndex = indices.narrow;
+        }
+      } else if (defaultIndex >= 0 && selectedIndex === 0) {
+        // Только при первой инициализации устанавливаем дефолтный размер
+        selectedIndex = defaultIndex;
+        renderer.setCategoryIndex('narrow', defaultIndex, false);
+        localStorage.setItem('previewSizeNarrowIndex', defaultIndex.toString());
+        indices = renderer.getCategoryIndices();
+        selectedIndex = indices.narrow;
       }
       
       const selectedSize = categorized.narrow[selectedIndex];
@@ -176,12 +232,14 @@ export const updatePreviewSizeSelect = () => {
           option.classList.add('selected');
         }
         option.textContent = `${size.width} × ${size.height} (${size.platform})`;
-        option.onclick = () => {
-          narrowText.textContent = option.textContent;
-          narrowDropdown.style.display = 'none';
-          closeAllPreviewDropdowns();
-          changePreviewSizeCategory('narrow', index.toString());
-        };
+          option.onclick = () => {
+            narrowText.textContent = option.textContent;
+            narrowDropdown.style.display = 'none';
+            closeAllPreviewDropdowns();
+            // Сохраняем выбранный индекс
+            localStorage.setItem('previewSizeNarrowIndex', index.toString());
+            changePreviewSizeCategory('narrow', index.toString());
+          };
         narrowDropdown.appendChild(option);
       });
     }
@@ -211,25 +269,41 @@ export const updatePreviewSizeSelect = () => {
         ? categorized.wide[currentIndex] 
         : null;
       
-      // Если индекс равен 0 (начальное значение) и размер из "Общие" найден, устанавливаем его
-      // Также устанавливаем, если текущий размер не из "Общие" и индекс 0
-      if (defaultIndex >= 0 && currentIndex === 0) {
-        renderer.setCategoryIndex('wide', defaultIndex, false);
-        indices = renderer.getCategoryIndices(); // Получаем обновленные индексы
-      }
-      
-      // Используем текущий выбранный индекс (не перезаписываем, если он уже установлен)
+      // Используем текущий выбранный индекс из renderer
       let selectedIndex = indices.wide;
-      
-      // Если индекс равен 0 (начальное значение) и размер из "Общие" найден, устанавливаем его
-      // Но только если индекс действительно равен 0 (не был установлен пользователем)
-      if (defaultIndex >= 0 && selectedIndex === 0) {
-        selectedIndex = defaultIndex;
-      }
       
       // Проверяем валидность индекса
       if (selectedIndex < 0 || selectedIndex >= categorized.wide.length) {
-        selectedIndex = defaultIndex >= 0 ? defaultIndex : 0;
+        // Если индекс невалидный, устанавливаем дефолтный или 0
+        if (defaultIndex >= 0) {
+          selectedIndex = defaultIndex;
+          renderer.setCategoryIndex('wide', defaultIndex, false);
+        } else {
+          selectedIndex = 0;
+          renderer.setCategoryIndex('wide', 0, false);
+        }
+        // Получаем обновленные индексы
+        indices = renderer.getCategoryIndices();
+        selectedIndex = indices.wide;
+      }
+      
+      // Проверяем сохраненный индекс
+      const savedWideIndex = localStorage.getItem('previewSizeWideIndex');
+      if (savedWideIndex !== null) {
+        const savedIndex = parseInt(savedWideIndex, 10);
+        if (savedIndex >= 0 && savedIndex < categorized.wide.length) {
+          selectedIndex = savedIndex;
+          renderer.setCategoryIndex('wide', savedIndex, false);
+          indices = renderer.getCategoryIndices();
+          selectedIndex = indices.wide;
+        }
+      } else if (defaultIndex >= 0 && selectedIndex === 0) {
+        // Только при первой инициализации устанавливаем дефолтный размер
+        selectedIndex = defaultIndex;
+        renderer.setCategoryIndex('wide', defaultIndex, false);
+        localStorage.setItem('previewSizeWideIndex', defaultIndex.toString());
+        indices = renderer.getCategoryIndices();
+        selectedIndex = indices.wide;
       }
       
       const selectedSize = categorized.wide[selectedIndex];
@@ -247,6 +321,8 @@ export const updatePreviewSizeSelect = () => {
           wideText.textContent = option.textContent;
           wideDropdown.style.display = 'none';
           closeAllPreviewDropdowns();
+          // Сохраняем выбранный индекс
+          localStorage.setItem('previewSizeWideIndex', index.toString());
           changePreviewSizeCategory('wide', index.toString());
         };
         wideDropdown.appendChild(option);
@@ -275,25 +351,41 @@ export const updatePreviewSizeSelect = () => {
         ? categorized.square[currentIndex] 
         : null;
       
-      // Если индекс равен 0 (начальное значение) и размер из "Общие" найден, устанавливаем его
-      // Также устанавливаем, если текущий размер не из "Общие" и индекс 0
-      if (defaultIndex >= 0 && currentIndex === 0) {
-        renderer.setCategoryIndex('square', defaultIndex, false);
-        indices = renderer.getCategoryIndices(); // Получаем обновленные индексы
-      }
-      
-      // Используем текущий выбранный индекс (не перезаписываем, если он уже установлен)
+      // Используем текущий выбранный индекс из renderer
       let selectedIndex = indices.square;
-      
-      // Если индекс равен 0 (начальное значение) и размер из "Общие" найден, устанавливаем его
-      // Но только если индекс действительно равен 0 (не был установлен пользователем)
-      if (defaultIndex >= 0 && selectedIndex === 0) {
-        selectedIndex = defaultIndex;
-      }
       
       // Проверяем валидность индекса
       if (selectedIndex < 0 || selectedIndex >= categorized.square.length) {
-        selectedIndex = defaultIndex >= 0 ? defaultIndex : 0;
+        // Если индекс невалидный, устанавливаем дефолтный или 0
+        if (defaultIndex >= 0) {
+          selectedIndex = defaultIndex;
+          renderer.setCategoryIndex('square', defaultIndex, false);
+        } else {
+          selectedIndex = 0;
+          renderer.setCategoryIndex('square', 0, false);
+        }
+        // Получаем обновленные индексы
+        indices = renderer.getCategoryIndices();
+        selectedIndex = indices.square;
+      }
+      
+      // Проверяем сохраненный индекс
+      const savedSquareIndex = localStorage.getItem('previewSizeSquareIndex');
+      if (savedSquareIndex !== null) {
+        const savedIndex = parseInt(savedSquareIndex, 10);
+        if (savedIndex >= 0 && savedIndex < categorized.square.length) {
+          selectedIndex = savedIndex;
+          renderer.setCategoryIndex('square', savedIndex, false);
+          indices = renderer.getCategoryIndices();
+          selectedIndex = indices.square;
+        }
+      } else if (defaultIndex >= 0 && selectedIndex === 0) {
+        // Только при первой инициализации устанавливаем дефолтный размер
+        selectedIndex = defaultIndex;
+        renderer.setCategoryIndex('square', defaultIndex, false);
+        localStorage.setItem('previewSizeSquareIndex', defaultIndex.toString());
+        indices = renderer.getCategoryIndices();
+        selectedIndex = indices.square;
       }
       
       const selectedSize = categorized.square[selectedIndex];
@@ -311,6 +403,8 @@ export const updatePreviewSizeSelect = () => {
           squareText.textContent = option.textContent;
           squareDropdown.style.display = 'none';
           closeAllPreviewDropdowns();
+          // Сохраняем выбранный индекс
+          localStorage.setItem('previewSizeSquareIndex', index.toString());
           changePreviewSizeCategory('square', index.toString());
         };
         squareDropdown.appendChild(option);
@@ -391,6 +485,14 @@ export const changePreviewSizeCategory = (category, index) => {
             }
             // Закрываем все дроплисты
             closeAllPreviewDropdowns();
+            // Сохраняем выбранный индекс
+            if (category === 'narrow') {
+              localStorage.setItem('previewSizeNarrowIndex', index.toString());
+            } else if (category === 'wide') {
+              localStorage.setItem('previewSizeWideIndex', index.toString());
+            } else if (category === 'square') {
+              localStorage.setItem('previewSizeSquareIndex', index.toString());
+            }
             changePreviewSizeCategory(category, index.toString());
           };
           dropdown.appendChild(option);
@@ -447,6 +549,11 @@ export const changePreviewSizeCategory = (category, index) => {
  */
 export const toggleSize = (platform, index) => {
   togglePresetSize(platform, index);
+  const checkbox = document.getElementById(`size-${platform}-${index}`);
+  if (checkbox) {
+    const state = getState();
+    checkbox.checked = state.presetSizes[platform]?.[index]?.checked ?? false;
+  }
   updatePreviewSizeSelect();
   updateSizesSummary();
   renderer.render();
@@ -457,6 +564,7 @@ export const toggleSize = (platform, index) => {
  */
 export const toggleCustomSizeAction = (id) => {
   toggleCustomSize(id);
+  updateSizesSummary();
   updatePreviewSizeSelect();
   updateSizesSummary();
   renderer.render();
@@ -469,7 +577,7 @@ export const removeCustomSizeAction = (id) => {
   removeCustomSize(id);
   renderCustomSizes();
   updatePreviewSizeSelect();
-  updateSizesSummary();
+  updateSizesSummary(); // Обновляем сводку после удаления
   renderer.render();
 };
 

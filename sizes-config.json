@@ -4,9 +4,25 @@
     { "width": 1080, "height": 1920, "checked": true },
     { "width": 1920, "height": 720, "checked": true }
   ],
-  "РСЯ": [
+  "Я.Директ": [
     { "width": 1600, "height": 1200, "checked": true },
     { "width": 240, "height": 400, "checked": true }
+  ],
+  "Я.Директ Графические": [
+    { "width": 160, "height": 600, "checked": true },
+    { "width": 240, "height": 600, "checked": true },
+    { "width": 300, "height": 250, "checked": true },
+    { "width": 300, "height": 300, "checked": true },
+    { "width": 300, "height": 500, "checked": true },
+    { "width": 300, "height": 600, "checked": true },
+    { "width": 320, "height": 50, "checked": true },
+    { "width": 320, "height": 100, "checked": true },
+    { "width": 320, "height": 480, "checked": true },
+    { "width": 336, "height": 280, "checked": true },
+    { "width": 480, "height": 320, "checked": true },
+    { "width": 728, "height": 90, "checked": true },
+    { "width": 970, "height": 250, "checked": true },
+    { "width": 1000, "height": 120, "checked": true }
   ],
   "MTS": [
     { "width": 200, "height": 200, "checked": true },
@@ -36,26 +52,34 @@
     { "width": 960, "height": 450, "checked": true },
     { "width": 1560, "height": 320, "checked": true }
   ],
-  "Яндекс Директ": [
-    { "width": 160, "height": 600, "checked": true },
-    { "width": 240, "height": 400, "checked": true },
-    { "width": 240, "height": 600, "checked": true },
-    { "width": 300, "height": 250, "checked": true },
-    { "width": 300, "height": 300, "checked": true },
-    { "width": 300, "height": 500, "checked": true },
-    { "width": 300, "height": 600, "checked": true },
-    { "width": 320, "height": 50, "checked": true },
-    { "width": 320, "height": 100, "checked": true },
-    { "width": 320, "height": 480, "checked": true },
-    { "width": 336, "height": 280, "checked": true },
-    { "width": 480, "height": 320, "checked": true },
-    { "width": 728, "height": 90, "checked": true },
-    { "width": 970, "height": 250, "checked": true },
-    { "width": 1000, "height": 120, "checked": true }
-  ],
   "Ozon": [
     { "width": 2832, "height": 600, "checked": true },
     { "width": 1080, "height": 450, "checked": true }
+  ],
+  "Google Ads": [
+    { "width": 300, "height": 250, "checked": true },
+    { "width": 336, "height": 280, "checked": true },
+    { "width": 728, "height": 90, "checked": true },
+    { "width": 300, "height": 600, "checked": true },
+    { "width": 160, "height": 600, "checked": true },
+    { "width": 970, "height": 90, "checked": true },
+    { "width": 970, "height": 250, "checked": true },
+    { "width": 250, "height": 250, "checked": true },
+    { "width": 200, "height": 200, "checked": true },
+    { "width": 468, "height": 60, "checked": true },
+    { "width": 320, "height": 50, "checked": true },
+    { "width": 320, "height": 100, "checked": true },
+    { "width": 300, "height": 50, "checked": true }
+  ],
+  "VK Ads": [
+    { "width": 1080, "height": 607, "checked": true },
+    { "width": 600, "height": 600, "checked": true },
+    { "width": 1080, "height": 1080, "checked": true },
+    { "width": 145, "height": 85, "checked": true },
+    { "width": 1080, "height": 1350, "checked": true },
+    { "width": 600, "height": 360, "checked": true },
+    { "width": 1440, "height": 720, "checked": true },
+    { "width": 256, "height": 256, "checked": true }
   ]
 }
 

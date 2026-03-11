@@ -2,12 +2,21 @@
 
 # Скрипт для деплоя статического сайта в Yandex Object Storage
 # Бакет: practicum-banners
+#
+# Режимы: по умолчанию — только изменённые файлы (MD5 vs ETag).
+#         ./deploy.sh --full — полная синхронизация и удаление с S3.
 
 set -e
 
 BUCKET_NAME="practicum-banners"
 ENDPOINT_URL="https://storage.yandexcloud.net"
 LOCAL_DIR="."
+
+# Режим деплоя: 0 = только изменённые (по хешу), 1 = полная синхронизация (sync + удаление)
+FULL_DEPLOY=0
+if [ "${1:-}" = "--full" ]; then
+  FULL_DEPLOY=1
+fi
 
 # Цвета для вывода
 GREEN='\033[0;32m'
@@ -17,6 +26,11 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}🚀 Начинаем деплой в Yandex Object Storage${NC}"
 echo "Бакет: ${BUCKET_NAME}"
+if [ "$FULL_DEPLOY" -eq 1 ]; then
+  echo -e "${YELLOW}FULL: полная синхронизация (sync), удаление отсутствующих файлов${NC}"
+else
+  echo -e "${GREEN}Только изменения: загрузка файлов с изменённым содержимым (по хешу)${NC}"
+fi
 echo ""
 
 # Проверка наличия AWS CLI
@@ -48,8 +62,13 @@ fi
 echo -e "${YELLOW}📦 Проверка бакета...${NC}"
 if ! aws --endpoint-url=${ENDPOINT_URL} s3 ls "s3://${BUCKET_NAME}" &> /dev/null; then
     echo -e "${YELLOW}⚠️  Бакет не найден. Создаём бакет...${NC}"
-    aws --endpoint-url=${ENDPOINT_URL} s3 mb "s3://${BUCKET_NAME}"
-    echo -e "${GREEN}✅ Бакет создан${NC}"
+    if aws --endpoint-url=${ENDPOINT_URL} s3 mb "s3://${BUCKET_NAME}" 2>/dev/null; then
+        echo -e "${GREEN}✅ Бакет создан${NC}"
+    else
+        echo -e "${RED}❌ Не удалось создать бакет${NC}"
+        echo "   Возможно, бакет уже существует или недостаточно прав"
+        echo "   Продолжаем выполнение..."
+    fi
 fi
 
 # Настройка публичного доступа (опционально, может требовать storage.admin)
@@ -138,12 +157,14 @@ NEEDS_CONVERSION=false
 # Проверяем наличие PNG/JPG файлов без WebP версий
 if [ -d "assets" ]; then
     # Ищем PNG/JPG файлы, для которых нет соответствующих WebP
-    UNCONVERTED=$(find assets -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \) 2>/dev/null | while read -r img_file; do
+    UNCONVERTED=""
+    while IFS= read -r -d '' img_file; do
         webp_file="${img_file%.*}.webp"
         if [ ! -f "$webp_file" ]; then
-            echo "$img_file"
+            UNCONVERTED="$img_file"
+            break
         fi
-    done | head -1)
+    done < <(find assets -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \) -print0 2>/dev/null)
     
     if [ -n "$UNCONVERTED" ]; then
         NEEDS_CONVERSION=true
@@ -238,17 +259,48 @@ get_content_type() {
 }
 
 # Функция для определения Cache-Control по типу файла
+# Настройки оптимизированы для автоматического обновления без необходимости очистки кеша
 get_cache_control() {
     local file=$1
     local ext="${file##*.}"
     case "$ext" in
-        html) echo "public, max-age=0, must-revalidate" ;;
-        css|js) echo "public, max-age=3600, must-revalidate" ;;
-        json) echo "public, max-age=3600" ;;
-        png|jpg|jpeg|gif|webp|svg|ico) echo "public, max-age=31536000, immutable" ;;
-        ttf|woff|woff2|otf|eot) echo "public, max-age=31536000, immutable" ;;
-        *) echo "public, max-age=86400" ;;
+        html) 
+            # HTML файлы проверяются на актуальность при каждой загрузке
+            # no-cache означает, что браузер должен проверять сервер перед использованием кеша
+            echo "no-cache, must-revalidate, max-age=0" 
+            ;;
+        css|js) 
+            # JS/CSS файлы проверяются на обновления при каждой загрузке
+            # Используем no-cache вместо max-age=0 для лучшей совместимости
+            echo "no-cache, must-revalidate" 
+            ;;
+        json) 
+            # JSON файлы (конфигурация) тоже должны обновляться
+            echo "no-cache, must-revalidate" 
+            ;;
+        png|jpg|jpeg|gif|webp|svg|ico) 
+            # Изображения кешируются долго, так как они редко меняются
+            echo "public, max-age=31536000, immutable" 
+            ;;
+        ttf|woff|woff2|otf|eot) 
+            # Шрифты кешируются долго
+            echo "public, max-age=31536000, immutable" 
+            ;;
+        *) 
+            # Остальные файлы кешируются на день
+            echo "public, max-age=86400" 
+            ;;
     esac
+}
+
+# Функция для получения локального хеша файла (MD5)
+get_local_hash() {
+    local file=$1
+    if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+        echo ""
+        return
+    fi
+    (md5 -q "$file" 2>/dev/null || (md5sum "$file" 2>/dev/null | cut -d' ' -f1)) || echo ""
 }
 
 # Функция для загрузки файла с правильным Content-Type и Cache-Control
@@ -265,6 +317,7 @@ upload_with_content_type() {
 }
 
 # Получаем список изменённых файлов через --dryrun
+if [ "$FULL_DEPLOY" -eq 1 ]; then
 echo "  Проверка изменённых файлов..."
 SYNC_OUTPUT=$(aws --endpoint-url=${ENDPOINT_URL} s3 sync "${LOCAL_DIR}" "s3://${BUCKET_NAME}/" \
     --exclude ".DS_Store" \
@@ -284,30 +337,67 @@ SYNC_OUTPUT=$(aws --endpoint-url=${ENDPOINT_URL} s3 sync "${LOCAL_DIR}" "s3://${
     --dryrun 2>&1)
 
 # Извлекаем список файлов для загрузки и удаления
-UPLOAD_FILES=$(echo "$SYNC_OUTPUT" | grep "upload:" | sed 's/.*upload: //' | sed 's/.*to s3:\/\/[^/]*\///' || true)
-DELETE_FILES=$(echo "$SYNC_OUTPUT" | grep "delete:" | sed 's/.*delete: s3:\/\/[^/]*\///' || true)
+# Используем более надежный парсинг, который обрабатывает пути с пробелами
+# Формат вывода aws s3 sync: "upload: ./file.txt to s3://bucket/file.txt"
+UPLOAD_FILES=""
+DELETE_FILES=""
+while IFS= read -r line; do
+    # Извлекаем путь после "s3://bucket/"
+    if [[ "$line" =~ upload:.*to\ s3://[^/]+/(.+) ]]; then
+        file_path="${BASH_REMATCH[1]}"
+        if [ -n "$file_path" ]; then
+            UPLOAD_FILES="${UPLOAD_FILES}${UPLOAD_FILES:+$'\n'}${file_path}"
+        fi
+    fi
+done < <(echo "$SYNC_OUTPUT" | grep "upload:" || true)
 
-UPLOAD_COUNT=$(echo "$UPLOAD_FILES" | grep -v '^$' | wc -l | tr -d ' ')
-DELETE_COUNT=$(echo "$DELETE_FILES" | grep -v '^$' | wc -l | tr -d ' ')
+while IFS= read -r line; do
+    # Формат вывода: "delete: s3://bucket/file.txt"
+    if [[ "$line" =~ delete:\ s3://[^/]+/(.+) ]]; then
+        file_path="${BASH_REMATCH[1]}"
+        if [ -n "$file_path" ]; then
+            DELETE_FILES="${DELETE_FILES}${DELETE_FILES:+$'\n'}${file_path}"
+        fi
+    fi
+done < <(echo "$SYNC_OUTPUT" | grep "delete:" || true)
+
+# Более надежный подсчет файлов (обрабатывает пустые строки и отсутствие файлов)
+UPLOAD_COUNT=0
+if [ -n "$UPLOAD_FILES" ]; then
+    UPLOAD_COUNT=$(echo "$UPLOAD_FILES" | grep -v '^$' | wc -l | tr -d ' ')
+    # Если wc -l вернул пустую строку, значит файлов нет
+    [ -z "$UPLOAD_COUNT" ] && UPLOAD_COUNT=0
+fi
+DELETE_COUNT=0
+if [ -n "$DELETE_FILES" ]; then
+    DELETE_COUNT=$(echo "$DELETE_FILES" | grep -v '^$' | wc -l | tr -d ' ')
+    [ -z "$DELETE_COUNT" ] && DELETE_COUNT=0
+fi
 
 # Принудительно проверяем JS и CSS файлы, так как они могут не обнаруживаться при изменении без изменения размера
 FORCE_UPLOAD_FILES=""
-FORCE_CHECK_FILES=$(find src -type f \( -name "*.js" -o -name "*.css" \) 2>/dev/null || true)
+if [ -d "src" ]; then
+    FORCE_CHECK_FILES=$(find src -type f \( -name "*.js" -o -name "*.css" \) 2>/dev/null || true)
+fi
 if [ -n "$FORCE_CHECK_FILES" ]; then
     echo "  Проверка JS/CSS файлов на изменения..."
     while IFS= read -r file; do
-        if [ -n "$file" ] && [ -f "$file" ]; then
+        if [ -n "$file" ] && [ -f "$file" ] && [ -r "$file" ]; then
             # Проверяем, есть ли файл в списке для загрузки
-            if ! echo "$UPLOAD_FILES" | grep -q "^${file}$"; then
+            # Используем grep -F для точного совпадения (без интерпретации спецсимволов)
+            if ! echo "$UPLOAD_FILES" | grep -Fxq "$file"; then
                 # Проверяем, изменился ли файл (сравниваем по MD5)
-                LOCAL_HASH=$(md5 -q "$file" 2>/dev/null || md5sum "$file" 2>/dev/null | cut -d' ' -f1 || echo "")
+                LOCAL_HASH=$(get_local_hash "$file")
                 if [ -n "$LOCAL_HASH" ]; then
                     # Получаем ETag из S3 (обычно это MD5)
                     S3_ETAG=$(aws --endpoint-url=${ENDPOINT_URL} s3api head-object --bucket "${BUCKET_NAME}" --key "${file}" --query 'ETag' --output text 2>/dev/null | tr -d '"' || echo "")
                     if [ -z "$S3_ETAG" ] || [ "$LOCAL_HASH" != "$S3_ETAG" ]; then
                         # Файл изменился или не существует, добавляем в список для загрузки
-                        FORCE_UPLOAD_FILES="${FORCE_UPLOAD_FILES}
-${file}"
+                        if [ -z "$FORCE_UPLOAD_FILES" ]; then
+                            FORCE_UPLOAD_FILES="$file"
+                        else
+                            FORCE_UPLOAD_FILES="${FORCE_UPLOAD_FILES}"$'\n'"${file}"
+                        fi
                         echo "    ⚠️  Обнаружено изменение в ${file}"
                     fi
                 fi
@@ -318,10 +408,19 @@ fi
 
 # Объединяем списки файлов для загрузки
 if [ -n "$FORCE_UPLOAD_FILES" ]; then
-    UPLOAD_FILES="${UPLOAD_FILES}${FORCE_UPLOAD_FILES}"
+    if [ -z "$UPLOAD_FILES" ]; then
+        UPLOAD_FILES="$FORCE_UPLOAD_FILES"
+    else
+        UPLOAD_FILES="${UPLOAD_FILES}"$'\n'"${FORCE_UPLOAD_FILES}"
+    fi
 fi
 
-UPLOAD_COUNT=$(echo "$UPLOAD_FILES" | grep -v '^$' | wc -l | tr -d ' ')
+# Пересчитываем количество файлов после объединения списков
+UPLOAD_COUNT=0
+if [ -n "$UPLOAD_FILES" ]; then
+    UPLOAD_COUNT=$(echo "$UPLOAD_FILES" | grep -v '^$' | wc -l | tr -d ' ')
+    [ -z "$UPLOAD_COUNT" ] && UPLOAD_COUNT=0
+fi
 
 if [ "$UPLOAD_COUNT" -gt 0 ] || [ "$DELETE_COUNT" -gt 0 ]; then
     echo "  Найдено изменений: $UPLOAD_COUNT файлов для загрузки, $DELETE_COUNT для удаления"
@@ -353,11 +452,130 @@ if [ "$UPLOAD_COUNT" -gt 0 ] || [ "$DELETE_COUNT" -gt 0 ]; then
     fi
     
     echo "  ✅ Синхронизация завершена (загружены только изменённые файлы)"
-else
+  else
     echo "  Изменений не обнаружено, всё актуально"
     echo "  💡 Если изменения не отображаются, попробуйте:"
     echo "     1. Очистить кэш браузера (Ctrl+Shift+R или Cmd+Shift+R)"
-    echo "     2. Запустить деплой с принудительной загрузкой всех JS файлов"
+    echo "     2. Запустить деплой с принудительной загрузкой: ./deploy.sh --full"
+fi
+else
+  # ========== Только изменённые: манифест (mtime+size) → хеш и S3 только для изменённых ==========
+  MANIFEST_FILE=".deploy-manifest"
+  get_stat() {
+    local f="$1"
+    if [ -f "$f" ]; then
+      stat -f '%m %z' "$f" 2>/dev/null || stat -c '%Y %s' "$f" 2>/dev/null || echo ""
+    fi
+  }
+
+  ALL_FILES=$(find . -type f \
+    ! -path './.git/*' \
+    ! -path './__pycache__/*' \
+    ! -path './node_modules/*' \
+    ! -name '.DS_Store' \
+    ! -name '*.pyc' \
+    ! -name '*.py' \
+    ! -name '*.md' \
+    ! -name '*.tmp' \
+    ! -name '.gitignore' \
+    ! -name '.gitattributes' \
+    ! -name 'compress_images.py' \
+    ! -name 'start_server.py' \
+    ! -name 'deploy.sh' \
+    ! -name 'deploy-*.sh' \
+    ! -name 'run_*.sh' \
+    ! -name 'DEPLOY.md' \
+    ! -name 'TROUBLESHOOTING.md' \
+    ! -name 'YANDEX_CLOUD_SETUP.md' \
+    -print 2>/dev/null | sed 's|^\./||' | grep -v '^$' || true)
+
+  TOTAL_FILES=$(echo "$ALL_FILES" | grep -c . 2>/dev/null || echo 0)
+  TO_CHECK=""
+  if [ -f "$MANIFEST_FILE" ]; then
+    while IFS= read -r file; do
+      [ -z "$file" ] && continue
+      [ ! -f "$file" ] && continue
+      current=$(get_stat "$file")
+      [ -z "$current" ] && { TO_CHECK="${TO_CHECK}${TO_CHECK:+$'\n'}${file}"; continue; }
+      want="${file}	${current}"
+      if ! grep -Fxq "$want" "$MANIFEST_FILE" 2>/dev/null; then
+        TO_CHECK="${TO_CHECK}${TO_CHECK:+$'\n'}${file}"
+      fi
+    done <<< "$ALL_FILES"
+  else
+    echo "  Манифест не найден — первая проверка по хешу (один раз)."
+    TO_CHECK="$ALL_FILES"
+  fi
+
+  TO_CHECK_COUNT=$(echo "$TO_CHECK" | grep -c . 2>/dev/null || echo 0)
+  echo "  Файлов к проверке (изменённые/новые): $TO_CHECK_COUNT из $TOTAL_FILES"
+
+  UPLOAD_FILES=""
+  if [ "$TO_CHECK_COUNT" -gt 0 ]; then
+    UPLOAD_LIST=$(mktemp)
+    trap "rm -f '$UPLOAD_LIST'" EXIT
+    CHECKED=0
+    BATCH_SIZE=25
+    while IFS= read -r file; do
+      [ -z "$file" ] && continue
+      if [ -f "$file" ]; then
+        (
+          h=$(get_local_hash "$file")
+          if [ -n "$h" ]; then
+            e=$(aws --endpoint-url="${ENDPOINT_URL}" s3api head-object --bucket "${BUCKET_NAME}" --key "$file" --query 'ETag' --output text 2>/dev/null | tr -d '"' || echo "")
+            if [ -z "$e" ] || [ "$h" != "$e" ]; then
+              echo "$file" >> "$UPLOAD_LIST"
+            fi
+          fi
+        ) &
+        CHECKED=$((CHECKED + 1))
+        if [ $((CHECKED % BATCH_SIZE)) -eq 0 ]; then
+          wait
+        fi
+      fi
+    done <<< "$TO_CHECK"
+    wait
+    UPLOAD_FILES=$(cat "$UPLOAD_LIST" 2>/dev/null | grep -v '^$' || true)
+    rm -f "$UPLOAD_LIST"
+    trap - EXIT
+  fi
+
+  # Обновляем манифест после проверки (текущие mtime+size по всем файлам)
+  MANIFEST_TMP=$(mktemp)
+  while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    if [ -f "$file" ]; then
+      s=$(get_stat "$file")
+      [ -n "$s" ] && printf '%s\t%s\n' "$file" "$s" >> "$MANIFEST_TMP"
+    fi
+  done <<< "$ALL_FILES"
+  mv "$MANIFEST_TMP" "$MANIFEST_FILE"
+
+  UPLOAD_COUNT=0
+  if [ -n "$UPLOAD_FILES" ]; then
+    UPLOAD_COUNT=$(echo "$UPLOAD_FILES" | grep -v '^$' | wc -l | tr -d ' ')
+    [ -z "$UPLOAD_COUNT" ] && UPLOAD_COUNT=0
+  fi
+
+  if [ "$UPLOAD_COUNT" -gt 0 ]; then
+    echo "  Найдено изменений: $UPLOAD_COUNT файлов для загрузки"
+    echo "  Загрузка изменённых файлов с правильным Content-Type..."
+    echo "$UPLOAD_FILES" | grep -v '^$' | while read -r file; do
+      if [ -n "$file" ] && [ -f "$file" ]; then
+        content_type=$(get_content_type "$file")
+        cache_control=$(get_cache_control "$file")
+        echo "    📤 Загружаем: ${file}"
+        aws --endpoint-url=${ENDPOINT_URL} s3 cp "${file}" "s3://${BUCKET_NAME}/${file}" \
+          --content-type "${content_type}" \
+          --cache-control "${cache_control}" \
+          --metadata-directive REPLACE 2>/dev/null || true
+      fi
+    done
+    echo "  ✅ Синхронизация завершена (загружены только изменённые файлы)"
+  else
+    echo "  Изменений не обнаружено, всё актуально"
+    echo "  💡 Для полной синхронизации: ./deploy.sh --full. Сброс кеша: rm .deploy-manifest"
+  fi
 fi
 
 # Content-Type уже установлены в процессе загрузки выше
@@ -367,11 +585,14 @@ echo ""
 echo -e "${YELLOW}🧹 Очистка старых PNG/JPG из бакета (заменены на WebP)...${NC}"
 if command -v aws &> /dev/null; then
     # Находим все PNG и JPG в бакете в папке assets
+    # Формат вывода aws s3 ls: "DATE TIME SIZE path/to/file.png"
+    # Извлекаем путь (все после третьего поля - размера файла)
     OLD_IMAGES=$(aws --endpoint-url=${ENDPOINT_URL} s3 ls "s3://${BUCKET_NAME}/assets/" --recursive 2>/dev/null | \
-        grep -E '\.(png|jpg|jpeg)$' | awk '{print $4}' || true)
+        grep -E '\.(png|jpg|jpeg)$' | sed 's/^[^ ]* [^ ]* [^ ]* //' || true)
     
     if [ -n "$OLD_IMAGES" ]; then
         OLD_COUNT=$(echo "$OLD_IMAGES" | grep -v '^$' | wc -l | tr -d ' ')
+        [ -z "$OLD_COUNT" ] && OLD_COUNT=0
         echo "  Найдено старых изображений для удаления: $OLD_COUNT"
         
         # Проверяем, есть ли соответствующий WebP файл перед удалением
@@ -380,9 +601,8 @@ if command -v aws &> /dev/null; then
             base_path="${old_file%.*}"
             # Проверяем, существует ли WebP версия
             webp_file="${base_path}.webp"
-            webp_exists=$(aws --endpoint-url=${ENDPOINT_URL} s3 ls "s3://${BUCKET_NAME}/${webp_file}" 2>/dev/null | wc -l | tr -d ' ')
-            
-            if [ "$webp_exists" -gt 0 ]; then
+            # Более надежная проверка существования файла в S3
+            if aws --endpoint-url=${ENDPOINT_URL} s3api head-object --bucket "${BUCKET_NAME}" --key "${webp_file}" &>/dev/null; then
                 # WebP версия существует, удаляем старый файл
                 aws --endpoint-url=${ENDPOINT_URL} s3 rm "s3://${BUCKET_NAME}/${old_file}" 2>/dev/null && \
                     echo "    ✓ Удалён: ${old_file} (есть WebP версия)"

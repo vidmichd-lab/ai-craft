@@ -656,39 +656,6 @@ if (typeof document !== 'undefined') {
 }
 
 // Обратная совместимость со старым дроплистом
-export const updatePreviewSizeSelectOld = () => {
-  const dom = getDom();
-  if (dom.previewSizeSelect) {
-    const sortedSizes = renderer.getSortedSizes();
-    if (!sortedSizes.length) {
-      dom.previewSizeSelect.innerHTML = '<option value="-1">No sizes selected</option>';
-      return;
-    }
-
-    const defaultIndex = sortedSizes.findIndex(size => size.width === 1600 && size.height === 1200);
-    const currentIndex = renderer.getCurrentIndex();
-    
-    let selectedIndex;
-    if (currentIndex < 0 || currentIndex >= sortedSizes.length) {
-      selectedIndex = defaultIndex >= 0 ? defaultIndex : 0;
-    } else if (currentIndex === 0 && defaultIndex >= 0 && defaultIndex !== 0) {
-      selectedIndex = defaultIndex;
-    } else {
-      selectedIndex = currentIndex;
-    }
-
-    if (selectedIndex !== currentIndex) {
-      renderer.setCurrentIndex(selectedIndex);
-    }
-
-    const options = sortedSizes
-      .map((size, index) => `<option value="${index}" ${index === selectedIndex ? 'selected' : ''}>${size.width} × ${size.height} (${size.platform})</option>`)
-      .join('');
-
-    dom.previewSizeSelect.innerHTML = options;
-  }
-};
-
 // Функция updateLogoUI теперь импортируется из ./components/logoSelector.js
 
 // updateKVUI теперь импортируется из ./components/kvSelector.js
@@ -1290,6 +1257,359 @@ export const selectLayoutMode = (mode) => {
   renderer.render();
 };
 
+const updateProModeTags = (enabled) => {
+  const modeTags = document.querySelectorAll('.mode-tag');
+  if (!modeTags || modeTags.length === 0) return;
+  
+  // Обновляем активное состояние тегов
+  modeTags.forEach(tag => {
+    const mode = tag.dataset.mode;
+    if ((mode === 'on' && enabled) || (mode === 'off' && !enabled)) {
+      tag.classList.add('active');
+      tag.style.background = 'var(--accent-color, #027EF2)';
+      tag.style.color = 'white';
+      tag.style.borderColor = 'var(--accent-color, #027EF2)';
+    } else {
+      tag.classList.remove('active');
+      tag.style.background = 'var(--bg-secondary)';
+      tag.style.color = 'var(--text-primary)';
+      tag.style.borderColor = 'var(--border-color)';
+    }
+  });
+};
+
+const updateProModeToggle = (enabled) => {
+  updateProModeTags(enabled);
+  const select = document.getElementById('logoAssetsDefaultProMode');
+  if (select) {
+    select.value = enabled ? 'true' : 'false';
+  }
+};
+
+export const toggleProMode = async () => {
+  // Получаем текущее состояние из state
+  const state = getState();
+  const currentProMode = state.proMode || false;
+  const newProMode = !currentProMode;
+  
+  // Применяем новое состояние
+  await selectProMode(newProMode);
+};
+
+export const selectProModeByTag = async (mode) => {
+  // mode может быть 'on', 'off' или другие режимы в будущем
+  if (mode === 'on' || mode === 'off') {
+    const enabled = mode === 'on';
+    await selectProMode(enabled);
+  } else {
+    // Для будущих режимов можно добавить свою логику
+    console.log('Режим не реализован:', mode);
+  }
+};
+
+export const selectProMode = async (enabled) => {
+  const state = getState();
+  setKey('proMode', enabled);
+  
+  // Обновляем визуальное состояние тегов
+  updateProModeTags(enabled);
+  
+  if (enabled) {
+    // При включении PRO режима применяем все настройки
+    // 1. Логотип меняется на logo/white/pro/mono.svg
+    await selectPreloadedLogo('logo/white/pro/mono.svg');
+    
+    // 2. Фон ставится из assets/pro/bg/shape=triangle, inside=green, theme=dark.webp
+    await selectPreloadedBG('assets/pro/bg/shape=triangle, inside=green, theme=dark.webp');
+    
+    // Ждем немного, чтобы фон успел загрузиться
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // 3. Затемнение градиентом убирается (0%)
+    setKey('textGradientOpacity', 0);
+    const dom = getDom();
+    if (dom.textGradientOpacity) {
+      dom.textGradientOpacity.value = 0;
+    }
+    if (dom.textGradientOpacityValue) {
+      dom.textGradientOpacityValue.textContent = '0%';
+    }
+    
+    // Сохраняем исходный размер заголовка перед увеличением
+    const currentTitleSize = state.titleSize || 8;
+    setKey('titleSizeBeforePro', currentTitleSize);
+    
+    // Увеличиваем размер заголовка на 10%
+    const newTitleSize = parseFloat((currentTitleSize * 1.1).toFixed(2));
+    setKey('titleSize', newTitleSize);
+    
+    // Обновляем UI для размера заголовка
+    const domTitleSize = getDom();
+    if (domTitleSize.titleSize) {
+      domTitleSize.titleSize.value = newTitleSize;
+    }
+    if (domTitleSize.titleSizeValue) {
+      domTitleSize.titleSizeValue.textContent = `${newTitleSize}%`;
+    }
+    
+    // 4. Заголовок всегда капсом с YS Display Cond Regular
+    setKey('titleTransform', 'uppercase');
+    setKey('titleFontFamily', 'YS Display Cond');
+    setKey('titleWeight', 'Regular');
+    
+    // Определяем цвет типографики в зависимости от темы фона
+    // Проверяем, темный ли фон (по умолчанию dark)
+    const updatedState = getState();
+    const activePairIndex = updatedState.activePairIndex || 0;
+    const pairs = updatedState.titleSubtitlePairs || [];
+    const activePair = pairs[activePairIndex] || {};
+    const bgImage = activePair.bgImageSelected || updatedState.bgImage || updatedState.bgImageSelected;
+    // Проверяем путь фона на наличие theme=dark или theme=light
+    const bgImagePath = typeof bgImage === 'string' ? bgImage : (bgImage?.src || '');
+    const isDarkTheme = !bgImagePath || bgImagePath.includes('theme=dark');
+    const typographyColor = isDarkTheme ? '#DCE5BB' : '#778858';
+    
+    // 5. Цвета типографики меняются (заголовок, подзаголовок и лигал)
+    setKey('titleColor', typographyColor);
+    setKey('subtitleColor', typographyColor);
+    setKey('legalColor', typographyColor);
+    
+    // Обновляем UI для цветов
+    const dom2 = getDom();
+    if (dom2.titleColor) {
+      dom2.titleColor.value = typographyColor;
+    }
+    if (dom2.titleColorHex) {
+      dom2.titleColorHex.value = typographyColor;
+    }
+    if (dom2.subtitleColor) {
+      dom2.subtitleColor.value = typographyColor;
+    }
+    if (dom2.subtitleColorHex) {
+      dom2.subtitleColorHex.value = typographyColor;
+    }
+    if (dom2.legalColor) {
+      dom2.legalColor.value = typographyColor;
+    }
+    if (dom2.legalColorHex) {
+      dom2.legalColorHex.value = typographyColor;
+    }
+    
+    // Обновляем предзагруженные цвета для PRO режима
+    updatePresetColorsForPro(true, isDarkTheme);
+    
+    // 6. Подзаголовок остается YS Text Regular, но с новым цветом (уже установлен выше)
+    setKey('subtitleFontFamily', 'YS Text');
+    setKey('subtitleWeight', 'Regular');
+    
+    // 7. Легал меняется на новый текст
+    const legalPRO = 'Реклама. Рекламодатель: ООО "Яндекс" (ИНН 7736207543). Услуги оказывает АНО ДПО "Образовательные технологии Яндекса", действующая на основании лицензии №Л035-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/pro/ *PRO – Про';
+    setKey('legal', legalPRO);
+    const legalTextarea = document.getElementById('legal');
+    if (legalTextarea) {
+      legalTextarea.value = legalPRO;
+    }
+    
+    // 8. Визуал по умолчанию ставится pro/assets/1.webp
+    await selectPreloadedKV('assets/pro/assets/1.webp');
+    setKey('showKV', true);
+    const showKVCheckbox = document.getElementById('showKV');
+    if (showKVCheckbox) {
+      showKVCheckbox.checked = true;
+    }
+    
+    // Обновляем тумблер трансформации заголовка
+    const titleTransformToggle = document.getElementById('titleTransformToggleMain');
+    if (titleTransformToggle) {
+      titleTransformToggle.setAttribute('data-value', 'uppercase');
+      const transformOptions = titleTransformToggle.querySelectorAll('.toggle-switch-option');
+      transformOptions.forEach(option => {
+        if (option.dataset.value === 'uppercase') {
+          option.classList.add('active');
+        } else {
+          option.classList.remove('active');
+        }
+      });
+    }
+  } else {
+    // При выключении PRO режима полностью восстанавливаем Reskill настройки из дефолтных значений
+    const { getDefaultValues } = await import('../state/store.js');
+    const defaults = getDefaultValues();
+    
+    // Восстанавливаем размер заголовка
+    const titleSizeBeforePro = state.titleSizeBeforePro || defaults.titleSize || 8;
+    setKey('titleSize', titleSizeBeforePro);
+    
+    // Обновляем UI для размера заголовка
+    const domTitleSize = getDom();
+    if (domTitleSize.titleSize) {
+      domTitleSize.titleSize.value = titleSizeBeforePro;
+    }
+    if (domTitleSize.titleSizeValue) {
+      domTitleSize.titleSizeValue.textContent = `${titleSizeBeforePro}%`;
+    }
+    
+    // Восстанавливаем трансформацию заголовка (убираем uppercase)
+    setKey('titleTransform', 'none');
+    const titleTransformToggle = document.getElementById('titleTransformToggleMain');
+    if (titleTransformToggle) {
+      titleTransformToggle.setAttribute('data-value', 'none');
+      const transformOptions = titleTransformToggle.querySelectorAll('.toggle-switch-option');
+      transformOptions.forEach(option => {
+        if (option.dataset.value === 'none') {
+          option.classList.add('active');
+        } else {
+          option.classList.remove('active');
+        }
+      });
+    }
+    
+    // Восстанавливаем шрифты заголовка и подзаголовка из дефолтных значений
+    setKey('titleFontFamily', defaults.fontFamily || 'YS Text');
+    setKey('titleWeight', defaults.titleWeight || 'Regular');
+    setKey('subtitleFontFamily', defaults.fontFamily || 'YS Text');
+    setKey('subtitleWeight', defaults.subtitleWeight || 'Regular');
+    
+    // Восстанавливаем цвета из дефолтных значений
+    setKey('titleColor', defaults.titleColor || '#ffffff');
+    setKey('subtitleColor', defaults.subtitleColor || '#e0e0e0');
+    setKey('legalColor', defaults.legalColor || '#ffffff');
+    
+    // Обновляем UI для цветов
+    const domColors = getDom();
+    if (domColors.titleColor) {
+      domColors.titleColor.value = defaults.titleColor || '#ffffff';
+    }
+    if (domColors.titleColorHex) {
+      domColors.titleColorHex.value = defaults.titleColor || '#ffffff';
+    }
+    if (domColors.subtitleColor) {
+      domColors.subtitleColor.value = defaults.subtitleColor || '#e0e0e0';
+    }
+    if (domColors.subtitleColorHex) {
+      domColors.subtitleColorHex.value = defaults.subtitleColor || '#e0e0e0';
+    }
+    if (domColors.legalColor) {
+      domColors.legalColor.value = defaults.legalColor || '#ffffff';
+    }
+    if (domColors.legalColorHex) {
+      domColors.legalColorHex.value = defaults.legalColor || '#ffffff';
+    }
+    
+    // Восстанавливаем предзагруженные цвета для Reskill режима
+    updatePresetColorsForPro(false);
+    
+    // Восстанавливаем лигал из дефолтных значений
+    if (state.logoLanguage === 'kz') {
+      const legalKZ = defaults.legal || state.legalKZ || '*Жарнама / Реклама. ТОО "Y. Izdeu men Jarnama", регистрационный номер:170240015454 Сайт: https://practicum.yandex.kz/.';
+      setKey('legal', legalKZ);
+      const legalTextarea = document.getElementById('legal');
+      if (legalTextarea) {
+        legalTextarea.value = legalKZ;
+      }
+    } else {
+      const legalRU = defaults.legal || 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/';
+      setKey('legal', legalRU);
+      const legalTextarea = document.getElementById('legal');
+      if (legalTextarea) {
+        legalTextarea.value = legalRU;
+      }
+    }
+    
+    // Восстанавливаем логотип в зависимости от языка
+    if (state.logoLanguage === 'kz') {
+      await selectPreloadedLogo('logo/white/kz/main.svg');
+    } else {
+      await selectPreloadedLogo('logo/white/ru/main.svg');
+    }
+    
+    // Восстанавливаем фон из дефолтных значений
+    if (defaults.bgImage) {
+      await selectPreloadedBG(defaults.bgImage);
+    } else {
+      // Если дефолтного фона нет, очищаем фон
+      const activePairIndex = state.activePairIndex || 0;
+      updatePairBgImage(activePairIndex, null);
+      setState({ bgImage: null });
+    }
+    
+    // Восстанавливаем размер фона из дефолтных значений
+    setKey('bgImageSize', defaults.bgImageSize || 100);
+    const domBgSize = getDom();
+    if (domBgSize.bgImageSize) {
+      domBgSize.bgImageSize.value = defaults.bgImageSize || 100;
+    }
+    if (domBgSize.bgImageSizeValue) {
+      domBgSize.bgImageSizeValue.textContent = `${defaults.bgImageSize || 100}%`;
+    }
+    
+    // Восстанавливаем затемнение градиентом из дефолтных значений
+    setKey('textGradientOpacity', defaults.textGradientOpacity || 100);
+    const dom = getDom();
+    if (dom.textGradientOpacity) {
+      dom.textGradientOpacity.value = defaults.textGradientOpacity || 100;
+    }
+    if (dom.textGradientOpacityValue) {
+      dom.textGradientOpacityValue.textContent = `${defaults.textGradientOpacity || 100}%`;
+    }
+    
+    // Восстанавливаем визуал из дефолтных значений
+    if (defaults.kvSelected) {
+      await selectPreloadedKV(defaults.kvSelected);
+    } else {
+      // Загружаем дефолтный визуал через loadDefaultKV
+      await loadDefaultKV();
+    }
+    setKey('showKV', true);
+    const showKVCheckbox = document.getElementById('showKV');
+    if (showKVCheckbox) {
+      showKVCheckbox.checked = true;
+    }
+  }
+  
+  // Обновляем тумблер
+  updateProModeToggle(enabled);
+  
+  renderer.render();
+};
+
+export const initializeProModeToggle = async () => {
+  const modeTags = document.querySelectorAll('.mode-tag');
+  if (!modeTags || modeTags.length === 0) return;
+  
+  const state = getState();
+  const proMode = state.proMode || false;
+  
+  // Устанавливаем начальное состояние тегов
+  updateProModeTags(proMode);
+  
+  // Если PRO режим был включен, применяем его настройки
+  if (proMode) {
+    await selectProMode(true);
+  }
+  
+  // Добавляем обработчики клика на теги
+  modeTags.forEach(tag => {
+    tag.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const mode = tag.dataset.mode;
+      await selectProModeByTag(mode);
+    });
+    
+    // Добавляем hover эффект
+    tag.addEventListener('mouseenter', () => {
+      if (!tag.classList.contains('active')) {
+        tag.style.background = 'var(--bg-hover, #1a1a1a)';
+      }
+    });
+    tag.addEventListener('mouseleave', () => {
+      if (!tag.classList.contains('active')) {
+        tag.style.background = 'var(--bg-secondary)';
+      }
+    });
+  });
+};
+
 export const updatePadding = (value) => {
   const numeric = parseInt(value, 10);
   if (isNaN(numeric)) {
@@ -1668,6 +1988,38 @@ const updateTextColorsForBg = async (bgColor) => {
   }
 };
 
+/**
+ * Обновляет предзагруженные цвета для PRO режима
+ */
+const updatePresetColorsForPro = (isPro, isDarkTheme = true) => {
+  const colorKeys = ['titleColor', 'subtitleColor', 'legalColor'];
+  
+  colorKeys.forEach(key => {
+    // Находим все кнопки предзагруженных цветов для этого ключа
+    const buttons = document.querySelectorAll(`button[data-function="updateColorFromPicker"][data-params*="${key}"]`);
+    
+    buttons.forEach((button, index) => {
+      if (isPro) {
+        // Для PRO режима: первый цвет - для темного фона (#DCE5BB), второй - для светлого (#778858)
+        const proColor = index === 0 ? '#DCE5BB' : '#778858';
+        const params = JSON.parse(button.getAttribute('data-params'));
+        params[1] = proColor;
+        button.setAttribute('data-params', JSON.stringify(params));
+        button.style.background = proColor;
+        button.setAttribute('title', proColor);
+      } else {
+        // Для Reskill режима: восстанавливаем стандартные цвета
+        const defaultColor = index === 0 ? '#FFFFFF' : '#1E1E1E';
+        const params = JSON.parse(button.getAttribute('data-params'));
+        params[1] = defaultColor;
+        button.setAttribute('data-params', JSON.stringify(params));
+        button.style.background = defaultColor;
+        button.setAttribute('title', defaultColor);
+      }
+    });
+  });
+};
+
 export const updateColorFromPicker = async (key, value) => {
   setKey(key, value);
   const dom = getDom();
@@ -1804,7 +2156,10 @@ export const loadSettings = () => {
     // Обновляем заголовок страницы
     const pageTitle = document.querySelector('.header h1');
     if (pageTitle) {
-      pageTitle.textContent = `Генератор макетов ${state.brandName}`;
+      // Сохраняем версию при обновлении заголовка
+      const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
+      const versionHTML = versionSpan ? versionSpan.outerHTML : '';
+      pageTitle.innerHTML = `Practicum AI-Craft${versionHTML ? ' ' + versionHTML : ''}`;
     }
   }
 
@@ -2858,11 +3213,14 @@ const renderTitleSubtitlePairs = () => {
     titleTextarea.oninput = (e) => {
       updatePairTitleDirect(index, e.target.value);
     };
-    titleTextarea.onfocus = () => {
+    titleTextarea.onfocus = async () => {
       const state = getState();
       // Устанавливаем активную пару только если она еще не активна
       if (index !== (state.activePairIndex || 0)) {
-        setActivePairIndex(index);
+        await setActivePairIndex(index);
+        // Обновляем UI после переключения пары
+        syncFormFields();
+        renderer.render();
       }
     };
     
@@ -2912,11 +3270,14 @@ const renderTitleSubtitlePairs = () => {
     subtitleTextarea.oninput = (e) => {
       updatePairSubtitleDirect(index, e.target.value);
     };
-    subtitleTextarea.onfocus = () => {
+    subtitleTextarea.onfocus = async () => {
       const state = getState();
       // Устанавливаем активную пару только если она еще не активна
       if (index !== (state.activePairIndex || 0)) {
-        setActivePairIndex(index);
+        await setActivePairIndex(index);
+        // Обновляем UI после переключения пары
+        syncFormFields();
+        renderer.render();
       }
     };
     
@@ -3007,7 +3368,10 @@ const renderTitleSubtitlePairs = () => {
 };
 
 export const setActiveTitlePair = async (index) => {
-  setActivePairIndex(index);
+  await setActivePairIndex(index);
+  // Обновляем UI после переключения пары
+  syncFormFields();
+  renderer.render();
   
   // Загружаем KV и фоновое изображение для активной пары
   const state = getState();
@@ -3111,7 +3475,10 @@ export const initializeStateSubscribers = () => {
       // Обновляем заголовок страницы
       const pageTitle = document.querySelector('.header h1');
       if (pageTitle) {
-        pageTitle.textContent = `Генератор макетов ${state.brandName}`;
+        // Сохраняем версию при обновлении заголовка
+        const versionSpan = pageTitle.querySelector('span[style*="color: var(--text-secondary"]');
+        const versionHTML = versionSpan ? versionSpan.outerHTML : '';
+        pageTitle.innerHTML = `Генератор макетов ${state.brandName}${versionHTML ? ' ' + versionHTML : ''}`;
       }
     }
     

@@ -31,6 +31,8 @@ import {
   toggleLogoPos,
   selectLogoLanguage,
   toggleLogoLanguage,
+  toggleProMode,
+  selectProMode,
   selectLayoutMode,
   updateColorFromPicker,
   updateColorFromHex,
@@ -70,6 +72,7 @@ import {
   initializeLogoDropdown,
   initializeLogoToggle,
   initializeLogoPosToggle,
+  initializeProModeToggle,
   initializeTitleAlignToggle,
   initializeTitleVPosToggle,
   initializeKVPositionToggle,
@@ -136,7 +139,6 @@ import { loadConfigFromFile } from './utils/fullConfig.js';
 import { showLogoAssetsAdmin } from './ui/components/logoAssetsAdmin.js';
 import { openGuideModal, closeGuideModal } from './ui/ui.js';
 import { setLanguage, getLanguage, updateUI, t } from './utils/i18n.js';
-import { createFigmaImporterSection, initFigmaImporter } from './ui/components/figmaImporter.js';
 import { initPanelResizers } from './utils/panelResizer.js';
 
 const initializeEventDelegation = (dom) => {
@@ -163,7 +165,7 @@ const initializeLanguageSelector = () => {
   
   // Устанавливаем текущий язык (по умолчанию русский)
   let currentLang = getLanguage();
-  if (!currentLang || (currentLang !== 'ru' && currentLang !== 'en')) {
+  if (!currentLang || (currentLang !== 'ru' && currentLang !== 'en' && currentLang !== 'tr')) {
     currentLang = 'ru';
     setLanguage('ru');
   }
@@ -248,6 +250,35 @@ const initializeLanguageSelector = () => {
   });
 };
 
+async function hardResetCache() {
+  const confirmed = confirm('Очистить весь кеш? Настройки, тема и дефолты сохранятся.');
+  if (!confirmed) return;
+
+  if ('caches' in window) {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map(name => caches.delete(name)));
+  }
+
+  try {
+    indexedDB.deleteDatabase('imageCache');
+  } catch (e) {}
+
+  const protectedKeys = ['default-values', 'theme', 'admin_password', 'brandName', 'sizes-config', 'format-multipliers'];
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!protectedKeys.includes(key)) keysToRemove.push(key);
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(r => r.unregister()));
+  }
+
+  window.location.reload(true);
+}
+
 const exposeGlobals = () => {
   Object.assign(window, {
     updateState: (key, rawValue) => {
@@ -283,18 +314,17 @@ const exposeGlobals = () => {
         
         // Для начертаний используем синхронный рендеринг для немедленного отображения
         if (key === 'titleWeight' || key === 'subtitleWeight' || key === 'legalWeight' || key === 'ageWeight') {
-          // Принудительно очищаем кэш измерения текста перед рендерингом для начертаний
-          clearTextMeasurementCache();
-          // Используем синхронный рендеринг для немедленного отображения изменений
           try {
             renderer.renderSync();
           } catch (renderError) {
             console.error('Ошибка синхронного рендеринга:', renderError);
-            // Пробуем асинхронный рендеринг как fallback
-            renderer.render();
+            try {
+              renderer.render();
+            } catch (e) {
+              console.error('Ошибка асинхронного рендеринга:', e);
+            }
           }
         } else {
-          // Асинхронный рендеринг для остальных изменений
           try {
             renderer.render();
           } catch (renderError) {
@@ -340,6 +370,8 @@ const exposeGlobals = () => {
     toggleLogoPos,
     selectLogoLanguage,
     toggleLogoLanguage,
+    toggleProMode,
+    selectProMode,
     toggleTitleAlign,
     toggleTitleVPos,
     selectLayoutMode,
@@ -409,6 +441,7 @@ const exposeGlobals = () => {
     selectSubtitleTransform,
     selectLegalTransform
   });
+  window.hardResetCache = hardResetCache;
 };
 
 // Кеш для загруженных шрифтов
@@ -643,20 +676,13 @@ const initialize = async () => {
       const savedDefaults = localStorage.getItem('default-values');
       if (savedDefaults) {
         const defaults = JSON.parse(savedDefaults);
-        let needsUpdate = false;
-        // Заменяем 'system-ui' на 'YS Text' для шрифта по умолчанию
         if (defaults.fontFamily === 'system-ui') {
           defaults.fontFamily = 'YS Text';
-          needsUpdate = true;
         }
-        // Применяем сохраненные значения по умолчанию к state
+        // Применяем сохраненные значения к state только в память (не пишем в localStorage)
         Object.keys(defaults).forEach(key => {
           setKey(key, defaults[key]);
         });
-        // Сохраняем обновленные значения обратно в localStorage, если были изменения
-        if (needsUpdate) {
-          localStorage.setItem('default-values', JSON.stringify(defaults));
-        }
         // Очищаем кэш измерений текста, так как могли измениться шрифты
         clearTextMeasurementCache();
         
@@ -688,20 +714,46 @@ const initialize = async () => {
         setKey('brandName', savedBrandName);
         const pageTitle = document.querySelector('.header h1');
         if (pageTitle) {
-          pageTitle.textContent = `Генератор макетов ${savedBrandName}`;
+          // Сохраняем версию при обновлении заголовка
+          const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
+          const versionHTML = versionSpan ? versionSpan.outerHTML : '';
+          pageTitle.innerHTML = `Practicum AI-Craft${versionHTML ? ' ' + versionHTML : ''}`;
         }
       } else {
         // Используем значение из state
         const state = getState();
         if (state.brandName) {
           const pageTitle = document.querySelector('.header h1');
-          if (pageTitle) {
-            pageTitle.textContent = `Генератор макетов ${state.brandName}`;
-          }
+        if (pageTitle) {
+          // Сохраняем версию при обновлении заголовка
+          const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
+          const versionHTML = versionSpan ? versionSpan.outerHTML : '';
+          pageTitle.innerHTML = `Practicum AI-Craft${versionHTML ? ' ' + versionHTML : ''}`;
+        }
         }
       }
     } catch (e) {
       console.warn('Ошибка при загрузке названия бренда:', e);
+    }
+    
+    // Инициализируем фавиконку
+    try {
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      const savedFavicon = localStorage.getItem('favicon');
+      if (savedFavicon) {
+        link.href = savedFavicon;
+      } else {
+        // Используем фавиконку из папки fav по умолчанию
+        link.href = 'fav/favicon.png';
+        link.type = 'image/png';
+      }
+    } catch (e) {
+      console.warn('Ошибка при загрузке фавиконки:', e);
     }
     
     console.log('Кешируем DOM элементы...');
@@ -734,16 +786,6 @@ const initialize = async () => {
 
     initializeTabs();
     
-    // Инициализируем секцию Figma импортера
-    const figmaContainer = document.getElementById('panel-section-figma-container');
-    if (figmaContainer) {
-      const figmaSection = createFigmaImporterSection();
-      figmaContainer.appendChild(figmaSection);
-      initFigmaImporter();
-      // Обновляем переводы для новой секции
-      updateUI();
-    }
-    
     // Инициализируем переключатель языка (должен быть первым, чтобы язык был установлен до других инициализаций)
     initializeLanguageSelector();
     
@@ -757,6 +799,7 @@ const initialize = async () => {
     // Отложенная инициализация логотипов - будет выполнена при открытии модального окна
     initializeLogoToggle();
     initializeLogoPosToggle();
+    await initializeProModeToggle();
     initializeTitleAlignToggle();
     initializeTitleVPosToggle();
     initializeKVPositionToggle();
@@ -776,7 +819,19 @@ const initialize = async () => {
     ensurePresetSelection();
 
     // Сначала экспортируем функции в глобальную область, чтобы они были доступны в HTML
+    console.log('Экспортируем функции в window...');
     exposeGlobals();
+    console.log('✓ Функции экспортированы в window');
+    
+    // Проверяем ключевые функции после экспорта
+    const criticalFunctions = ['updateState', 'showSizesAdmin', 'showLogoAssetsAdmin', 'showSection', 'exportAllPNG', 'exportAllJPG'];
+    criticalFunctions.forEach(funcName => {
+      if (typeof window[funcName] === 'function') {
+        console.log(`✓ ${funcName} доступна в window`);
+      } else {
+        console.error(`✗ ${funcName} НЕ доступна в window`);
+      }
+    });
     
     // Проверяем, что showSizesAdmin доступна сразу после exposeGlobals
     if (typeof window.showSizesAdmin === 'function') {
@@ -810,14 +865,17 @@ const initialize = async () => {
     syncFormFields();
     refreshMediaPreviews();
     updatePartnerLogoUI();
-    updateSizesSummary();
+    console.log('Инициализируем обработчики событий...');
     initializeEventDelegation(dom);
+    console.log('✓ Локальные обработчики событий инициализированы');
     
     // Инициализируем систему делегирования событий
     initEventDelegation();
+    console.log('✓ Система делегирования событий инициализирована');
     
     // Инициализируем обработчики для чекбоксов напрямую
     initCheckboxHandlers();
+    console.log('✓ Обработчики чекбоксов инициализированы');
     
     updateAddSizeButtonState();
     
@@ -826,6 +884,9 @@ const initialize = async () => {
     
     // Обновляем интерфейс с учетом выбранного языка
     updateUI();
+    
+    // Обновляем сводку размеров ПОСЛЕ updateUI(), чтобы она не перезаписалась
+    updateSizesSummary();
 
     // Убеждаемся, что есть выбранные размеры перед рендерингом
     ensurePresetSelection();
@@ -1024,7 +1085,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     // Регистрируем с задержкой, чтобы не блокировать основную загрузку
     setTimeout(() => {
-      navigator.serviceWorker.register('/sw.js')
+      navigator.serviceWorker.register('/sw.js?v=1.0.2', { updateViaCache: 'none' })
         .then((registration) => {
           console.log('Service Worker зарегистрирован:', registration.scope);
           
@@ -1033,19 +1094,32 @@ if ('serviceWorker' in navigator) {
             const newWorker = registration.installing;
             if (newWorker) {
               newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // Новый service worker установлен, обновляем страницу
-                  console.log('Новая версия Service Worker установлена, обновляем страницу...');
-                  window.location.reload();
+                if (newWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    // Новый service worker установлен, очищаем кеш и обновляем страницу
+                    console.log('Новая версия Service Worker установлена, очищаем кеш и обновляем страницу...');
+                    // Отправляем сообщение для очистки кеша
+                    newWorker.postMessage({ type: 'CLEAR_CACHE' });
+                    // Обновляем страницу через небольшую задержку
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 100);
+                  } else {
+                    // Первая установка
+                    console.log('Service Worker установлен впервые');
+                  }
                 }
               });
             }
           });
           
-          // Проверяем обновления каждые 30 секунд
+          // Принудительно проверяем обновления сразу
+          registration.update();
+          
+          // Проверяем обновления каждые 10 секунд (более часто)
           setInterval(() => {
             registration.update();
-          }, 30000);
+          }, 10000);
           
           // Проверяем обновления при фокусе на окне
           window.addEventListener('focus', () => {

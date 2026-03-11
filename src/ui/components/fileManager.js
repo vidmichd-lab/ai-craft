@@ -183,8 +183,7 @@ export function renderFileManager() {
               <span class="material-icons" style="font-size: 18px;">create_new_folder</span>
               <span>Создать папку</span>
             </button>
-            <button class="btn" id="fileManagerUploadBtn" style="flex: 1; padding: 10px; background: var(--bg-secondary, #1a1a1a); border: 1px solid ${borderColor}; border-radius: 6px; color: ${textPrimary}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-              <span class="material-icons" style="font-size: 18px;">upload</span>
+            <button class="btn" id="fileManagerUploadBtn" style="flex: 1; padding: 10px; background: var(--bg-secondary, #1a1a1a); border: 1px solid ${borderColor}; border-radius: 6px; color: ${textPrimary}; cursor: pointer; display: flex; align-items: center; justify-content: center;">
               <span>Загрузить файл</span>
             </button>
             <button class="btn" id="fileManagerRefreshBtn" style="padding: 10px; background: var(--bg-secondary, #1a1a1a); border: 1px solid ${borderColor}; border-radius: 6px; color: ${textPrimary}; cursor: pointer;">
@@ -587,6 +586,10 @@ export function initFileManager() {
             await api.renameFolder(folderPath, newName);
             await loadFileManagerTree();
             await refreshLibraries();
+            // Обновляем превью в админке
+            if (typeof window.updateLogoAssetsPreview === 'function') {
+              window.updateLogoAssetsPreview();
+            }
           } catch (error) {
             alert(`Ошибка при переименовании: ${error.message}`);
             input.focus();
@@ -634,6 +637,10 @@ export function initFileManager() {
             await api.uploadFile(file, targetDir);
             await loadFileManagerTree();
             await refreshLibraries();
+            // Обновляем превью в админке
+            if (typeof window.updateLogoAssetsPreview === 'function') {
+              window.updateLogoAssetsPreview();
+            }
             alert('Файл заменен успешно');
           } catch (error) {
             alert(`Ошибка при замене файла: ${error.message}`);
@@ -685,6 +692,10 @@ export function initFileManager() {
           }
           await loadFileManagerTree();
           await refreshLibraries();
+          // Обновляем превью в админке, если удаленный файл был выбран
+          if (typeof window.updateLogoAssetsPreview === 'function') {
+            window.updateLogoAssetsPreview();
+          }
           alert('Удалено успешно');
         } catch (error) {
           alert(`Ошибка при удалении: ${error.message}`);
@@ -714,9 +725,46 @@ export function initFileManager() {
       checkFileExists.cache.clear();
     }
     
-    // Показываем уведомление вместо перезагрузки страницы
-    // Пользователь может обновить библиотеки вручную, нажав кнопку обновления в модальных окнах
-    console.log('Библиотеки обновлены. Обновите модальные окна выбора файлов для отображения новых файлов.');
+    // Обновляем превью в админке логотипов и ассетов, если она открыта
+    const logoAssetsAdmin = document.getElementById('logoAssetsAdminModal');
+    if (logoAssetsAdmin && typeof window.updateLogoAssetsPreview === 'function') {
+      try {
+        window.updateLogoAssetsPreview();
+      } catch (e) {
+        console.warn('Не удалось обновить превью в админке:', e);
+      }
+    }
+    
+    // Обновляем модальные окна выбора, если они открыты
+    const logoSelectModal = document.querySelector('.logo-select-modal');
+    const kvSelectModal = document.querySelector('.kv-select-modal');
+    const bgSelectModal = document.querySelector('.bg-select-modal');
+    
+    if (logoSelectModal && typeof window.refreshLogoSelectModal === 'function') {
+      try {
+        window.refreshLogoSelectModal();
+      } catch (e) {
+        console.warn('Не удалось обновить модальное окно выбора логотипа:', e);
+      }
+    }
+    
+    if (kvSelectModal && typeof window.refreshKVSelectModal === 'function') {
+      try {
+        window.refreshKVSelectModal();
+      } catch (e) {
+        console.warn('Не удалось обновить модальное окно выбора KV:', e);
+      }
+    }
+    
+    if (bgSelectModal && typeof window.refreshBGSelectModal === 'function') {
+      try {
+        window.refreshBGSelectModal();
+      } catch (e) {
+        console.warn('Не удалось обновить модальное окно выбора фона:', e);
+      }
+    }
+    
+    console.log('Библиотеки обновлены. Модальные окна обновлены автоматически.');
   }
   
   // Обработчики для кнопок выбора базовой папки
@@ -809,6 +857,10 @@ export function initFileManager() {
         await api.createFolder(folderName.trim(), targetPath);
         await loadFileManagerTree();
         await refreshLibraries();
+        // Обновляем превью в админке
+        if (typeof window.updateLogoAssetsPreview === 'function') {
+          window.updateLogoAssetsPreview();
+        }
         alert('Папка создана успешно');
       } catch (error) {
         console.error('Ошибка при создании папки:', error);
@@ -847,6 +899,10 @@ export function initFileManager() {
         }
         await loadFileManagerTree();
         await refreshLibraries();
+        // Обновляем превью в админке
+        if (typeof window.updateLogoAssetsPreview === 'function') {
+          window.updateLogoAssetsPreview();
+        }
         alert(`Загружено файлов: ${files.length}`);
       } catch (error) {
         alert(`Ошибка при загрузке файлов: ${error.message}`);
@@ -863,6 +919,10 @@ export function initFileManager() {
     refreshBtn.addEventListener('click', async () => {
       await loadFileManagerTree();
       await refreshLibraries();
+      // Обновляем превью в админке
+      if (typeof window.updateLogoAssetsPreview === 'function') {
+        window.updateLogoAssetsPreview();
+      }
     });
   }
 }

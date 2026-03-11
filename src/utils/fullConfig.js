@@ -129,11 +129,12 @@ export const importFullConfig = (file) => {
           }
         }
         
-        // Импортируем значения по умолчанию
+        // Импортируем значения по умолчанию (применяем к state при следующей загрузке через store)
         if (config.defaultValues) {
           try {
-            localStorage.setItem('default-values', JSON.stringify(config.defaultValues));
-            console.log('✓ Значения по умолчанию импортированы');
+            // Не пишем в localStorage — только sizesAdmin может записывать default-values.
+            // Импортированные defaultValues можно применить к state через отдельный поток в админке при необходимости.
+            console.log('✓ Значения по умолчанию в конфиге пропущены (сохранение только через админ-панель)');
           } catch (error) {
             console.warn('Ошибка импорта значений по умолчанию:', error);
           }
@@ -196,38 +197,38 @@ export const importFullConfig = (file) => {
 export const loadConfigFromFile = async () => {
   try {
     const response = await fetch('/config.json');
-    if (response.ok) {
-      const config = await response.json();
-      
-      // Импортируем конфигурацию (используем ту же логику, что и при ручном импорте)
-      if (config.sizesConfig) {
-        localStorage.setItem('sizes-config', JSON.stringify(config.sizesConfig));
-      }
-      
-      if (config.defaultValues) {
-        localStorage.setItem('default-values', JSON.stringify(config.defaultValues));
-      }
-      
-      if (config.formatMultipliers) {
-        localStorage.setItem('format-multipliers', JSON.stringify(config.formatMultipliers));
-      }
-      
-      if (config.adminBackgrounds) {
-        localStorage.setItem('adminBackgrounds', JSON.stringify(config.adminBackgrounds));
-      }
-      
-      if (config.theme) {
-        localStorage.setItem('theme', config.theme);
-      }
-      
-      if (config.brandName) {
-        localStorage.setItem('brandName', config.brandName);
-      }
-      
-      console.log('✓ Конфигурация загружена из config.json');
-      return config;
+    if (!response.ok) {
+      return null;
     }
-    return null;
+    const config = await response.json();
+
+    // Импортируем конфигурацию (используем ту же логику, что и при ручном импорте)
+    if (config.sizesConfig) {
+      localStorage.setItem('sizes-config', JSON.stringify(config.sizesConfig));
+    }
+
+    if (config.defaultValues) {
+      // Не пишем в localStorage — только админ-панель может записывать default-values
+    }
+
+    if (config.formatMultipliers) {
+      localStorage.setItem('format-multipliers', JSON.stringify(config.formatMultipliers));
+    }
+
+    if (config.adminBackgrounds) {
+      localStorage.setItem('adminBackgrounds', JSON.stringify(config.adminBackgrounds));
+    }
+
+    if (config.theme) {
+      localStorage.setItem('theme', config.theme);
+    }
+
+    if (config.brandName) {
+      localStorage.setItem('brandName', config.brandName);
+    }
+
+    console.log('✓ Конфигурация загружена из config.json');
+    return config;
   } catch (error) {
     // Файл не найден - это нормально, просто используем настройки по умолчанию
     console.log('config.json не найден, используем настройки по умолчанию');

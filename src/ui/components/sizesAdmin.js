@@ -190,46 +190,46 @@ const renderValuesTab = () => {
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.titleLabel')}</label>
-        <textarea id="defaultTitle" class="theme-input" style="min-height: 60px;">${state.title || ''}</textarea>
+        <textarea id="defaultTitle" class="theme-input" style="min-height: 60px;">${values.title || ''}</textarea>
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.subtitleLabel')}</label>
-        <textarea id="defaultSubtitle" class="theme-input" style="min-height: 60px;">${state.subtitle || ''}</textarea>
+        <textarea id="defaultSubtitle" class="theme-input" style="min-height: 60px;">${values.subtitle || ''}</textarea>
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.legalLabel')}</label>
-        <textarea id="defaultLegal" class="theme-input" style="min-height: 80px;">${state.legal || ''}</textarea>
+        <textarea id="defaultLegal" class="theme-input" style="min-height: 80px;">${values.legal || ''}</textarea>
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.ageLabel')}</label>
-        <input type="text" id="defaultAge" class="theme-input" value="${state.age || '18+'}">
+        <input type="text" id="defaultAge" class="theme-input" value="${values.age || '18+'}">
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.bgLabel')}</label>
-        <div id="defaultBgPreview" class="preview-container" style="background: ${state.bgColor || '#1e1e1e'};">
-          <img id="defaultBgPreviewImg" src="${state.bgImage || ''}" class="preview-img" style="display: ${state.bgImage ? 'block' : 'none'}; position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
-          <span id="defaultBgPreviewPlaceholder" class="preview-placeholder" style="z-index: 1;">${state.bgImage ? t('admin.sizes.defaults.bgImage') : t('admin.sizes.defaults.bgColor') + (state.bgColor || '#1e1e1e')}</span>
+        <div id="defaultBgPreview" class="preview-container" style="background: ${values.bgColor || '#1e1e1e'};">
+          <img id="defaultBgPreviewImg" src="${values.bgImage || ''}" class="preview-img" style="display: ${values.bgImage ? 'block' : 'none'}; position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
+          <span id="defaultBgPreviewPlaceholder" class="preview-placeholder" style="z-index: 1;">${values.bgImage ? t('admin.sizes.defaults.bgImage') : t('admin.sizes.defaults.bgColor') + (values.bgColor || '#1e1e1e')}</span>
         </div>
         <div class="input-group" style="margin-bottom: var(--spacing-sm);">
-          <input type="color" id="defaultBgColor" value="${state.bgColor || '#1e1e1e'}" style="flex: 0 0 60px;">
-          <input type="text" id="defaultBgColorHex" class="theme-input" value="${state.bgColor || '#1e1e1e'}" placeholder="#1e1e1e">
-          <button class="btn btn-danger" id="defaultBgColorReset" style="display: ${state.bgColor !== originalDefaults.bgColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
+          <input type="color" id="defaultBgColor" value="${values.bgColor || '#1e1e1e'}" style="flex: 0 0 60px;">
+          <input type="text" id="defaultBgColorHex" class="theme-input" value="${values.bgColor || '#1e1e1e'}" placeholder="#1e1e1e">
+          <button class="btn btn-danger" id="defaultBgColorReset" style="display: ${values.bgColor !== originalDefaults.bgColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
         </div>
         <button class="btn btn-full" id="defaultBgUpload"><span class="material-icons">upload</span>${t('admin.sizes.defaults.bgUpload')}</button>
         <input type="file" id="defaultBgUploadFile" accept="image/*" style="display: none;">
-        <button class="btn btn-danger btn-full" id="defaultBgClear" style="margin-top: var(--spacing-sm); display: ${state.bgImage ? 'block' : 'none'};"><span class="material-icons">delete</span>${t('admin.sizes.defaults.bgDelete')}</button>
+        <button class="btn btn-danger btn-full" id="defaultBgClear" style="margin-top: var(--spacing-sm); display: ${values.bgImage ? 'block' : 'none'};"><span class="material-icons">delete</span>${t('admin.sizes.defaults.bgDelete')}</button>
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.titleColorLabel')}</label>
         <div class="input-group">
-          <input type="color" id="defaultTextColor" value="${state.titleColor || '#ffffff'}" style="flex: 0 0 60px;">
-          <input type="text" id="defaultTextColorHex" class="theme-input" value="${state.titleColor || '#ffffff'}" placeholder="#ffffff">
-          <button class="btn btn-danger" id="defaultTextColorReset" style="display: ${state.titleColor !== originalDefaults.titleColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
+          <input type="color" id="defaultTextColor" value="${values.titleColor || '#ffffff'}" style="flex: 0 0 60px;">
+          <input type="text" id="defaultTextColorHex" class="theme-input" value="${values.titleColor || '#ffffff'}" placeholder="#ffffff">
+          <button class="btn btn-danger" id="defaultTextColorReset" style="display: ${values.titleColor !== originalDefaults.titleColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
         </div>
       </div>
       
@@ -246,7 +246,7 @@ const renderValuesTab = () => {
         <div class="admin-form-grid">
           <div class="form-group">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.titleSettings.size')}</label>
-            <input type="number" id="defaultTitleSize" class="theme-input" value="${state.titleSize ?? defaults.titleSize}" step="0.1" min="1" max="20">
+            <input type="number" id="defaultTitleSize" class="theme-input" value="${values.titleSize ?? defaults.titleSize}" step="0.1" min="1" max="20">
           </div>
           <div class="form-group">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.titleSettings.weight')}</label>
@@ -628,46 +628,46 @@ const renderDefaultsTab = () => {
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.titleLabel')}</label>
-        <textarea id="defaultTitle" class="theme-input" style="min-height: 60px;">${state.title || ''}</textarea>
+        <textarea id="defaultTitle" class="theme-input" style="min-height: 60px;">${values.title || ''}</textarea>
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.subtitleLabel')}</label>
-        <textarea id="defaultSubtitle" class="theme-input" style="min-height: 60px;">${state.subtitle || ''}</textarea>
+        <textarea id="defaultSubtitle" class="theme-input" style="min-height: 60px;">${values.subtitle || ''}</textarea>
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.legalLabel')}</label>
-        <textarea id="defaultLegal" class="theme-input" style="min-height: 80px;">${state.legal || ''}</textarea>
+        <textarea id="defaultLegal" class="theme-input" style="min-height: 80px;">${values.legal || ''}</textarea>
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.ageLabel')}</label>
-        <input type="text" id="defaultAge" class="theme-input" value="${state.age || '18+'}">
+        <input type="text" id="defaultAge" class="theme-input" value="${values.age || '18+'}">
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.bgLabel')}</label>
-        <div id="defaultBgPreview" class="preview-container" style="background: ${state.bgColor || '#1e1e1e'};">
-          <img id="defaultBgPreviewImg" src="${state.bgImage || ''}" class="preview-img" style="display: ${state.bgImage ? 'block' : 'none'}; position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
-          <span id="defaultBgPreviewPlaceholder" class="preview-placeholder" style="z-index: 1;">${state.bgImage ? t('admin.sizes.defaults.bgImage') : t('admin.sizes.defaults.bgColor') + (state.bgColor || '#1e1e1e')}</span>
+        <div id="defaultBgPreview" class="preview-container" style="background: ${values.bgColor || '#1e1e1e'};">
+          <img id="defaultBgPreviewImg" src="${values.bgImage || ''}" class="preview-img" style="display: ${values.bgImage ? 'block' : 'none'}; position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
+          <span id="defaultBgPreviewPlaceholder" class="preview-placeholder" style="z-index: 1;">${values.bgImage ? t('admin.sizes.defaults.bgImage') : t('admin.sizes.defaults.bgColor') + (values.bgColor || '#1e1e1e')}</span>
         </div>
         <div class="input-group" style="margin-bottom: var(--spacing-sm);">
-          <input type="color" id="defaultBgColor" value="${state.bgColor || '#1e1e1e'}" style="flex: 0 0 60px;">
-          <input type="text" id="defaultBgColorHex" class="theme-input" value="${state.bgColor || '#1e1e1e'}" placeholder="#1e1e1e">
-          <button class="btn btn-danger" id="defaultBgColorReset" style="display: ${state.bgColor !== originalDefaults.bgColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
+          <input type="color" id="defaultBgColor" value="${values.bgColor || '#1e1e1e'}" style="flex: 0 0 60px;">
+          <input type="text" id="defaultBgColorHex" class="theme-input" value="${values.bgColor || '#1e1e1e'}" placeholder="#1e1e1e">
+          <button class="btn btn-danger" id="defaultBgColorReset" style="display: ${values.bgColor !== originalDefaults.bgColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
         </div>
         <button class="btn btn-full" id="defaultBgUpload"><span class="material-icons">upload</span>${t('admin.sizes.defaults.bgUpload')}</button>
         <input type="file" id="defaultBgUploadFile" accept="image/*" style="display: none;">
-        <button class="btn btn-danger btn-full" id="defaultBgClear" style="margin-top: var(--spacing-sm); display: ${state.bgImage ? 'block' : 'none'};"><span class="material-icons">delete</span>${t('admin.sizes.defaults.bgDelete')}</button>
+        <button class="btn btn-danger btn-full" id="defaultBgClear" style="margin-top: var(--spacing-sm); display: ${values.bgImage ? 'block' : 'none'};"><span class="material-icons">delete</span>${t('admin.sizes.defaults.bgDelete')}</button>
       </div>
       
       <div class="form-group">
         <label style="font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm);">${t('admin.sizes.defaults.titleColorLabel')}</label>
         <div class="input-group">
-          <input type="color" id="defaultTextColor" value="${state.titleColor || '#ffffff'}" style="flex: 0 0 60px;">
-          <input type="text" id="defaultTextColorHex" class="theme-input" value="${state.titleColor || '#ffffff'}" placeholder="#ffffff">
-          <button class="btn btn-danger" id="defaultTextColorReset" style="display: ${state.titleColor !== originalDefaults.titleColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
+          <input type="color" id="defaultTextColor" value="${values.titleColor || '#ffffff'}" style="flex: 0 0 60px;">
+          <input type="text" id="defaultTextColorHex" class="theme-input" value="${values.titleColor || '#ffffff'}" placeholder="#ffffff">
+          <button class="btn btn-danger" id="defaultTextColorReset" style="display: ${values.titleColor !== originalDefaults.titleColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
         </div>
       </div>
       
@@ -684,7 +684,7 @@ const renderDefaultsTab = () => {
         <div class="admin-form-grid">
           <div class="form-group">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.titleSettings.size')}</label>
-            <input type="number" id="defaultTitleSize" class="theme-input" value="${state.titleSize ?? defaults.titleSize}" step="0.1" min="1" max="20">
+            <input type="number" id="defaultTitleSize" class="theme-input" value="${values.titleSize ?? defaults.titleSize}" step="0.1" min="1" max="20">
           </div>
           <div class="form-group">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.titleSettings.weight')}</label>
@@ -943,27 +943,27 @@ const renderDefaultsTab = () => {
               <option value="tile" ${values.bgSize === 'tile' ? 'selected' : ''}>${t('admin.sizes.advancedSettings.bgSize.tile')}</option>
             </select>
           </div>
-          <div class="form-group" id="bgImageSizeGroup" style="display: ${state.bgSize === 'tile' || state.bgSize === 'cover' || state.bgSize === 'contain' ? 'block' : 'none'};">
+          <div class="form-group" id="bgImageSizeGroup" style="display: ${values.bgSize === 'tile' || values.bgSize === 'cover' || values.bgSize === 'contain' ? 'block' : 'none'};">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.advancedSettings.bgImageSize')}</label>
-            <input type="range" id="defaultBgImageSize" class="theme-input" value="${state.bgImageSize ?? 100}" step="1" min="10" max="500" style="width: 100%;">
+            <input type="range" id="defaultBgImageSize" class="theme-input" value="${values.bgImageSize ?? 100}" step="1" min="10" max="500" style="width: 100%;">
             <div class="slider-value" style="display: flex; justify-content: center; margin-top: 4px;">
-              <span id="defaultBgImageSizeValue">${state.bgImageSize ?? 100}%</span>
+              <span id="defaultBgImageSizeValue">${values.bgImageSize ?? 100}%</span>
             </div>
             <div class="hint">${t('admin.sizes.advancedSettings.bgImageSizeHint')}</div>
           </div>
           <div class="form-group">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.advancedSettings.textGradientOpacity')}</label>
-            <input type="number" id="defaultTextGradientOpacity" class="theme-input" value="${state.textGradientOpacity ?? defaults.textGradientOpacity}" step="1" min="0" max="100">
+            <input type="number" id="defaultTextGradientOpacity" class="theme-input" value="${values.textGradientOpacity ?? defaults.textGradientOpacity}" step="1" min="0" max="100">
           </div>
           <div class="form-group">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.advancedSettings.centerTextOverlayOpacity')}</label>
-            <input type="number" id="defaultCenterTextOverlayOpacity" class="theme-input" value="${state.centerTextOverlayOpacity ?? 20}" step="1" min="0" max="100">
+            <input type="number" id="defaultCenterTextOverlayOpacity" class="theme-input" value="${values.centerTextOverlayOpacity ?? 20}" step="1" min="0" max="100">
           </div>
           <div class="form-group" style="grid-column: 1 / -1;">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.advancedSettings.defaultFont')}</label>
             <select id="defaultFontFamily" class="theme-input">
               ${AVAILABLE_FONTS.map(font => {
-                const currentFontFamily = (state.fontFamily === 'system-ui' ? 'YS Text' : state.fontFamily) || 'YS Text';
+                const currentFontFamily = (values.fontFamily === 'system-ui' ? 'YS Text' : values.fontFamily) || 'YS Text';
                 const selected = currentFontFamily === font.family ? 'selected' : '';
                 return `<option value="${font.family}" ${selected}>${font.name || font.family}</option>`;
               }).join('')}
@@ -987,10 +987,10 @@ const renderDefaultsTab = () => {
           <div class="form-group">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.exportSettings.maxFileSize')}</label>
             <div style="display: flex; gap: 8px; align-items: center;">
-              <input type="number" id="defaultMaxFileSizeValue" class="theme-input" value="${state.maxFileSizeValue ?? 150}" step="0.1" min="0.1" max="100" style="flex: 1;">
+              <input type="number" id="defaultMaxFileSizeValue" class="theme-input" value="${values.maxFileSizeValue ?? 150}" step="0.1" min="0.1" max="100" style="flex: 1;">
               <select id="defaultMaxFileSizeUnit" class="theme-input" style="flex: 0 0 120px;">
-                <option value="KB" ${(state.maxFileSizeUnit || 'KB') === 'KB' ? 'selected' : ''}>${t('admin.sizes.exportSettings.maxFileSizeUnit.KB')}</option>
-                <option value="MB" ${(state.maxFileSizeUnit || 'KB') === 'MB' ? 'selected' : ''}>${t('admin.sizes.exportSettings.maxFileSizeUnit.MB')}</option>
+                <option value="KB" ${(values.maxFileSizeUnit || 'KB') === 'KB' ? 'selected' : ''}>${t('admin.sizes.exportSettings.maxFileSizeUnit.KB')}</option>
+                <option value="MB" ${(values.maxFileSizeUnit || 'KB') === 'MB' ? 'selected' : ''}>${t('admin.sizes.exportSettings.maxFileSizeUnit.MB')}</option>
               </select>
             </div>
             <div class="hint">${t('admin.sizes.exportSettings.maxFileSizeHint')}</div>
@@ -998,13 +998,13 @@ const renderDefaultsTab = () => {
           <div class="form-group" style="grid-column: 1 / -1;">
             <label class="label-medium" style="margin-bottom: var(--spacing-xs);">${t('admin.sizes.exportSettings.habrBorder')}</label>
             <div class="checkbox-group" style="margin-bottom: var(--spacing-sm);">
-              <input type="checkbox" id="defaultHabrBorderEnabled" ${state.habrBorderEnabled ? 'checked' : ''}>
+              <input type="checkbox" id="defaultHabrBorderEnabled" ${values.habrBorderEnabled ? 'checked' : ''}>
               <label for="defaultHabrBorderEnabled" style="margin: 0;">${t('admin.sizes.exportSettings.habrBorderEnabled')}</label>
             </div>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
               <label for="defaultHabrBorderColor" class="sr-only">${t('admin.sizes.exportSettings.habrBorderColor')}</label>
-              <input type="color" id="defaultHabrBorderColor" value="${state.habrBorderColor || '#D5DDDF'}" style="flex: 0 0 60px;">
-              <input type="text" id="defaultHabrBorderColorHex" class="theme-input" value="${state.habrBorderColor || '#D5DDDF'}" placeholder="#D5DDDF" style="flex: 1;">
+              <input type="color" id="defaultHabrBorderColor" value="${values.habrBorderColor || '#D5DDDF'}" style="flex: 0 0 60px;">
+              <input type="text" id="defaultHabrBorderColorHex" class="theme-input" value="${values.habrBorderColor || '#D5DDDF'}" placeholder="#D5DDDF" style="flex: 1;">
             </div>
             <div class="hint">${t('admin.sizes.exportSettings.habrBorderHint')}</div>
           </div>
@@ -1013,7 +1013,7 @@ const renderDefaultsTab = () => {
       
       ${(() => {
         // Содержимое из вкладки множителей
-        const multipliers = state.formatMultipliers || {
+        const multipliers = values.formatMultipliers || {
           vertical: { logo: 2, title: 1, subtitle: 1, legal: 1, age: 1 },
           ultraWide: { logo: 0.75, titleSmall: 3, titleMedium: 2.2, titleLarge: 2, subtitleSmall: 3, subtitleMedium: 2.2, subtitleLarge: 2, legalNormal: 2.5, legalMedium: 2, age: 2 },
           veryWide: { logo: 0.75, titleMedium: 2.2, titleLarge: 2, titleExtraLarge: 2, subtitleMedium: 2.2, subtitleLarge: 2, subtitleExtraLarge: 2, legalNormal: 2.5, legalMedium: 2, legalExtraLarge: 2.5, age: 2 },
@@ -2313,8 +2313,8 @@ const openSizesAdmin = async () => {
   // Принудительно загружаем размеры из файла, если они еще не загружены
   let sizes = getPresetSizes();
   
-  // Проверяем, есть ли все платформы (включая "Яндекс Директ")
-  if (!sizes['Яндекс Директ'] || Object.keys(sizes).length < 7) {
+  // Проверяем, есть ли платформа Я.Директ (перформанс‑форматы)
+  if (!sizes['Я.Директ']) {
     console.log('Размеры неполные, загружаем из файла...');
     try {
       sizes = await loadSizesConfig();
@@ -2494,7 +2494,7 @@ const openSizesAdmin = async () => {
                 style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; color: ${textPrimary}; font-size: 14px; font-family: inherit;"
               />
               <div class="hint" style="margin-top: 8px; font-size: 12px; color: ${textSecondary};">
-                Это название будет использоваться в заголовке страницы "Генератор макетов [название]" и в текстах по умолчанию
+                Это название будет использоваться в текстах по умолчанию (например, в заголовке курса)
               </div>
             </div>
             
@@ -2502,7 +2502,7 @@ const openSizesAdmin = async () => {
               <div style="padding: 12px; background: rgba(33, 150, 243, 0.1); border-left: 3px solid #2196F3; border-radius: 4px;">
                 <div style="font-size: 12px; color: ${textSecondary}; margin-bottom: 4px;">Пример использования:</div>
                 <div style="font-size: 14px; color: ${textPrimary}; font-weight: 500;" id="brandNamePreview">
-                  Генератор макетов ${getState().brandName || 'Практикума'}
+                  Practicum AI-Craft — ${getState().brandName || 'Практикума'}
                 </div>
               </div>
             </div>
@@ -2759,6 +2759,11 @@ const renderAdminPlatforms = (sizes) => {
       '2832x600': { width: 2100, height: 570, hideLegal: false, hideAge: false, titleAlign: 'left' },
       '1080x450': { width: 1020, height: 405, hideLegal: false, hideAge: false, titleAlign: 'left' }
     },
+    // Перформанс‑форматы Я.Директ (РСЯ + Поиск)
+    'Я.Директ': {
+      '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center' }
+    },
+    // Обратная совместимость со старыми сохранёнными конфигами (платформа "РСЯ")
     'РСЯ': {
       '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center' }
     }
@@ -3220,7 +3225,7 @@ const setupAdminHandlers = (initialSizes) => {
       const brandName = e.target.value.trim() || 'Практикума';
       const preview = document.getElementById('brandNamePreview');
       if (preview) {
-        preview.textContent = `Генератор макетов ${brandName}`;
+        preview.textContent = `Practicum AI-Craft — ${brandName}`;
       }
     });
   }
@@ -3508,6 +3513,11 @@ const setupAdminHandlers = (initialSizes) => {
             '2832x600': { width: 2100, height: 570, hideLegal: false, hideAge: false, titleAlign: 'left' },
             '1080x450': { width: 1020, height: 405, hideLegal: false, hideAge: false, titleAlign: 'left' }
           },
+          // Перформанс‑форматы Я.Директ (РСЯ + Поиск)
+          'Я.Директ': {
+            '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center' }
+          },
+          // Обратная совместимость со старыми сохранёнными конфигами (платформа "РСЯ")
           'РСЯ': {
             '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center' }
           }
@@ -3763,7 +3773,10 @@ const setupAdminHandlers = (initialSizes) => {
       // Обновляем заголовок страницы
       const pageTitle = document.querySelector('.header h1');
       if (pageTitle) {
-        pageTitle.textContent = `Генератор макетов ${brandName}`;
+        // Сохраняем версию при обновлении заголовка
+        const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
+        const versionHTML = versionSpan ? versionSpan.outerHTML : '';
+        pageTitle.innerHTML = `Генератор макетов ${brandName}${versionHTML ? ' ' + versionHTML : ''}`;
       }
       
       // Обновляем заголовки в парах, если они содержат старое название
@@ -3937,7 +3950,10 @@ const setupAdminHandlers = (initialSizes) => {
         setKey('brandName', imported.brandName);
         const pageTitle = document.querySelector('.header h1');
         if (pageTitle) {
-          pageTitle.textContent = `Генератор макетов ${imported.brandName}`;
+          // Сохраняем версию при обновлении заголовка
+          const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
+          const versionHTML = versionSpan ? versionSpan.outerHTML : '';
+          pageTitle.innerHTML = `Генератор макетов ${imported.brandName}${versionHTML ? ' ' + versionHTML : ''}`;
         }
       }
       

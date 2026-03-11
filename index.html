@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Multi-Artboard Layout Generator</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="fav/favicon.png" type="image/png">
   <!-- Yandex.Metrika counter -->
 <script type="text/javascript">
   (function(m,e,t,r,i,k,a){
@@ -28,24 +28,23 @@
   <link rel="dns-prefetch" href="https://fonts.googleapis.com">
   
   <!-- Версия приложения для обхода кеша -->
+  <!-- ⚠️ ALSO UPDATE CACHE_VERSION in sw.js -->
   <script>
-    window.APP_VERSION = '1.0.0';
-    window.APP_BUILD_TIME = '2024-01-01T00:00:00Z';
+    window.APP_VERSION = '1.0.2';
+    window.APP_BUILD_TIME = new Date().toISOString();
   </script>
   
   <!-- Preload критических ресурсов -->
-  <link rel="preload" href="styles.css?v=1.0.0" as="style">
-  <link rel="preload" href="src/main.js?v=1.0.0" as="script" type="module">
-  <link rel="preload" href="src/constants.js?v=1.0.0" as="script" type="module">
-  <link rel="preload" href="src/state/store.js?v=1.0.0" as="script" type="module">
-  <link rel="preload" href="src/renderer.js?v=1.0.0" as="script" type="module">
+  <link rel="preload" href="styles.css?v=1.0.2" as="style">
+  <link rel="modulepreload" href="src/main.js?v=1.0.2">
+  <link rel="modulepreload" href="src/constants.js?v=1.0.2">
+  <link rel="modulepreload" href="src/state/store.js?v=1.0.2">
+  <!-- Do not preload or script-load renderer.js; it must load only via import from main.js (ES module) -->
+  <link rel="prefetch" href="sizes-config.json?v=1.0.2" as="fetch" crossorigin>
+  <link rel="modulepreload" href="src/utils/assetScanner.js?v=1.0.2">
+  <link rel="modulepreload" href="src/utils/imageCache.js?v=1.0.2">
   
-  <!-- Prefetch для часто используемых ресурсов -->
-  <link rel="prefetch" href="sizes-config.json?v=1.0.0" as="fetch" crossorigin>
-  <link rel="prefetch" href="src/utils/assetScanner.js?v=1.0.0" as="script" type="module">
-  <link rel="prefetch" href="src/utils/imageCache.js?v=1.0.0" as="script" type="module">
-  
-  <link rel="stylesheet" href="styles.css?v=1.0.0">
+  <link rel="stylesheet" href="styles.css?v=1.0.2">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script>
     // Инициализация темы до загрузки страницы (избегаем мерцания)
@@ -60,7 +59,7 @@
     (function() {
       const savedLang = localStorage.getItem('language');
       // Убеждаемся, что язык валидный, иначе устанавливаем 'ru'
-      if (!savedLang || (savedLang !== 'ru' && savedLang !== 'en')) {
+      if (!savedLang || (savedLang !== 'ru' && savedLang !== 'en' && savedLang !== 'tr')) {
         localStorage.setItem('language', 'ru');
       }
     })();
@@ -69,7 +68,17 @@
 <body>
   <div class="app">
     <div class="header">
-      <h1 data-i18n="app.title">Генератор макетов Практикума <span style="color: var(--text-secondary, #999999); font-size: 0.6em; font-weight: normal; margin-left: 8px;">V1.0</span></h1>
+      <div class="header-title-container">
+        <h1 data-i18n="app.title">Practicum AI-Craft <span class="app-version">V1.0</span></h1>
+        <!-- Теги режимов - можно легко добавлять новые режимы, просто добавив новую кнопку с классом mode-tag и data-mode -->
+        <div class="mode-tags">
+          <button class="mode-tag" data-mode="off" data-i18n="logo.pro.off">Reskill</button>
+          <button class="mode-tag" data-mode="on" data-i18n="logo.pro.on">PRO</button>
+          <!-- Пример добавления нового режима:
+          <button class="mode-tag" data-mode="custom" data-i18n="logo.pro.custom">Custom</button>
+          -->
+        </div>
+      </div>
       <div class="header-actions">
           <div class="language-selector">
             <div class="custom-select-wrapper">
@@ -80,6 +89,7 @@
               <div class="custom-select-dropdown" id="languageSelectDropdown">
                 <div class="custom-select-option selected" data-value="ru" data-i18n="common.language.ru">RU</div>
                 <div class="custom-select-option" data-value="en" data-i18n="common.language.en">EN</div>
+                <div class="custom-select-option" data-value="tr" data-i18n="common.language.tr">TR</div>
               </div>
             </div>
           </div>
@@ -119,9 +129,6 @@
         <div class="tab" data-section="kv">
           <span data-i18n="tab.kv">Визуал</span>
         </div>
-        <div class="tab" data-section="figma">
-          <span data-i18n="tab.figma">Figma</span>
-        </div>
         <div class="theme-text-muted" style="margin-top: auto; padding: 16px; text-align: center; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
           <span><span data-i18n="footer.credit">Вайб-код от</span> <a href="https://staff.yandex-team.ru/vidmich" target="_blank" rel="noopener" style="color: var(--accent-color); text-decoration: none;">@vidmich</a></span>
         </div>
@@ -144,8 +151,8 @@
             <div class="form-group form-group-section">
             <label data-i18n="layout.background">Фон</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
-              <label for="bgColor" class="sr-only" data-i18n="layout.background"></label>
-              <input type="color" id="bgColor" value="#1e1e1e" data-state-key="bgColor" data-update-handler="updateColorFromPicker" data-handler-param="bgColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.bgColor">
+              <label for="bgColor" class="sr-only" data-i18n="layout.background">Фон</label>
+              <input type="color" id="bgColor" value="#1e1e1e" data-state-key="bgColor" data-update-handler="updateColorFromPicker" data-handler-param="bgColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.bgColor" title="Выберите цвет фона">
               <label for="bgColorHex" class="sr-only" data-i18n="layout.background"></label>
               <input type="text" id="bgColorHex" value="#1e1e1e" placeholder="#1e1e1e" data-state-key="bgColor" data-update-handler="updateColorFromHex" data-handler-param="bgColor" style="flex: 1;" data-i18n-aria-label="aria.bgColorHex">
             </div>
@@ -190,7 +197,7 @@
               <div id="bgGradientStops" style="margin-top: 16px;">
                 <!-- Остановки градиента будут добавлены динамически -->
               </div>
-              <button class="btn btn-full mt-sm" id="addGradientStopBtn" data-function="addGradientStop"><span class="material-icons" style="margin-right: 6px; font-size: 18px;">add</span><span data-i18n="layout.bgGradient.addStop">Добавить остановку</span></button>
+              <button class="btn btn-full mt-sm" id="addGradientStopBtn" data-function="addGradientStop"><span data-i18n="layout.bgGradient.addStop">Добавить остановку</span></button>
             </div>
           </div>
           <div class="form-group">
@@ -204,8 +211,8 @@
                 <div class="modal-header">
                   <span class="modal-title" data-i18n="layout.bgImage.selectModal.title">Выбрать фоновое изображение</span>
                   <div class="modal-actions">
-                    <button class="btn" data-function="refreshBGColumns" data-action="stop-propagation" data-i18n-title="common.refresh"><span class="material-icons">refresh</span></button>
-                    <button class="btn" data-function="closeBGSelectModal" data-action="stop-propagation" data-i18n-title="common.close"><span class="material-icons">close</span></button>
+                    <button class="btn" data-function="refreshBGColumns" data-action="stop-propagation" data-i18n-title="common.refresh" data-i18n="common.refresh">Обновить</button>
+                    <button class="btn" data-function="closeBGSelectModal" data-action="stop-propagation" data-i18n-title="common.close" data-i18n="common.close">Закрыть</button>
                   </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 150px 150px 1fr; height: calc(70vh - 50px); max-height: 550px;">
@@ -224,8 +231,8 @@
             <button class="btn btn-full mb-sm" id="bgSelectTrigger"><span id="bgSelectText" data-i18n="layout.bgImage.select">Выбрать из библиотеки</span></button>
             <div style="display: flex; gap: 8px; width: 100%; margin-top: 8px;">
               <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" style="flex: 1;" id="bgUploadBtn"><span class="material-icons" style="font-size: 18px; margin-right: 4px;">image</span><span data-i18n="common.upload">Загрузить</span></button>
-              <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" id="bgReplaceBtn" style="display: none; flex: 1;" data-i18n-title="layout.bgImage.replace"><span class="material-icons" style="font-size: 18px; margin-right: 4px;">refresh</span><span data-i18n="layout.bgImage.replace">Заменить</span></button>
-              <button class="btn" data-function="clearBg" id="bgDeleteBtn" style="display: none; flex: 1;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 18px;">delete</span><span data-i18n="common.delete">Удалить</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="bgUpload" id="bgReplaceBtn" style="display: none; flex: 1;" data-i18n-title="layout.bgImage.replace" data-i18n="layout.bgImage.replace">Заменить фон</button>
+              <button class="btn" data-function="clearBg" id="bgDeleteBtn" style="display: none; flex: 1;" data-i18n-title="common.delete" data-i18n="common.delete">Удалить фон</button>
             </div>
             <input type="file" id="bgUpload" accept="image/*" style="display: none;" data-handler="handleBgUpload">
           </div>
@@ -299,8 +306,8 @@
                 <div class="modal-header">
                   <span class="modal-title" data-i18n="logo.selectModal.title">Выбрать логотип</span>
                   <div class="modal-actions">
-                    <button class="btn" data-function="refreshLogoColumns" data-action="stop-propagation" data-i18n-title="common.refresh"><span class="material-icons">refresh</span></button>
-                    <button class="btn" data-function="closeLogoSelectModal" data-action="stop-propagation" data-i18n-title="common.close"><span class="material-icons">close</span></button>
+                    <button class="btn" data-function="refreshLogoColumns" data-action="stop-propagation" data-i18n-title="common.refresh" data-i18n="common.refresh">Обновить</button>
+                    <button class="btn" data-function="closeLogoSelectModal" data-action="stop-propagation" data-i18n-title="common.close" data-i18n="common.close">Закрыть</button>
                   </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 150px 150px 150px 1fr; height: calc(70vh - 50px); max-height: 550px;">
@@ -324,9 +331,9 @@
               <option value="" selected data-i18n="common.none">— Нет —</option>
             </select>
             <div style="display: flex; gap: 8px; width: 100%;">
-              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" style="flex: 1;" id="logoUploadBtn" data-i18n-title="common.upload"><span class="material-icons">upload</span></button>
-              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" id="logoReplaceBtn" style="display: none; flex: 1;" data-i18n-title="logo.replace"><span class="material-icons">refresh</span></button>
-              <button class="btn btn-danger" id="logoRemoveBtn" data-function="clearLogo" style="flex: 1;" disabled data-i18n-title="common.delete"><span class="material-icons">delete</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" style="flex: 1;" id="logoUploadBtn" title="Загрузить файл" aria-label="Загрузить файл" data-i18n-title="common.upload"><span class="material-icons">upload</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="logoUpload" id="logoReplaceBtn" style="display: none; flex: 1;" data-i18n-title="logo.replace" data-i18n="logo.replace">Заменить логотип</button>
+              <button class="btn btn-danger" id="logoRemoveBtn" data-function="clearLogo" style="flex: 1;" disabled data-i18n-title="common.delete" data-i18n="common.delete">Удалить логотип</button>
               <input type="file" id="logoUpload" accept="image/*,.svg" style="display: none;" data-handler="handleLogoUpload">
             </div>
           </div>
@@ -357,13 +364,13 @@
               <span id="partnerLogoPreviewPlaceholder" class="preview-placeholder" data-i18n="common.none">— Нет —</span>
             </div>
             <div style="display: flex; gap: 8px; width: 100%;">
-              <button class="btn" data-action="trigger-file-input" data-input-id="partnerLogoUpload" style="flex: 1;" data-i18n-title="logo.replace"><span class="material-icons">refresh</span></button>
-              <button class="btn btn-danger" id="partnerLogoRemoveBtn" data-function="clearPartnerLogo" style="flex: 1;" data-i18n-title="common.delete"><span class="material-icons">delete</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="partnerLogoUpload" style="flex: 1;" data-i18n-title="logo.replace" data-i18n="logo.replace">Загрузить логотип</button>
+              <button class="btn btn-danger" id="partnerLogoRemoveBtn" data-function="clearPartnerLogo" style="flex: 1;" data-i18n-title="common.delete" data-i18n="common.delete">Удалить логотип</button>
               <input type="file" id="partnerLogoUpload" accept="image/*,.svg" style="display: none;" data-handler="handlePartnerLogoUpload">
             </div>
           </div>
           <div class="form-group">
-            <button class="btn btn-full" id="addPartnerLogoBtn" data-function="showPartnerLogoSection"><span class="material-icons" style="margin-right: 6px;">add</span><span data-i18n="logo.partner.add">Добавить логотип</span></button>
+            <button class="btn btn-full" id="addPartnerLogoBtn" data-function="showPartnerLogoSection"><span data-i18n="logo.partner.add">Добавить логотип</span></button>
           </div>
         </div>
         <!-- End Logo Section -->
@@ -402,8 +409,8 @@
           <div class="form-group">
             <label data-i18n="title.color">Цвет</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
-              <label for="titleColor" class="sr-only" data-i18n="title.color"></label>
-              <input type="color" id="titleColor" value="#ffffff" data-state-key="titleColor" data-update-handler="updateColorFromPicker" data-handler-param="titleColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.titleColor">
+              <label for="titleColor" class="sr-only" data-i18n="title.color">Цвет заголовка</label>
+              <input type="color" id="titleColor" value="#ffffff" data-state-key="titleColor" data-update-handler="updateColorFromPicker" data-handler-param="titleColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.titleColor" title="Выберите цвет заголовка">
               <label for="titleColorHex" class="sr-only" data-i18n="title.color"></label>
               <input type="text" id="titleColorHex" value="#ffffff" placeholder="#ffffff" data-state-key="titleColor" data-update-handler="updateColorFromHex" data-handler-param="titleColor" style="flex: 1;" data-i18n-aria-label="aria.titleColorHex">
             </div>
@@ -454,12 +461,12 @@
                 </div>
                 <div class="custom-select-dropdown" id="titleFontFamilyDropdown"></div>
               </div>
-              <button class="btn" data-action="trigger-file-input" data-input-id="titleFontUpload" style="flex: 0 0 auto;" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="titleFontUpload" style="flex: 0 0 auto;" title="Загрузить файл" aria-label="Загрузить файл" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
               <input type="file" id="titleFontUpload" accept=".woff,.woff2,.ttf,.otf" style="display: none;" data-handler="handleTitleFontUpload">
             </div>
             <div id="titleCustomFontInfo" class="theme-text-muted" style="display: none; margin-top: 8px; font-size: 12px;">
               <span id="titleCustomFontName"></span>
-              <button class="btn btn-small" data-function="clearTitleCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 16px;">delete</span></button>
+              <button class="btn btn-small" data-function="clearTitleCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete" data-i18n="common.delete">Удалить</button>
             </div>
           </div>
           <div class="form-group">
@@ -540,8 +547,8 @@
           <div class="form-group">
             <label data-i18n="subtitle.color">Цвет</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
-              <label for="subtitleColor" class="sr-only" data-i18n="subtitle.color"></label>
-              <input type="color" id="subtitleColor" value="#e0e0e0" data-state-key="subtitleColor" data-update-handler="updateColorFromPicker" data-handler-param="subtitleColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.subtitleColor">
+              <label for="subtitleColor" class="sr-only" data-i18n="subtitle.color">Цвет подзаголовка</label>
+              <input type="color" id="subtitleColor" value="#e0e0e0" data-state-key="subtitleColor" data-update-handler="updateColorFromPicker" data-handler-param="subtitleColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.subtitleColor" title="Выберите цвет подзаголовка">
               <label for="subtitleColorHex" class="sr-only" data-i18n="subtitle.color"></label>
               <input type="text" id="subtitleColorHex" value="#e0e0e0" placeholder="#e0e0e0" data-state-key="subtitleColor" data-update-handler="updateColorFromHex" data-handler-param="subtitleColor" style="flex: 1;" data-i18n-aria-label="aria.subtitleColorHex">
             </div>
@@ -579,12 +586,12 @@
                 </div>
                 <div class="custom-select-dropdown" id="subtitleFontFamilyDropdown"></div>
               </div>
-              <button class="btn" data-action="trigger-file-input" data-input-id="subtitleFontUpload" style="flex: 0 0 auto;" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="subtitleFontUpload" style="flex: 0 0 auto;" title="Загрузить файл" aria-label="Загрузить файл" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
               <input type="file" id="subtitleFontUpload" accept=".woff,.woff2,.ttf,.otf" style="display: none;" data-handler="handleSubtitleFontUpload">
             </div>
             <div id="subtitleCustomFontInfo" class="theme-text-muted" style="display: none; margin-top: 8px; font-size: 12px;">
               <span id="subtitleCustomFontName"></span>
-              <button class="btn btn-small" data-function="clearSubtitleCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 16px;">delete</span></button>
+              <button class="btn btn-small" data-function="clearSubtitleCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete" data-i18n="common.delete">Удалить</button>
             </div>
           </div>
           <div class="form-group">
@@ -619,6 +626,13 @@
             <label for="subtitleGap" style="margin: 0; flex: 1;" data-i18n="subtitle.gap">Отступ от заголовка</label>
             <input type="number" id="subtitleGap" value="-1" min="-20" max="20" step="0.5" data-state-key="subtitleGap" style="width: 80px;">
           </div>
+          <div class="form-group">
+            <label data-i18n="layout.spacing.title">Отступы заголовка по вертикали</label>
+            <div class="gap-sm mb-sm" style="display: flex; gap: 8px;">
+              <input type="number" id="titleOffsetTopPx" class="theme-input" placeholder="Сверху, px" min="0" data-state-key="titleOffsetTopPx">
+              <input type="number" id="titleOffsetBottomPx" class="theme-input" placeholder="Снизу, px" min="0" data-state-key="titleOffsetBottomPx">
+            </div>
+          </div>
         </div>
         <!-- End Subtitle Section -->
         
@@ -648,8 +662,8 @@
           <div class="form-group">
             <label data-i18n="legal.color">Цвет</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
-              <label for="legalColor" class="sr-only" data-i18n="legal.color"></label>
-              <input type="color" id="legalColor" value="#ffffff" data-state-key="legalColor" data-update-handler="updateColorFromPicker" data-handler-param="legalColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.legalColor">
+              <label for="legalColor" class="sr-only" data-i18n="legal.color">Цвет юридического текста</label>
+              <input type="color" id="legalColor" value="#ffffff" data-state-key="legalColor" data-update-handler="updateColorFromPicker" data-handler-param="legalColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.legalColor" title="Выберите цвет юридического текста">
               <label for="legalColorHex" class="sr-only" data-i18n="legal.color"></label>
               <input type="text" id="legalColorHex" value="#ffffff" placeholder="#ffffff" data-state-key="legalColor" data-update-handler="updateColorFromHex" data-handler-param="legalColor" style="flex: 1;" data-i18n-aria-label="aria.legalColorHex">
             </div>
@@ -686,12 +700,12 @@
                 </div>
                 <div class="custom-select-dropdown" id="legalFontFamilyDropdown"></div>
               </div>
-              <button class="btn" data-action="trigger-file-input" data-input-id="legalFontUpload" style="flex: 0 0 auto;" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
+              <button class="btn" data-action="trigger-file-input" data-input-id="legalFontUpload" style="flex: 0 0 auto;" title="Загрузить файл" aria-label="Загрузить файл" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
               <input type="file" id="legalFontUpload" accept=".woff,.woff2,.ttf,.otf" style="display: none;" data-handler="handleLegalFontUpload">
             </div>
             <div id="legalCustomFontInfo" class="theme-text-muted" style="display: none; margin-top: 8px; font-size: 12px;">
               <span id="legalCustomFontName"></span>
-              <button class="btn btn-small" data-function="clearLegalCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 16px;">delete</span></button>
+              <button class="btn btn-small" data-function="clearLegalCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete" data-i18n="common.delete">Удалить</button>
             </div>
           </div>
           <div class="form-group">
@@ -754,12 +768,12 @@
                   </div>
                   <div class="custom-select-dropdown" id="ageFontFamilyDropdown"></div>
                 </div>
-                <button class="btn" data-action="trigger-file-input" data-input-id="ageFontUpload" style="flex: 0 0 auto;" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
+                <button class="btn" data-action="trigger-file-input" data-input-id="ageFontUpload" style="flex: 0 0 auto;" title="Загрузить файл" aria-label="Загрузить файл" data-i18n-title="common.upload"><span class="material-icons">download</span></button>
                 <input type="file" id="ageFontUpload" accept=".woff,.woff2,.ttf,.otf" style="display: none;" data-handler="handleAgeFontUpload">
               </div>
               <div id="ageCustomFontInfo" class="theme-text-muted" style="display: none; margin-top: 8px; font-size: 12px;">
                 <span id="ageCustomFontName"></span>
-                <button class="btn btn-small" data-function="clearAgeCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete"><span class="material-icons" style="font-size: 16px;">delete</span></button>
+                <button class="btn btn-small" data-function="clearAgeCustomFont" style="margin-left: 8px; padding: 2px 8px;" data-i18n-title="common.delete" data-i18n="common.delete">Удалить</button>
               </div>
             </div>
             <div class="form-group">
@@ -815,8 +829,8 @@
                   <div class="modal-header">
                     <span class="modal-title" data-i18n="kv.selectModal.title">Выбрать KV</span>
                     <div class="modal-actions">
-                      <button class="btn" data-function="refreshKVColumns" data-action="stop-propagation" data-i18n-title="common.refresh"><span class="material-icons">refresh</span></button>
-                      <button class="btn" data-function="closeKVSelectModal" data-action="stop-propagation" data-i18n-title="common.close"><span class="material-icons">close</span></button>
+                      <button class="btn" data-function="refreshKVColumns" data-action="stop-propagation" data-i18n-title="common.refresh" data-i18n="common.refresh">Обновить</button>
+                      <button class="btn" data-function="closeKVSelectModal" data-action="stop-propagation" data-i18n-title="common.close" data-i18n="common.close">Закрыть</button>
                     </div>
                   </div>
                   <div style="display: grid; grid-template-columns: 150px 150px 1fr; height: calc(70vh - 50px); max-height: 550px;">
@@ -837,9 +851,9 @@
                 <option value="" selected data-i18n="kv.none">— Нет —</option>
               </select>
               <div style="display: flex; gap: 8px; width: 100%;">
-                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" style="flex: 1; min-width: 0;" id="kvUploadBtn" data-i18n-title="kv.upload"><span class="material-icons">upload</span></button>
-                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" id="kvReplaceBtn" style="display: none; flex: 1; min-width: 0;" data-i18n-title="kv.replace"><span class="material-icons">refresh</span></button>
-                <button class="btn btn-danger" id="kvRemoveBtn" data-function="clearKV" style="flex: 1; min-width: 0;" disabled data-i18n-title="kv.delete"><span class="material-icons">delete</span></button>
+                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" style="flex: 1; min-width: 0;" id="kvUploadBtn" title="Загрузить файл" aria-label="Загрузить файл" data-i18n-title="kv.upload"><span class="material-icons">upload</span></button>
+                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" id="kvReplaceBtn" style="display: none; flex: 1; min-width: 0;" data-i18n-title="kv.replace" data-i18n="kv.replace">Заменить</button>
+                <button class="btn btn-danger" id="kvRemoveBtn" data-function="clearKV" style="flex: 1; min-width: 0;" disabled data-i18n-title="kv.delete" data-i18n="kv.delete">Удалить</button>
                 <input type="file" id="kvUpload" accept="image/*" style="display: none;" data-handler="handleKVUpload">
               </div>
             </div>
@@ -849,10 +863,6 @@
           </div>
         </div>
         <!-- End KV Section -->
-        
-        <!-- Figma Section -->
-        <div id="panel-section-figma-container"></div>
-        <!-- End Figma Section -->
         
       </div>
       
@@ -942,8 +952,8 @@
             </div>
           </div>
           <div style="display: flex; gap: 8px; margin-top: 12px;">
-            <button class="btn primary" data-function="exportAllPNG" style="flex: 1;" data-i18n="export.png">Архив PNG</button>
-            <button class="btn" data-function="exportAllJPG" style="flex: 1;" data-i18n="export.jpg">Архив JPG</button>
+            <button class="btn primary" data-function="exportAllPNG" style="flex: 1;" data-i18n="export.png">Экспорт PNG</button>
+            <button class="btn" data-function="exportAllJPG" style="flex: 1;" data-i18n="export.jpg">Экспорт JPG</button>
           </div>
         </div>
         <div class="form-group-section">
@@ -956,7 +966,7 @@
                 <label for="customHeight" class="sr-only" data-i18n="export.customSize.height">В</label>
                 <input type="number" id="customHeight" class="theme-input" data-i18n-placeholder="export.customSize.height" placeholder="В" min="1" data-action="update-add-size-button" style="flex: 1; padding: 8px 12px; border-radius: 6px; font-size: 13px;" data-i18n-aria-label="aria.customHeight">
             </div>
-            <button class="btn btn-full" id="addSizeButton" data-function="addCustomSizeFromInput" disabled><span class="material-icons" style="margin-right: 6px;">add</span><span data-i18n="export.customSize.add">Добавить размер</span></button>
+            <button class="btn btn-full" id="addSizeButton" data-function="addCustomSizeFromInput" disabled><span data-i18n="export.customSize.add">Добавить размер</span></button>
           </div>
           <div class="form-group-section" id="customSizesSection" style="display: none;">
             <label data-i18n="export.customSize">Пользовательские</label>
@@ -967,8 +977,8 @@
             <div id="content-preset-sizes">
               <div class="form-group">
                 <div class="gap-sm mb-md" style="display: flex;">
-                  <button class="btn btn-full" data-function="selectAllSizes" data-i18n-title="export.presetSizes.selectAll"><span class="material-icons">select_all</span></button>
-                  <button class="btn btn-full" data-function="deselectAllSizes" data-i18n-title="export.presetSizes.deselectAll"><span class="material-icons">deselect</span></button>
+                  <button class="btn btn-full" data-function="selectAllSizes" data-i18n-title="export.presetSizes.selectAll" data-i18n="export.presetSizes.selectAll">Выбрать все</button>
+                  <button class="btn btn-full" data-function="deselectAllSizes" data-i18n-title="export.presetSizes.deselectAll" data-i18n="export.presetSizes.deselectAll">Снять выбор</button>
                 </div>
               </div>
               <div class="form-group">
@@ -980,19 +990,17 @@
         </div>
 
         <div class="form-group-section">
-          <label data-i18n="export.settings">Настройки</label>
           <div id="content-settings">
-            <div class="form-group" style="display: flex; gap: 8px;">
-              <button class="btn btn-full" data-function="saveSettings" style="flex: 1;" data-i18n-title="export.settings.save"><span class="material-icons">save</span></button>
-              <button class="btn btn-full" data-function="loadSettings" style="flex: 1;" data-i18n-title="export.settings.load"><span class="material-icons">download</span></button>
+            <div class="form-group" style="margin-top: 8px;">
+              <button class="btn btn-full" data-function="showSizesAdmin" data-i18n-title="export.settings.admin" data-i18n="export.settings.admin">Все настройки</button>
             </div>
             <div class="form-group" style="margin-top: 8px;">
-              <button class="btn btn-full" data-function="showSizesAdmin" data-i18n-title="export.settings.admin"><span class="material-icons">settings</span><span data-i18n="export.settings.admin">Все настройки</span></button>
+              <button class="btn btn-full" data-function="showLogoAssetsAdmin" data-i18n-title="export.settings.media" data-i18n="export.settings.media">Медиа</button>
             </div>
-            <div class="form-group" style="margin-top: 8px;">
-              <button class="btn btn-full" data-function="showLogoAssetsAdmin" data-i18n-title="export.settings.media"><span class="material-icons">image</span><span data-i18n="export.settings.media">Медиа</span></button>
-            </div>
-            
+            <button class="btn btn-danger" onclick="hardResetCache()" style="margin-top: 8px; width: 100%;">
+              <span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">delete_sweep</span>
+              <span data-i18n="settings.hardReset">Очистить кеш</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1004,7 +1012,7 @@
       <div class="modal-header">
         <span class="modal-title" data-i18n="guide.title">Как это работает?</span>
         <div class="modal-actions">
-          <button class="btn" id="closeGuideModal" data-function="closeGuideModal" data-action="stop-propagation" data-i18n-title="common.close"><span class="material-icons">close</span></button>
+          <button class="btn" id="closeGuideModal" data-function="closeGuideModal" data-action="stop-propagation" title="Закрыть" aria-label="Закрыть окно" data-i18n-title="common.close"><span class="material-icons">close</span></button>
         </div>
       </div>
       <div class="guide-modal-content" style="padding: 24px; overflow-y: auto; max-height: calc(85vh - 60px);">
@@ -1134,6 +1142,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
-  <script type="module" src="./src/main.js?v=1.0.0"></script>
+  <!-- Единственная точка входа приложения: только как ES module -->
+  <script type="module" src="./src/main.js?v=1.0.2"></script>
 </body>
 </html>

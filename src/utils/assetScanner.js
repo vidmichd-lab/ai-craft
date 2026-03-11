@@ -1,172 +1,85 @@
 // Кэш для проверки существования файлов
 const fileExistsCache = new Map();
 
+async function checkFilesParallel(urls, concurrency = 10) {
+  const found = [];
+  const executing = new Set();
+
+  for (const url of urls) {
+    const p = checkFileExists(url).then(exists => {
+      executing.delete(p);
+      if (exists) found.push(url);
+    }).catch(() => {
+      executing.delete(p);
+    });
+    executing.add(p);
+    if (executing.size >= concurrency) {
+      await Promise.race(executing);
+    }
+  }
+  await Promise.all(executing);
+  return found;
+}
+
 // Функция для проверки существования файла (без ошибок в консоли)
-// Использует Image объект для изображений, чтобы избежать ошибок 404 в консоли
+// Использует fetch HEAD, чтобы не засорять консоль 404 при отсутствии файла
 export const checkFileExists = async (url) => {
-  // Проверяем кэш
   if (fileExistsCache.has(url)) {
     return fileExistsCache.get(url);
   }
-  
-  // Используем абсолютный URL, если передан относительный путь
   const absoluteUrl = url.startsWith('http') ? url : new URL(url, window.location.origin).href;
-  
-  // Определяем, является ли файл изображением
-  const isImage = /\.(webp|jpg|jpeg|png|gif|svg|bmp|ico)$/i.test(url);
-  
-  if (isImage) {
-    // Для изображений используем Image объект, который не выводит ошибки в консоль
-    return new Promise((resolve) => {
-      const img = new Image();
-      let resolved = false;
-      
-      const cleanup = () => {
-        img.onload = null;
-        img.onerror = null;
-        img.src = '';
-      };
-      
-      const timeoutId = setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          cleanup();
-          const exists = false;
-          fileExistsCache.set(url, exists);
-          resolve(exists);
-        }
-      }, 2000); // Таймаут 2 секунды
-      
-      img.onload = () => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeoutId);
-          cleanup();
-          const exists = true;
-          fileExistsCache.set(url, exists);
-          resolve(exists);
-        }
-      };
-      
-      img.onerror = () => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeoutId);
-          cleanup();
-          const exists = false;
-          fileExistsCache.set(url, exists);
-          resolve(exists);
-        }
-      };
-      
-      // Начинаем загрузку
-      img.src = absoluteUrl;
-    });
-  } else {
-    // Для не-изображений используем fetch (например, для шрифтов)
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000); // Таймаут 2 секунды
-      
-      const response = await fetch(absoluteUrl, { 
-        method: 'HEAD',
-        cache: 'default',
-        mode: 'cors',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      const exists = response.ok;
-      fileExistsCache.set(url, exists);
-      return exists;
-    } catch (error) {
-      // Игнорируем все ошибки (404, таймаут, сетевые ошибки) - файл не существует
-      const exists = false;
-      fileExistsCache.set(url, exists);
-      return exists;
-    }
+  try {
+    const response = await fetch(absoluteUrl, { method: 'HEAD' });
+    const exists = response.ok;
+    fileExistsCache.set(url, exists);
+    return exists;
+  } catch {
+    fileExistsCache.set(url, false);
+    return false;
   }
 };
 
 /**
- * Умная проверка файлов с ранней остановкой
- * Проверяет файлы последовательно и останавливается, если несколько подряд не найдены
+ * Умная проверка файлов с параллельной проверкой и ранней остановкой
+ * По умолчанию проверяем только 01–35 (endNum=35), чтобы не слать десятки HEAD по несуществующим номерам.
  */
-export const checkFilesSmart = async (basePath, startNum = 1, endNum = 99, maxConsecutiveMisses = 5) => {
-  const foundFiles = [];
+export const checkFilesSmart = async (basePath, startNum = 1, endNum = 35, maxConsecutiveMisses = 3) => {
+  const candidateUrls = [];
+  for (let i = startNum; i <= endNum; i++) {
+    const num = String(i).padStart(2, '0');
+    candidateUrls.push(`${basePath}/${num}.webp`);
+  }
+
+  // Проверяем батчами по 5, останавливаемся после 3 подряд 404 — меньше шума в консоли
+  const foundUrls = [];
   let consecutiveMisses = 0;
-  
-  // Сначала проверяем первые несколько файлов, чтобы понять, есть ли вообще файлы в папке
-  const quickCheckPromises = [];
-  for (let i = startNum; i <= Math.min(startNum + 4, endNum); i++) {
-    const num = i.toString().padStart(2, '0');
-    quickCheckPromises.push(
-      checkFileExists(`${basePath}/${num}.webp`).then(exists => ({ num, ext: 'webp', exists, index: i })),
-      checkFileExists(`${basePath}/${num}.jpg`).then(exists => ({ num, ext: 'jpg', exists, index: i })),
-      checkFileExists(`${basePath}/${num}.jpeg`).then(exists => ({ num, ext: 'jpeg', exists, index: i }))
-    );
-  }
-  
-  const quickResults = await Promise.all(quickCheckPromises);
-  let hasAnyFiles = false;
-  
-  // Обрабатываем результаты быстрой проверки
-  for (let k = 0; k < quickResults.length; k += 3) {
-    const webpResult = quickResults[k];
-    const jpgResult = quickResults[k + 1];
-    const jpegResult = quickResults[k + 2];
-    
-    if (webpResult.exists) {
-      foundFiles.push({ name: webpResult.num, file: `${basePath}/${webpResult.num}.webp` });
-      hasAnyFiles = true;
-      consecutiveMisses = 0;
-    } else if (jpgResult.exists) {
-      foundFiles.push({ name: jpgResult.num, file: `${basePath}/${jpgResult.num}.jpg` });
-      hasAnyFiles = true;
-      consecutiveMisses = 0;
-    } else if (jpegResult.exists) {
-      foundFiles.push({ name: jpegResult.num, file: `${basePath}/${jpegResult.num}.jpeg` });
-      hasAnyFiles = true;
-      consecutiveMisses = 0;
-    } else {
-      consecutiveMisses++;
-    }
-  }
-  
-  // Если в быстрой проверке не найдено ни одного файла, прекращаем поиск
-  if (!hasAnyFiles) {
-    return foundFiles;
-  }
-  
-  // Продолжаем проверку остальных файлов с ранней остановкой
-  for (let i = startNum + 5; i <= endNum; i++) {
-    const num = i.toString().padStart(2, '0');
-    
-    // Проверяем файлы параллельно
-    const [webpExists, jpgExists, jpegExists] = await Promise.all([
-      checkFileExists(`${basePath}/${num}.webp`),
-      checkFileExists(`${basePath}/${num}.jpg`),
-      checkFileExists(`${basePath}/${num}.jpeg`)
-    ]);
-    
-    if (webpExists) {
-      foundFiles.push({ name: num, file: `${basePath}/${num}.webp` });
-      consecutiveMisses = 0;
-    } else if (jpgExists) {
-      foundFiles.push({ name: num, file: `${basePath}/${num}.jpg` });
-      consecutiveMisses = 0;
-    } else if (jpegExists) {
-      foundFiles.push({ name: num, file: `${basePath}/${num}.jpeg` });
-      consecutiveMisses = 0;
-    } else {
-      consecutiveMisses++;
-      // Если несколько файлов подряд не найдены, прекращаем проверку
-      if (consecutiveMisses >= maxConsecutiveMisses) {
-        break;
+  const batchSize = 5;
+  for (let i = 0; i < candidateUrls.length; i += batchSize) {
+    const batch = candidateUrls.slice(i, i + batchSize);
+    const batchFound = await checkFilesParallel(batch, 5);
+    foundUrls.push(...batchFound);
+    const batchSet = new Set(batchFound);
+    for (const url of batch) {
+      if (batchSet.has(url)) {
+        consecutiveMisses = 0;
+      } else {
+        consecutiveMisses++;
       }
     }
+    if (consecutiveMisses >= maxConsecutiveMisses) {
+      break;
+    }
   }
-  
+
+  const byNum = {};
+  for (const url of foundUrls) {
+    const filePart = url.split('/').pop();
+    const [num, ext] = filePart.split('.');
+    if (!byNum[num]) byNum[num] = ext;
+  }
+  const foundFiles = Object.entries(byNum)
+    .map(([num, ext]) => ({ name: num, file: `${basePath}/${num}.${ext}` }))
+    .sort((a, b) => parseInt(a.name, 10) - parseInt(b.name, 10));
   return foundFiles;
 };
 
@@ -179,7 +92,8 @@ export const scanLogos = async () => {
   const firstLevelFolders = ['black', 'white'];
   
   // Список возможных папок второго уровня (только реально используемые)
-  const secondLevelFolders = [];
+  // pro - для PRO логотипов (logo/white/pro/mono.svg)
+  const secondLevelFolders = ['pro'];
   
   // Список возможных папок третьего уровня (языковые коды)
   const thirdLevelFolders = ['ru', 'en', 'kz'];
@@ -348,23 +262,26 @@ export const scanLogos = async () => {
     'mark.svg',
     'emblem.svg'
   ];
-  
+
+  const oneLevelCandidateUrls = [];
   for (const folder1 of firstLevelFolders) {
-    // Проверяем только известные SVG файлы
     for (const filename of knownLogoFiles) {
-      const file = `logo/${folder1}/${filename}`;
-      const exists = await checkFileExists(file);
-      if (exists) {
-        const baseName = filename.replace(/\.svg$/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
-        const name = `${folder1Name} / ${baseName}`;
-        if (!logos.find(l => l.file === file)) {
-          logos.push({ name, file });
-        }
-      }
+      oneLevelCandidateUrls.push(`logo/${folder1}/${filename}`);
     }
   }
-  
+  const oneLevelFoundUrls = await checkFilesParallel(oneLevelCandidateUrls, 10);
+
+  for (const file of oneLevelFoundUrls) {
+    const filename = file.split('/').pop();
+    const baseName = filename.replace(/\.svg$/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const folder1 = file.split('/')[1];
+    const folder1Name = folder1.charAt(0).toUpperCase() + folder1.slice(1);
+    const name = `${folder1Name} / ${baseName}`;
+    if (!logos.find(l => l.file === file)) {
+      logos.push({ name, file });
+    }
+  }
+
   // Возвращаем структурированные данные вместо плоского массива
   return logoStructure;
 };
@@ -374,55 +291,93 @@ export const scanKV = async () => {
   const kvStructure = {};
   
   // Список реальных папок первого уровня (только те, что существуют в проекте)
-  // В проекте есть assets/3d/ и assets/photo/
-  const firstLevelFolders = ['3d', 'photo'];
+  // В проекте есть assets/3d/, assets/photo/ и assets/pro/
+  const firstLevelFolders = ['3d', 'photo', 'pro'];
   
   // Список известных папок второго уровня для проверки
   // Для 3d: sign, icons, logos, numbers, other, shapes, tech, yandex
   // Для photo: pro, ai_reskill, old_reskill и другие
+  // Для pro: assets, bg, photo_env, photo_faces
   const knownSecondLevelFolders3d = ['sign', 'icons', 'logos', 'numbers', 'other', 'shapes', 'tech', 'yandex'];
   const knownSecondLevelFoldersPhoto = ['pro', 'ai_reskill', 'old_reskill'];
+  const knownSecondLevelFoldersPro = ['assets', 'bg', 'photo_env', 'photo_faces'];
+  
+  // Расширенный список возможных имен папок для автоматического обнаружения
+  // Включает все возможные варианты имен, которые могут встречаться в проекте
+  const extendedFolderNames = [
+    // Основные категории
+    'assets', 'bg', 'backgrounds', 'images', 'img', 'pictures', 'pics', 'photos', 'photo',
+    // Специфичные для проекта
+    'photo_env', 'photo_faces', 'photo_envs', 'faces', 'environments', 'env',
+    'icons', 'logos', 'numbers', 'shapes', 'sign', 'signs', 'tech', 'yandex',
+    'other', 'others',
+    // Общие категории
+    'textures', 'patterns', 'overlays', 'frames', 'borders', 'elements', 
+    'graphics', 'illustrations', 'vectors', 'svg', 'png', 'jpg',
+    // Варианты написания
+    'ai_reskill', 'old_reskill', 'reskill', 'ai', 'old',
+    // Числовые и буквенные варианты (для динамических папок)
+    '01', '02', '03', '04', '05', '06', '07', '08', '09', '10',
+    '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
+  ];
   
   // Функция для проверки существования папки (проверяем наличие хотя бы одного файла)
   const checkFolderExists = async (folder1, folder2) => {
     // Если folder1 пустой, проверяем assets/folder2/
     const basePath = folder1 ? `assets/${folder1}/${folder2}` : `assets/${folder2}`;
     
-    // Проверяем только первые 3 файла параллельно для быстрой проверки
-    // Если ни один не найден, папка скорее всего не существует
+    // Специальная обработка для папки bg (файлы с особыми именами)
+    if (folder2 === 'bg') {
+      // Проверяем известные файлы фонов PRO
+      const bgFileNames = [
+        'shape=triangle, inside=green, theme=dark',
+        'shape=triangle, inside=green, theme=light',
+        'shape=triangle, inside=black, theme=dark',
+        'shape=triangle, inside=white, theme=light',
+        'shape=circle, inside=green, theme=dark',
+        'shape=circle, inside=green, theme=light',
+        'shape=circle, inside=black, theme=dark',
+        'shape=circle, inside=white, theme=light',
+        'shape=square, inside=green, theme=dark',
+        'shape=square, inside=green, theme=light',
+        'shape=square, inside=black, theme=dark',
+        'shape=square, inside=white, theme=light',
+        'shape=8, inside=green, theme=dark',
+        'shape=8, inside=green, theme=light',
+        'shape=8, inside=black, theme=dark',
+        'shape=8, inside=white, theme=light'
+      ];
+      
+      const bgCheckPromises = bgFileNames.map(name => 
+        Promise.all([
+          checkFileExists(`${basePath}/${name}.webp`),
+          checkFileExists(`${basePath}/${name}.png`)
+        ])
+      );
+      
+      const bgResults = await Promise.all(bgCheckPromises);
+      for (const results of bgResults) {
+        if (results[0] || results[1]) {
+          return true;
+        }
+      }
+    }
+    
+    // Проверяем только первые 3 файла параллельно для быстрой проверки (только .webp — в assets нет .jpg)
     const quickCheckPromises = [];
     for (let i = 1; i <= 3; i++) {
       const num = i.toString().padStart(2, '0');
-      quickCheckPromises.push(
-        checkFileExists(`${basePath}/${num}.webp`),
-        checkFileExists(`${basePath}/${num}.jpg`)
-      );
+      quickCheckPromises.push(checkFileExists(`${basePath}/${num}.webp`));
     }
     
     const quickResults = await Promise.all(quickCheckPromises);
+    if (quickResults.some(Boolean)) return true;
     
-    // Проверяем результаты
-    for (let i = 0; i < quickResults.length; i += 2) {
-      if (quickResults[i] || quickResults[i + 1]) {
-        return true;
-      }
-    }
-    
-    // Если первые 3 файла не найдены, проверяем еще несколько распространенных имен
+    // Дополнительно проверяем распространённые имена (только .webp)
     const commonNames = ['01', '1'];
-    const commonCheckPromises = [];
     for (const name of commonNames) {
-      commonCheckPromises.push(
-        checkFileExists(`${basePath}/${name}.webp`),
-        checkFileExists(`${basePath}/${name}.jpg`)
-      );
-    }
-    
-    const commonResults = await Promise.all(commonCheckPromises);
-    for (let i = 0; i < commonResults.length; i += 2) {
-      if (commonResults[i] || commonResults[i + 1]) {
-        return true;
-      }
+      if (await checkFileExists(`${basePath}/${name}.webp`)) return true;
     }
     
     return false;
@@ -432,7 +387,50 @@ export const scanKV = async () => {
   const scanFolder = async (folder1, folder2) => {
     const basePath = folder1 ? `assets/${folder1}/${folder2}` : `assets/${folder2}`;
     
-    // Используем умную проверку файлов с ранней остановкой
+    // Специальная обработка для папки bg (файлы с особыми именами)
+    if (folder2 === 'bg') {
+      const bgFiles = [];
+      const shapes = ['triangle', 'circle', 'square', '8'];
+      const insides = ['green', 'black', 'white'];
+      const themes = ['dark', 'light'];
+
+      const bgCandidateUrls = [];
+      for (const shape of shapes) {
+        for (const inside of insides) {
+          for (const theme of themes) {
+            const fileName = `shape=${shape}, inside=${inside}, theme=${theme}`;
+            bgCandidateUrls.push(`${basePath}/${fileName}.webp`);
+            bgCandidateUrls.push(`${basePath}/${fileName}.png`);
+          }
+        }
+      }
+      const bgFoundUrls = await checkFilesParallel(bgCandidateUrls, 10);
+
+      const byKey = {};
+      for (const url of bgFoundUrls) {
+        const filePart = url.split('/').pop();
+        const [baseName, ext] = filePart.split('.');
+        const key = baseName;
+        if (!byKey[key] || ext === 'webp') {
+          byKey[key] = ext;
+        }
+      }
+      for (const [fileName, ext] of Object.entries(byKey)) {
+        const parts = fileName.split(', ');
+        const shape = parts[0] ? parts[0].split('=')[1] || '' : '';
+        const inside = parts[1] ? parts[1].split('=')[1] || '' : '';
+        const theme = parts[2] ? parts[2].split('=')[1] || '' : '';
+        const displayName = `${shape} ${inside} ${theme}`;
+        bgFiles.push({
+          name: displayName,
+          file: `${basePath}/${fileName}.${ext}`
+        });
+      }
+
+      return bgFiles;
+    }
+    
+    // Используем умную проверку файлов с ранней остановкой для числовых файлов
     return await checkFilesSmart(basePath, 1, 99, 5);
   };
   
@@ -442,9 +440,14 @@ export const scanKV = async () => {
     const discoveredFolders = new Set();
     
     // Выбираем список известных папок в зависимости от папки первого уровня
-    const knownSecondLevelFolders = folder1 === 'photo' 
-      ? knownSecondLevelFoldersPhoto 
-      : knownSecondLevelFolders3d;
+    let knownSecondLevelFolders;
+    if (folder1 === 'photo') {
+      knownSecondLevelFolders = knownSecondLevelFoldersPhoto;
+    } else if (folder1 === 'pro') {
+      knownSecondLevelFolders = knownSecondLevelFoldersPro;
+    } else {
+      knownSecondLevelFolders = knownSecondLevelFolders3d;
+    }
     
     // Проверяем известные папки параллельно для ускорения
     const checkPromises = knownSecondLevelFolders.map(async (folder2) => {
@@ -456,17 +459,11 @@ export const scanKV = async () => {
     
     await Promise.all(checkPromises);
     
-    // Также пробуем проверить другие возможные имена папок
-    // Проверяем распространенные имена папок, которые могут быть добавлены
-    const additionalFoldersToCheck = [
-      'backgrounds', 'bg', 'images', 'img', 'pictures', 'pics', 
-      'textures', 'patterns', 'overlays', 'frames', 'borders',
-      'elements', 'graphics', 'illustrations', 'vectors'
-    ];
-    
-    const additionalCheckPromises = additionalFoldersToCheck.map(async (folder2) => {
-      // Проверяем только если папка еще не обнаружена
-      if (!discoveredFolders.has(folder2)) {
+    // Для assets/3d/, assets/photo/ и assets/pro/ не проверяем расширенный список —
+    // только известные папки, чтобы не слать сотни HEAD-запросов по несуществующим путям (404 в консоли)
+    if (folder1 !== '3d' && folder1 !== 'photo' && folder1 !== 'pro') {
+    const additionalCheckPromises = extendedFolderNames.map(async (folder2) => {
+      if (!discoveredFolders.has(folder2) && !knownSecondLevelFolders.includes(folder2)) {
         const exists = await checkFolderExists(folder1, folder2);
         if (exists) {
           discoveredFolders.add(folder2);
@@ -474,7 +471,12 @@ export const scanKV = async () => {
       }
     });
     
-    await Promise.all(additionalCheckPromises);
+    const batchSize = 10;
+    for (let i = 0; i < additionalCheckPromises.length; i += batchSize) {
+      const batch = additionalCheckPromises.slice(i, i + batchSize);
+      await Promise.all(batch);
+    }
+    }
     
     const secondLevelFolders = Array.from(discoveredFolders);
     
@@ -596,7 +598,16 @@ export const scanFonts = async () => {
   // Сканируем каждую папку
   for (const folder of fontFolders) {
     const fontFamily = folder;
-    
+    // Один запрос на папку: если папки нет на сервере — пропускаем (меньше 404 в консоли)
+    const canonicalPath = `font/${folder}/${fontFamily}-Regular.woff2`;
+    const folderExists = await checkFileExists(canonicalPath);
+    if (!folderExists) {
+      const fallbackPath = `font/${folder}/${fontFamily}-Regular.ttf`;
+      if (!(await checkFileExists(fallbackPath))) {
+        continue;
+      }
+    }
+
     // Сканируем файлы в папке
     // Проверяем только формат с дефисом (как в проекте): "YS Text-Regular.woff2"
     const fontPromises = [];

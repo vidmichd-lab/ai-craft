@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+*.pyc
+__pycache__/
+
+# Environment
+.env
+.env.local
+config.json
+
+# Logs
+*.log
+
+# Deploy manifest (local cache for fast incremental deploy)
+.deploy-manifest
+
+# Temp files
+*.tmp

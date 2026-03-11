@@ -14,10 +14,71 @@ export const registerHandler = (selector, handler) => {
 };
 
 /**
+ * Показывает overlay с drag-and-drop зоной вместо прямого вызова file input.
+ * @param {HTMLInputElement} fileInput - элемент <input type="file">
+ */
+function showUploadDropzone(fileInput) {
+  const accept = fileInput.getAttribute('accept') || '*/*';
+  const formats = accept.replace(/image\//g, '').replace(/,/g, ', ').toUpperCase();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'upload-overlay';
+  overlay.innerHTML = `
+    <div class="upload-dropzone" id="upload-dropzone-inner">
+      <div class="upload-icon">upload_file</div>
+      <div class="upload-text">Перетащите файл или нажмите для выбора</div>
+      <div class="upload-formats">${formats}</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const zone = overlay.querySelector('#upload-dropzone-inner');
+
+  const close = () => overlay.remove();
+
+  // Click on dropzone → trigger native file dialog
+  zone.addEventListener('click', () => fileInput.click());
+
+  // Click on overlay background → close
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  // Prevent browser from opening file when dropped on overlay background
+  overlay.addEventListener('dragover', (e) => e.preventDefault());
+  overlay.addEventListener('drop', (e) => e.preventDefault());
+
+  // Escape key → close
+  const onKey = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+
+  // Drag events
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const dt = new DataTransfer();
+      dt.items.add(files[0]);
+      fileInput.files = dt.files;
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      close();
+    }
+  });
+
+  const onFileChange = () => { close(); fileInput.removeEventListener('change', onFileChange); };
+  fileInput.addEventListener('change', onFileChange);
+}
+
+/**
  * Инициализирует делегирование событий
  * Вызывается после загрузки всех модулей
  */
 export const initEventDelegation = () => {
+  console.log('[EventHandler] Инициализация системы делегирования событий...');
+  
   // Обработка кликов с data-action
   document.addEventListener('click', (e) => {
     const target = e.target.closest('[data-action]');
@@ -37,7 +98,7 @@ export const initEventDelegation = () => {
       const inputId = target.dataset.inputId;
       if (inputId) {
         const input = document.getElementById(inputId);
-        if (input) input.click();
+        if (input) showUploadDropzone(input);
       }
     }
   });
@@ -594,6 +655,8 @@ export const initEventDelegation = () => {
       }
     }
   });
+  
+  console.log('[EventHandler] Система делегирования событий полностью инициализирована');
 };
 
 /**

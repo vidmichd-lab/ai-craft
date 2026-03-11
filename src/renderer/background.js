@@ -83,15 +83,21 @@ export const drawBackground = (ctx, width, height, state) => {
       }
     } else {
       // Cover (по умолчанию): изображение заполняет весь canvas, сохраняя пропорции
+      // Сначала вычисляем размер, который покрывает canvas
+      let coverWidth, coverHeight;
       if (baseImgAspect > canvasAspect) {
         // Изображение шире - подгоняем по высоте
-        drawHeight = height;
-        drawWidth = height * baseImgAspect;
+        coverHeight = height;
+        coverWidth = height * baseImgAspect;
       } else {
         // Изображение выше - подгоняем по ширине
-        drawWidth = width;
-        drawHeight = width / baseImgAspect;
+        coverWidth = width;
+        coverHeight = width / baseImgAspect;
       }
+      
+      // Применяем масштабирование bgImageSize к размеру, который покрывает canvas
+      drawWidth = coverWidth * (bgImageSize / 100);
+      drawHeight = coverHeight * (bgImageSize / 100);
     }
     
     // Для tile рисуем мозаику

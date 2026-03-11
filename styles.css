@@ -132,6 +132,20 @@
   /* Сначала системный sans-serif, затем YS Text после загрузки */
   --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'YS Text', sans-serif;
   --font-family-logo: 'YS Logotype', var(--font-family-base);
+
+  /* Interactive elements (buttons, chips, toggles) */
+  --interactive-radius: 8px;
+  --interactive-radius-sm: 6px;
+  --interactive-transition: 150ms ease;
+  --btn-height: 36px;
+  --btn-height-sm: 28px;
+  --btn-height-xs: 24px;
+  --btn-padding: 0 16px;
+  --btn-padding-sm: 0 12px;
+  --btn-padding-xs: 0 8px;
+  --btn-font-size: 13px;
+  --btn-font-size-sm: 12px;
+  --btn-font-size-xs: 11px;
 }
 
 [data-theme="light"] {
@@ -192,6 +206,12 @@ body {
 }
 
 
+.header-title-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
 .header h1 {
   font-family: var(--font-family-base);
   font-size: var(--font-size-xl);
@@ -201,6 +221,13 @@ body {
   transition: color 0.3s ease;
   margin: 0;
   line-height: 1.4;
+}
+
+.header h1 .app-version {
+  color: var(--text-secondary);
+  font-size: 0.6em;
+  font-weight: normal;
+  margin-left: var(--spacing-sm);
 }
 
 
@@ -259,6 +286,45 @@ body {
   font-size: 18px;
 }
 
+/* Стили для тегов режимов под заголовком */
+.mode-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mode-tag {
+  padding: 4px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+  font-family: var(--font-family-base);
+  outline: none;
+}
+
+.mode-tag:hover {
+  background: var(--bg-hover, #1a1a1a);
+  border-color: var(--accent-color, #027EF2);
+}
+
+.mode-tag.active {
+  background: var(--accent-color, #027EF2);
+  color: white;
+  border-color: var(--accent-color, #027EF2);
+  font-weight: 600;
+}
+
+.mode-tag:focus-visible {
+  outline: 2px solid var(--accent-color, #027EF2);
+  outline-offset: 2px;
+}
+
 .theme-icon {
   display: flex;
   align-items: center;
@@ -279,6 +345,7 @@ body {
   word-wrap: normal;
   direction: ltr;
   -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
   vertical-align: middle;
 }
@@ -959,7 +1026,7 @@ input[type="checkbox"]:focus-visible {
   margin-top: 0;
   margin-bottom: 0;
   flex-shrink: 0;
-  transition: all var(--transition-base);
+  transition: all var(--interactive-transition);
 }
 
 .toggle-switch:hover {
@@ -1057,7 +1124,13 @@ input[type="checkbox"]:focus-visible {
 
 .toggle-switch-option.active {
   color: var(--text-primary);
-  background: var(--bg-active);
+  font-weight: var(--font-weight-semibold);
+  z-index: 2;
+}
+
+.toggle-switch-slider {
+  background: var(--accent-color, #027EF2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 
@@ -1066,16 +1139,16 @@ input[type="checkbox"]:focus-visible {
   background: var(--border-color);
   border: none;
   color: var(--text-primary);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
+  padding: var(--btn-padding);
+  border-radius: var(--interactive-radius);
+  font-size: var(--btn-font-size);
   font-family: var(--font-family-base);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: all var(--interactive-transition);
   outline: none;
   letter-spacing: -0.1px;
-  height: var(--height-md);
+  height: var(--btn-height);
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -1146,12 +1219,12 @@ input[type="checkbox"]:focus-visible {
   border: none;
   color: var(--text-secondary);
   padding: var(--spacing-md) var(--spacing-md);
-  border-radius: 8px;
+  border-radius: var(--interactive-radius-sm);
   font-size: var(--font-size-sm);
   font-family: var(--font-family-base);
   cursor: pointer;
   text-align: center;
-  transition: all 0.2s ease;
+  transition: all var(--interactive-transition);
   font-weight: 500;
   letter-spacing: -0.1px;
   line-height: 1.4;
@@ -1220,22 +1293,22 @@ input[type="checkbox"]:focus-visible {
 
 
 .btn-small {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: var(--font-size-sm);
+  height: var(--btn-height-sm);
+  padding: var(--btn-padding-sm);
+  border-radius: var(--interactive-radius-sm);
+  font-size: var(--btn-font-size-sm);
   font-family: var(--font-family-base);
-  height: var(--height-sm);
   line-height: 1.4;
-  border-radius: var(--radius-sm);
 }
 
 .btn-tiny {
-  padding: var(--spacing-xs) var(--spacing-md);
-  font-size: var(--font-size-sm);
+  height: var(--btn-height-xs);
+  padding: var(--btn-padding-xs);
+  border-radius: var(--interactive-radius-sm);
+  font-size: var(--btn-font-size-xs);
   font-family: var(--font-family-base);
   white-space: nowrap;
-  height: var(--height-sm);
   line-height: 1.4;
-  border-radius: var(--radius-sm);
 }
 
 
@@ -1399,6 +1472,7 @@ input[type="range"]::-moz-range-thumb:hover {
   color: var(--text-primary);
   font-size: var(--font-size-xs);
   font-family: var(--font-family-base);
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -2602,3 +2676,54 @@ input[type="range"]::-moz-range-thumb:hover {
         font-weight: var(--font-weight-semibold);
     }
         
+
+.upload-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upload-dropzone {
+  border: 2px dashed var(--border-color, #555);
+  border-radius: var(--interactive-radius, 8px);
+  padding: 40px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 150ms ease;
+  background: var(--bg-secondary, #2a2a2a);
+  min-width: 320px;
+  max-width: 480px;
+}
+.upload-dropzone:hover,
+.upload-dropzone.dragover {
+  border-color: var(--accent-color, #ff6633);
+  background: rgba(255,102,51,0.08);
+}
+.upload-dropzone .upload-icon {
+  font-size: 40px;
+  opacity: 0.5;
+  margin-bottom: 12px;
+  font-family: 'Material Icons';
+}
+.upload-dropzone .upload-text {
+  font-size: 14px;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+.upload-dropzone .upload-formats {
+  font-size: 11px;
+  opacity: 0.45;
+  margin-top: 6px;
+}
+.upload-dropzone .upload-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  cursor: pointer;
+  opacity: 0.6;
+  font-family: 'Material Icons';
+  font-size: 20px;
+}

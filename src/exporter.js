@@ -34,6 +34,46 @@ const getRendererInternals = () => {
   return renderer.__unsafe_getRenderToCanvas();
 };
 
+/** Load a single image from URL (uses cache). Returns Promise<Image>; use .catch(() => null) for preload. */
+const loadImage = (url) => {
+  if (!url || typeof url !== 'string') return Promise.resolve(null);
+  const absoluteUrl = !url.startsWith('http') && !url.startsWith('data:')
+    ? new URL(url, window.location.origin).href
+    : url;
+  return Promise.race([
+    loadImageCached(absoluteUrl, { useCache: true, showBlur: false }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+  ]).then((cached) => {
+    const imgUrl = cached && cached.url ? cached.url : absoluteUrl;
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = imgUrl;
+    });
+  }).catch((e) => {
+    console.warn('Ошибка загрузки изображения, используем прямой URL:', e);
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = absoluteUrl;
+    });
+  });
+};
+
+async function renderSizeToBlob(canvas, width, height, state, format, quality) {
+  const { renderToCanvas } = getRendererInternals();
+  canvas.width = width;
+  canvas.height = height;
+  renderToCanvas(canvas, width, height, state);
+  await new Promise(r => setTimeout(r, 0));
+  const blob = await new Promise(r => canvas.toBlob(r, `image/${format}`, quality));
+  return blob;
+}
+
 // Функция для создания безопасного имени папки из заголовка
 const sanitizeFolderName = (title) => {
   if (!title || title.trim() === '') {
@@ -71,243 +111,157 @@ const exportSizes = async (format) => {
   const zip = new JSZip();
   const { renderToCanvas } = getRendererInternals();
 
+  // Предзагрузка всех KV и BG изображений параллельно
+  const pairAssets = await Promise.all(
+    pairs.map(async (pair) => {
+      const [kv, bg] = await Promise.all([
+        pair.kvSelected ? loadImage(pair.kvSelected).catch(() => null) : Promise.resolve(null),
+        pair.bgImageSelected
+          ? (typeof pair.bgImageSelected === 'string'
+            ? loadImage(pair.bgImageSelected).catch(() => null)
+            : Promise.resolve(pair.bgImageSelected))
+          : Promise.resolve(null)
+      ]);
+      return { kv, bg };
+    })
+  );
+
+  const totalSizes = pairs.length * sizes.length;
+  let completed = 0;
+  if (typeof updateExportProgress === 'function') updateExportProgress(0);
+
   // Экспортируем для каждой пары заголовок/подзаголовок
   for (let pairIndex = 0; pairIndex < pairs.length; pairIndex++) {
     const pair = pairs[pairIndex];
     const folderName = sanitizeFolderName(pair.title);
-    
-    // Загружаем KV для этой пары, если указан
-    let pairKV = null;
-    if (pair.kvSelected) {
-      try {
-        const src = pair.kvSelected;
-        const absoluteUrl = src && !src.startsWith('http') && !src.startsWith('data:')
-          ? new URL(src, window.location.origin).href
-          : src;
-        
-        // Используем кеш для загрузки с fallback
-        let imgUrl = absoluteUrl;
-        try {
-          const cached = await Promise.race([
-            loadImageCached(absoluteUrl, { useCache: true, showBlur: false }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
-          ]);
-          imgUrl = cached.url;
-        } catch (e) {
-          console.warn('Ошибка загрузки через кеш, используем прямой URL:', e);
-        }
-        
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-          img.src = imgUrl;
-        });
-        pairKV = img;
-      } catch (e) {
-        console.warn(`Не удалось загрузить KV для пары ${pairIndex}: ${pair.kvSelected}`, e);
-      }
-    }
-    
-    // Используем фоновое изображение из пары, если оно есть
-    // Если это строка (путь к файлу), загружаем изображение
-    let pairBgImage = null;
-    if (pair.bgImageSelected) {
-      if (typeof pair.bgImageSelected === 'string') {
-        // Это путь к файлу, загружаем изображение
-        try {
-          const src = pair.bgImageSelected;
-          const absoluteUrl = src && !src.startsWith('http') && !src.startsWith('data:')
-            ? new URL(src, window.location.origin).href
-            : src;
-          
-          // Используем кеш для загрузки с fallback
-          let imgUrl = absoluteUrl;
-          try {
-            const cached = await Promise.race([
-              loadImageCached(absoluteUrl, { useCache: true, showBlur: false }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
-            ]);
-            imgUrl = cached.url;
-          } catch (e) {
-            console.warn('Ошибка загрузки через кеш, используем прямой URL:', e);
-          }
-          
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = imgUrl;
-          });
-          pairBgImage = img;
-        } catch (e) {
-          console.warn(`Не удалось загрузить фоновое изображение для пары ${pairIndex}: ${pair.bgImageSelected}`, e);
-        }
-      } else {
-        // Это уже объект Image
-        pairBgImage = pair.bgImageSelected;
-      }
-    }
-    
-    // Экспортируем все размеры для этой пары
+    const pairKV = pairAssets[pairIndex].kv;
+    const pairBgImage = pairAssets[pairIndex].bg;
+
     const exportScale = state.exportScale || 1;
-    for (let sizeIndex = 0; sizeIndex < sizes.length; sizeIndex++) {
-      const size = sizes[sizeIndex];
-      
-      // Создаем state для этой пары и размера
-      const exportState = { 
-        ...state, 
-        showBlocks: false, 
-        showGuides: false,
-        title: pair.title || '',
-        subtitle: pair.subtitle || '',
-        kv: pairKV,
-        kvSelected: pair.kvSelected || '',
-        bgImage: pairBgImage,
-        bgColor: pair.bgColor || state.bgColor,
-        platform: size.platform || 'unknown' // Передаем платформу для проверки рамки Хабра
-      };
-      const canvas = document.createElement('canvas');
-      
-      // Применяем масштаб к размерам canvas
-      const scaledWidth = size.width * exportScale;
-      const scaledHeight = size.height * exportScale;
+    const BATCH_SIZE = 4;
+    const quality = format === 'jpeg' ? 0.95 : 1;
 
-      try {
-        renderToCanvas(canvas, scaledWidth, scaledHeight, exportState);
-      } catch (e) {
-        console.error(e);
-        alert('Ошибка экспорта. Запустите проект через локальный сервер.');
-        return;
-      }
+    for (let i = 0; i < sizes.length; i += BATCH_SIZE) {
+      const batch = sizes.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(async (size) => {
+          const exportState = {
+            ...state,
+            showBlocks: false,
+            showGuides: false,
+            title: pair.title || '',
+            subtitle: pair.subtitle || '',
+            kv: pairKV,
+            kvSelected: pair.kvSelected || '',
+            bgImage: pairBgImage,
+            bgColor: pair.bgColor || state.bgColor,
+            platform: size.platform || 'unknown'
+          };
+          const canvas = document.createElement('canvas');
+          const scaledWidth = size.width * exportScale;
+          const scaledHeight = size.height * exportScale;
 
-      const quality = format === 'jpeg' ? 0.95 : 1;
-      let blob = await new Promise((resolve) => canvas.toBlob(resolve, `image/${format}`, quality));
-      if (!blob) {
-        alert('Не удалось сформировать изображение. Возможно, холст «tainted».');
-        return;
-      }
-
-      // Оптимизируем изображение по весу до указанного размера
-      try {
-        // Получаем настройки веса файла из state
-        const maxFileSizeUnit = state.maxFileSizeUnit || 'KB';
-        const maxFileSizeValue = state.maxFileSizeValue || 150;
-        // Конвертируем в байты
-        const maxSizeBytes = maxFileSizeUnit === 'KB' ? maxFileSizeValue * 1024 : maxFileSizeValue * 1024 * 1024;
-        
-        // Если изображение уже меньше целевого размера, пропускаем сжатие
-        if (blob.size <= maxSizeBytes) {
-          console.log(`Изображение уже соответствует размеру: ${(blob.size / 1024).toFixed(2)} KB (максимум: ${(maxSizeBytes / 1024).toFixed(2)} KB)`);
-        } else {
-          // Проверяем наличие библиотеки оптимизации (может быть доступна через window или глобально)
-          let compressionLib = null;
-          if (typeof window !== 'undefined') {
-            compressionLib = window.imageCompression?.default || window.imageCompression || null;
+          let blob;
+          try {
+            blob = await renderSizeToBlob(canvas, scaledWidth, scaledHeight, exportState, format, quality);
+          } catch (e) {
+            console.error(e);
+            alert('Ошибка экспорта. Запустите проект через локальный сервер.');
+            throw e;
           }
-          if (!compressionLib && typeof imageCompression !== 'undefined') {
-            compressionLib = imageCompression.default || imageCompression;
+          if (!blob) {
+            alert('Не удалось сформировать изображение. Возможно, холст «tainted».');
+            throw new Error('toBlob failed');
           }
-          
-          if (compressionLib) {
-            const originalSize = blob.size;
-            // Конвертируем в MB для библиотеки
-            const maxSizeMB = maxSizeBytes / (1024 * 1024);
-            
-            // Итеративно снижаем качество, пока не достигнем целевого размера
-            let currentBlob = blob;
-            let quality = format === 'jpeg' ? 0.9 : 0.95;
-            let attempts = 0;
-            const maxAttempts = 10;
-            const qualityStep = 0.1;
-            
-            while (currentBlob.size > maxSizeBytes && attempts < maxAttempts && quality > 0.1) {
-              const options = {
-                maxSizeMB: maxSizeMB, // Максимальный размер в MB из настроек
-                maxWidthOrHeight: Math.max(scaledWidth, scaledHeight), // Сохраняем размер
-                useWebWorker: true, // Используем Web Worker для лучшей производительности
-                fileType: `image/${format}`,
-                initialQuality: quality, // Качество для оптимизации
-                alwaysKeepResolution: true // Сохраняем разрешение
-              };
-              
-              // Конвертируем blob в File для библиотеки
-              const file = new File([currentBlob], `temp.${format === 'jpeg' ? 'jpg' : format}`, { 
-                type: `image/${format}` 
-              });
-              
-              try {
-                // Оптимизируем изображение
-                const compressedFile = await compressionLib(file, options);
-                
-                // Если сжатие не помогло или размер все еще больше целевого, снижаем качество
-                if (compressedFile.size >= currentBlob.size || compressedFile.size > maxSizeBytes) {
-                  quality -= qualityStep;
-                  attempts++;
-                  continue;
-                }
-                
-                currentBlob = compressedFile;
-                
-                // Если достигли целевого размера, выходим
-                if (currentBlob.size <= maxSizeBytes) {
-                  break;
-                }
-                
-                // Если размер все еще больше, но уменьшился, продолжаем с тем же качеством
-                // или немного снижаем для следующей итерации
-                if (currentBlob.size < maxSizeBytes * 1.1) {
-                  // Близко к целевому размеру, можно остановиться
-                  break;
-                }
-                
-                quality -= qualityStep;
-                attempts++;
-              } catch (e) {
-                console.warn(`Ошибка при попытке сжатия (качество ${quality}):`, e);
-                quality -= qualityStep;
-                attempts++;
-              }
-            }
-            
-            if (currentBlob.size <= maxSizeBytes || currentBlob.size < originalSize) {
-              blob = currentBlob;
-              const savedPercent = ((1 - blob.size / originalSize) * 100).toFixed(1);
-              const finalSizeKB = (blob.size / 1024).toFixed(2);
-              const targetSizeKB = (maxSizeBytes / 1024).toFixed(2);
-              console.log(`Сжато до ${finalSizeKB} KB (цель: ${targetSizeKB} KB, экономия ${savedPercent}%)`);
+
+          try {
+            const maxFileSizeUnit = state.maxFileSizeUnit || 'KB';
+            const maxFileSizeValue = state.maxFileSizeValue || 150;
+            const maxSizeBytes = maxFileSizeUnit === 'KB' ? maxFileSizeValue * 1024 : maxFileSizeValue * 1024 * 1024;
+
+            if (blob.size <= maxSizeBytes) {
+              // skip compression
             } else {
-              console.warn(`Не удалось сжать до целевого размера. Текущий размер: ${(currentBlob.size / 1024).toFixed(2)} KB, цель: ${(maxSizeBytes / 1024).toFixed(2)} KB`);
-              // Используем лучшее сжатие, которое удалось получить
-              if (currentBlob.size < originalSize) {
-                blob = currentBlob;
+              let compressionLib = null;
+              if (typeof window !== 'undefined') {
+                compressionLib = window.imageCompression?.default || window.imageCompression || null;
+              }
+              if (!compressionLib && typeof imageCompression !== 'undefined') {
+                compressionLib = imageCompression.default || imageCompression;
+              }
+
+              if (compressionLib) {
+                const originalSize = blob.size;
+                const maxSizeMB = maxSizeBytes / (1024 * 1024);
+                const isPNG = format === 'png';
+
+                if (isPNG) {
+                  const options = {
+                    maxSizeMB: maxSizeMB,
+                    maxWidthOrHeight: Math.max(scaledWidth, scaledHeight),
+                    useWebWorker: true,
+                    fileType: `image/${format}`,
+                    initialQuality: 0.9,
+                    alwaysKeepResolution: true
+                  };
+                  const file = new File([blob], `temp.${format === 'jpeg' ? 'jpg' : format}`, { type: `image/${format}` });
+                  try {
+                    const compressedFile = await compressionLib(file, options);
+                    if (compressedFile.size < blob.size) blob = compressedFile;
+                  } catch (e) {
+                    console.warn('Ошибка при сжатии PNG, используем оригинал:', e);
+                  }
+                } else {
+                  let currentBlob = blob;
+                  let q = 0.85;
+                  let attempts = 0;
+                  const maxAttempts = 3;
+                  const qualityStep = 0.15;
+                  while (currentBlob.size > maxSizeBytes && attempts < maxAttempts && q > 0.3) {
+                    const options = {
+                      maxSizeMB: maxSizeMB,
+                      maxWidthOrHeight: Math.max(scaledWidth, scaledHeight),
+                      useWebWorker: true,
+                      fileType: `image/${format}`,
+                      initialQuality: q,
+                      alwaysKeepResolution: true
+                    };
+                    const file = new File([currentBlob], `temp.${format === 'jpeg' ? 'jpg' : format}`, { type: `image/${format}` });
+                    try {
+                      const compressedFile = await compressionLib(file, options);
+                      if (compressedFile.size < currentBlob.size && compressedFile.size <= maxSizeBytes) {
+                        currentBlob = compressedFile;
+                        break;
+                      }
+                      if (compressedFile.size < currentBlob.size) currentBlob = compressedFile;
+                      q -= qualityStep;
+                      attempts++;
+                    } catch (e) {
+                      console.warn(`Ошибка при попытке сжатия (качество ${q}):`, e);
+                      q -= qualityStep;
+                      attempts++;
+                    }
+                  }
+                  if (currentBlob.size < originalSize) blob = currentBlob;
+                }
+              } else {
+                const compressedBlob = await compressCanvasImage(canvas, format, maxSizeBytes);
+                if (compressedBlob) blob = compressedBlob;
               }
             }
-          } else {
-            // Если библиотека недоступна, используем встроенное сжатие canvas
-            console.warn('Библиотека imageCompression недоступна, используем встроенное сжатие canvas');
-            const compressedBlob = await compressCanvasImage(canvas, format, maxSizeBytes);
-            if (compressedBlob) {
-              blob = compressedBlob;
-              const finalSizeKB = (blob.size / 1024).toFixed(2);
-              const targetSizeKB = (maxSizeBytes / 1024).toFixed(2);
-              console.log(`Сжато через canvas до ${finalSizeKB} KB (цель: ${targetSizeKB} KB)`);
-            }
+          } catch (compressionError) {
+            console.warn('Ошибка оптимизации изображения, используем оригинал:', compressionError);
           }
-        }
-      } catch (compressionError) {
-        console.warn('Ошибка оптимизации изображения, используем оригинал:', compressionError);
-        // Продолжаем с оригинальным blob, если оптимизация не удалась
-      }
 
-      const platform = (size.platform || 'unknown').toString();
-      // В имени файла оставляем оригинальный размер, но фактически экспортируем в масштабе
-      const filename = `${folderName}/${platform}/${size.width}x${size.height}.${format === 'jpeg' ? 'jpg' : format}`;
-      
-      // Добавляем файл в ZIP
-      zip.file(filename, blob);
+          const platform = (size.platform || 'unknown').toString();
+          const filename = `${folderName}/${platform}/${size.width}x${size.height}.${format === 'jpeg' ? 'jpg' : format}`;
+          return { path: filename, blob };
+        })
+      );
+      results.forEach((r) => zip.file(r.path, r.blob));
+      completed += batch.length;
+      const pct = Math.round((completed / totalSizes) * 100);
+      if (typeof updateExportProgress === 'function') updateExportProgress(pct);
     }
   }
 

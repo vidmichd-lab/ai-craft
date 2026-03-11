@@ -6,7 +6,7 @@
 const memoryCache = new Map();
 const loadingPromises = new Map();
 
-// IndexedDB для персистентного кеша
+const MAX_MEMORY_CACHE_SIZE = 50;
 let db = null;
 const DB_NAME = 'imageCache';
 const DB_VERSION = 1;
@@ -38,6 +38,21 @@ const initDB = () => {
       }
     };
   });
+};
+
+/**
+ * Evict oldest memory cache entries when over limit; revokes their Object URLs.
+ */
+const evictMemoryCacheIfNeeded = () => {
+  while (memoryCache.size >= MAX_MEMORY_CACHE_SIZE) {
+    const firstKey = memoryCache.keys().next().value;
+    if (firstKey === undefined) break;
+    const entry = memoryCache.get(firstKey);
+    if (entry && entry.url) {
+      URL.revokeObjectURL(entry.url);
+    }
+    memoryCache.delete(firstKey);
+  }
 };
 
 /**
@@ -123,6 +138,9 @@ const saveToDB = async (url, blob, blurHash) => {
  */
 const getFromDB = async (url) => {
   try {
+    if (memoryCache.has(url)) {
+      return memoryCache.get(url);
+    }
     const database = await initDB();
     const transaction = database.transaction([STORE_NAME], 'readonly');
     const store = transaction.objectStore(STORE_NAME);
@@ -135,11 +153,14 @@ const getFromDB = async (url) => {
           // Проверяем, не устарел ли кеш (7 дней)
           const maxAge = 7 * 24 * 60 * 60 * 1000;
           if (Date.now() - result.timestamp < maxAge) {
-            resolve({
+            evictMemoryCacheIfNeeded();
+            const cached = {
               blob: result.blob,
               blurHash: result.blurHash,
               url: URL.createObjectURL(result.blob)
-            });
+            };
+            memoryCache.set(url, cached);
+            resolve(cached);
             return;
           }
         }
@@ -240,6 +261,7 @@ export const loadImage = async (url, options = {}) => {
 
       // Сохраняем в кеш
       if (useCache) {
+        evictMemoryCacheIfNeeded();
         memoryCache.set(url, result);
         // Сохраняем в IndexedDB асинхронно (не блокируем)
         saveToDB(url, blob, blurHash).catch(err => 
@@ -282,17 +304,26 @@ export const clearOldCache = async (maxAge = 30 * 24 * 60 * 60 * 1000) => {
     const request = index.openCursor();
     const cutoff = Date.now() - maxAge;
     let deleted = 0;
+    const deletedUrls = [];
 
     return new Promise((resolve) => {
       request.onsuccess = (event) => {
         const cursor = event.target.result;
         if (cursor) {
           if (cursor.value.timestamp < cutoff) {
+            deletedUrls.push(cursor.value.url);
             cursor.delete();
             deleted++;
           }
           cursor.continue();
         } else {
+          for (const url of deletedUrls) {
+            const entry = memoryCache.get(url);
+            if (entry && entry.url) {
+              URL.revokeObjectURL(entry.url);
+              memoryCache.delete(url);
+            }
+          }
           resolve(deleted);
         }
       };
@@ -318,6 +349,18 @@ export const getBlurHash = async (url) => {
   }
   
   return await generateBlurHash(url);
+};
+
+/**
+ * Revokes all memory cache Object URLs and clears the Map.
+ */
+export const clearMemoryCache = () => {
+  for (const entry of memoryCache.values()) {
+    if (entry && entry.url) {
+      URL.revokeObjectURL(entry.url);
+    }
+  }
+  memoryCache.clear();
 };
 
 // Инициализация при загрузке модуля

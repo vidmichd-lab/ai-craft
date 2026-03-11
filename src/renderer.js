@@ -20,7 +20,7 @@ const getFontWeight = (weightName) => {
 // Функция для формирования строки font с fallback на системный sans-serif
 const getFontString = (weight, size, fontFamily) => {
   // Добавляем fallback на системный sans-serif перед загрузкой кастомного шрифта
-  const fontFamilyWithFallback = fontFamily ? `${fontFamily}, sans-serif` : 'sans-serif';
+  const fontFamilyWithFallback = fontFamily ? `"${fontFamily}", sans-serif` : 'sans-serif';
   return `${weight} ${size}px ${fontFamilyWithFallback}`;
 };
 
@@ -47,58 +47,36 @@ export { clearTextMeasurementCache };
 // Все утилиты импортируются из ./renderer/utils.js
 
 const renderToCanvas = (canvas, width, height, state) => {
-  try {
-    if (!canvas) {
-      console.error('Canvas элемент не передан в renderToCanvas');
-      return null;
-    }
-    
-    if (!state) {
-      console.error('Состояние не передано в renderToCanvas');
-      return null;
-    }
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      console.error('Не удалось получить контекст 2D для canvas');
-      return null;
-    }
-    
-    ctx.imageSmoothingQuality = 'high';
-    
-    // Проверяем валидность размеров
-    if (!width || !height || width <= 0 || height <= 0 || !isFinite(width) || !isFinite(height)) {
-      console.error('Некорректные размеры canvas:', { width, height, canvasId: canvas.id });
-      return null;
-    }
+  if (!canvas) {
+    console.error('Canvas элемент не передан в renderToCanvas');
+    return null;
+  }
   
+  if (!state) {
+    console.error('Состояние не передано в renderToCanvas');
+    return null;
+  }
+  
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    console.error('Не удалось получить контекст 2D для canvas');
+    return null;
+  }
+  
+  ctx.imageSmoothingQuality = 'high';
+  
+  // Проверяем валидность размеров
+  if (!width || !height || width <= 0 || height <= 0 || !isFinite(width) || !isFinite(height)) {
+    console.error('Некорректные размеры canvas:', { width, height, canvasId: canvas.id });
+    return null;
+  }
+ 
   // Устанавливаем размеры canvas
   canvas.width = width;
   canvas.height = height;
   ctx.clearRect(0, 0, width, height);
   
-  // В режиме Figma используем конструктор со слоями из Figma (не показываем просто изображение)
-  // Режим constructor - обычный конструктор без данных из Figma
-  // Режим figma - конструктор с данными из Figma (элементы уже применены к state)
-  
-  // Логируем размеры для отладки (только первый раз для каждого canvas)
-  const logKey = `_logged_${canvas.id}`;
-  if (!renderToCanvas[logKey]) {
-    console.log('Рендеринг canvas:', { 
-      canvasId: canvas.id, 
-      width, 
-      height,
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
-      state: {
-        bgColor: state.bgColor,
-        title: state.title,
-        showKV: state.showKV,
-        showLogo: state.showLogo && !!state.logo
-      }
-    });
-    renderToCanvas[logKey] = true;
-  }
+  // Режим constructor — обычный конструктор
 
   // Проверяем, есть ли охранная область для данного размера
   const platform = state.platform || 'unknown';
@@ -110,6 +88,11 @@ const renderToCanvas = (canvas, width, height, state) => {
       '2832x600': { width: 2100, height: 570, hideLegal: false, hideAge: false, titleAlign: 'left' },
       '1080x450': { width: 1020, height: 405, hideLegal: false, hideAge: false, titleAlign: 'left' }
     },
+    // Перформанс‑форматы Я.Директ (РСЯ + Поиск)
+    'Я.Директ': {
+      '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center', logoPos: 'center' }
+    },
+    // Обратная совместимость со старыми сохранёнными конфигами (платформа "РСЯ")
     'РСЯ': {
       '1600x1200': { width: 900, height: 900, hideLegal: true, hideAge: true, titleAlign: 'center', logoPos: 'center' }
     }
@@ -280,22 +263,6 @@ const renderToCanvas = (canvas, width, height, state) => {
   // Передаем logoPosForSize для использования настройки из админки
   let logoBounds = calculateLogoBounds(state, logoWidthForCalc, logoHeightForCalc, logoPaddingForCalc, layoutType, logoSizePercent, logoPosForSize);
   
-  // Отладка для охранных областей
-  if (useSafeArea && safeArea) {
-    console.log('Safe Area Debug:', {
-      platform,
-      sizeKey,
-      safeArea,
-      horizontalPadding,
-      verticalPadding,
-      logoWidth,
-      logoHeight,
-      logoBounds: logoBounds ? { x: logoBounds.x, y: logoBounds.y, width: logoBounds.width, height: logoBounds.height } : null,
-      showLogo: state.showLogo,
-      hasLogo: !!state.logo
-    });
-  }
-  
   // Сохраняем logoBounds без смещения для расчетов, сместим позже перед отрисовкой
   const logoBoundsForCalculations = logoBounds;
   const logoHeightValue = logoBounds ? logoBounds.height : 0;
@@ -334,16 +301,6 @@ const renderToCanvas = (canvas, width, height, state) => {
       kvX: kvPlannedMeta.kvX + horizontalPadding,
       kvY: kvPlannedMeta.kvY + verticalPadding
     };
-    
-    // Отладка смещения KV
-    console.log('KV bounds shifted:', {
-      original: originalKV,
-      shifted: { kvX: kvPlannedMeta.kvX, kvY: kvPlannedMeta.kvY },
-      horizontalPadding,
-      verticalPadding,
-      showKV: state.showKV,
-      isKVValid
-    });
   }
   
   // Вычисляем область для текста - используем модуль layout
@@ -441,7 +398,8 @@ const renderToCanvas = (canvas, width, height, state) => {
       
       // Для охранных областей позиционируем legal относительно охранной области
       const legalX = useSafeArea ? (horizontalPadding + paddingPx) : effectiveHorizontalPadding;
-      const legalY = useSafeArea ? Math.max(verticalPadding + paddingPx, legalTop) : Math.max(effectiveVerticalPadding, legalTop);
+      const legalYBase = useSafeArea ? Math.max(verticalPadding + paddingPx, legalTop) : Math.max(effectiveVerticalPadding, legalTop);
+      const legalY = legalYBase + (state.legalOffsetTopPx || 0);
       
       legalContentBounds = {
         x: legalX,
@@ -596,26 +554,23 @@ const renderToCanvas = (canvas, width, height, state) => {
   
   ctx.font = getFontString(titleWeight, titleSize, state.titleFontFamily || state.fontFamily);
   const titleText = applyTextTransform(state.title, state.titleTransform);
-  const titleLines = wrapText(ctx, titleText, maxTextWidth, titleSize, titleWeight, state.titleLineHeight);
+  const titleLetterSpacingPx = (state.titleLetterSpacing / 100) * titleSize;
+  const adjustedMaxTextWidth = titleLetterSpacingPx > 0
+    ? Math.max(50, maxTextWidth - (titleLetterSpacingPx * 2))
+    : maxTextWidth;
+  const titleLines = wrapText(ctx, titleText, adjustedMaxTextWidth, titleSize, titleWeight, state.titleLineHeight);
   const titleBlockHeight = titleLines.length * titleSize * state.titleLineHeight;
 
   let subtitleBlockHeight = 0;
   let subtitleLines = [];
   if (shouldShowSubtitle) {
     ctx.font = getFontString(subtitleWeight, subtitleSize, state.subtitleFontFamily || state.fontFamily);
-    // Учитываем letter spacing при обертке текста - уменьшаем maxWidth
-    let effectiveMaxWidth = maxTextWidth;
-    if (state.subtitleLetterSpacing) {
-      // Вычисляем межбуквенное расстояние в пикселях на основе процента от размера шрифта
-      const letterSpacingPx = (state.subtitleLetterSpacing / 100) * subtitleSize;
-      // Приблизительно вычитаем максимальный letter spacing для длинной строки
-      // Это консервативная оценка, чтобы гарантировать, что текст не выйдет за границы
-      const estimatedCharsPerLine = Math.floor(maxTextWidth / (subtitleSize * 0.6)); // примерная ширина символа
-      const letterSpacingImpact = letterSpacingPx * Math.max(0, estimatedCharsPerLine - 1);
-      effectiveMaxWidth = Math.max(50, maxTextWidth - letterSpacingImpact);
-    }
+    const subtitleLetterSpacingPx = (state.subtitleLetterSpacing / 100) * subtitleSize;
+    const adjustedSubtitleMaxWidth = subtitleLetterSpacingPx > 0
+      ? Math.max(50, maxTextWidth - (subtitleLetterSpacingPx * 2))
+      : maxTextWidth;
     const subtitleText = applyTextTransform(state.subtitle, state.subtitleTransform);
-    subtitleLines = wrapText(ctx, subtitleText, effectiveMaxWidth, subtitleSize, subtitleWeight, state.subtitleLineHeight);
+    subtitleLines = wrapText(ctx, subtitleText, adjustedSubtitleMaxWidth, subtitleSize, subtitleWeight, state.subtitleLineHeight);
     if (subtitleLines.length > 0) {
       // Gap is calculated separately, not included in block height
       subtitleBlockHeight = subtitleLines.length * subtitleSize * state.subtitleLineHeight;
@@ -635,47 +590,101 @@ const renderToCanvas = (canvas, width, height, state) => {
     // Для широких форматов учитываем titleVPos
     const currentPadding = isSuperWide ? effectivePaddingPx : effectiveVerticalPadding;
     
+    // Для очень низких горизонтальных форматов (height < 150) увеличиваем минимальный отступ
+    const isVeryLowHorizontal = isHorizontalLayout && height < 150;
+    // Для форматов с высотой 400-500px также увеличиваем отступ
+    const isMediumHeight = isHorizontalLayout && height >= 400 && height <= 500;
+    const minGapForLow = isVeryLowHorizontal ? Math.max(paddingPx * 0.3, 4) : (isMediumHeight ? Math.max(paddingPx * 0.2, 6) : 0);
+    
     if (state.titleVPos === 'top') {
-      startY = currentPadding + titleSize;
+      startY = currentPadding + titleSize + (state.titleOffsetTopPx || 0);
       if (state.showLogo && state.logo && logoBoundsForCalculations) {
         // Используем logoBounds без смещения для расчетов
         // Для РСЯ 1600x1200 добавляем дополнительный отступ между логотипом и заголовком
         const isRSYA1600x1200ForGap = platform === 'РСЯ' && sizeKey === '1600x1200';
         const additionalGap = isRSYA1600x1200ForGap ? paddingPx * 0.5 : (useSafeArea ? paddingPx * 0.4 : 0);
-        const logoTitleGap = currentPadding + additionalGap;
+        const logoTitleGap = Math.max(currentPadding + additionalGap, minGapForLow);
         const logoBottom = logoBoundsForCalculations.y + logoBoundsForCalculations.height;
         const logoStart = logoBottom + logoTitleGap + titleSize;
         startY = Math.max(startY, logoStart);
+        
+        // Для очень низких и средних форматов убеждаемся, что заголовок не залезает на логотип
+        if (isVeryLowHorizontal || isMediumHeight) {
+          const minStartAfterLogo = logoBottom + Math.max(logoTitleGap, titleSize * 0.3);
+          startY = Math.max(startY, minStartAfterLogo);
+        }
       }
       if (legalBlockHeight > 0) {
         const bottomPadding = currentPadding + legalBlockHeight + currentPadding * 0.5;
         const maxY = useSafeArea ? (verticalPadding + effectiveHeight) : height;
         startY = Math.min(startY, maxY - bottomPadding - totalTextHeight + titleSize);
       }
-      startY = Math.max(currentPadding + titleSize, startY);
+      startY = Math.max(currentPadding + titleSize + (state.titleOffsetTopPx || 0), startY);
     } else if (state.titleVPos === 'center') {
       // При центрировании текста логотип остается вверху, центрируем только текст
       // Для РСЯ 1600x1200 добавляем дополнительный отступ между логотипом и заголовком
       const isRSYA1600x1200ForGap = platform === 'РСЯ' && sizeKey === '1600x1200';
       const additionalGap = isRSYA1600x1200ForGap ? paddingPx * 0.5 : (useSafeArea ? paddingPx * 0.4 : 0);
-      const logoTitleGap = currentPadding + additionalGap;
+      // Для очень низких горизонтальных форматов (height < 150) увеличиваем минимальный отступ
+      const isVeryLowHorizontal = isHorizontalLayout && height < 150;
+      const minGapForLow = isVeryLowHorizontal ? Math.max(paddingPx * 0.3, 4) : 0;
+      const logoTitleGap = Math.max(currentPadding + additionalGap, minGapForLow);
       const logoBottom = (state.showLogo && state.logo && logoBoundsForCalculations) 
         ? logoBoundsForCalculations.y + logoBoundsForCalculations.height 
         : currentPadding;
       const topArea = Math.max(currentPadding, logoBottom + logoTitleGap);
-      const maxY = useSafeArea ? (verticalPadding + effectiveHeight) : height;
-      const bottomArea = maxY - currentPadding - legalBlockHeight;
-      const availableHeight = Math.max(0, bottomArea - topArea);
-      if (availableHeight > 0 && totalTextHeight > 0) {
-        const centerY = topArea + availableHeight / 2;
-        startY = centerY - totalTextHeight / 2 + titleSize;
-        const minStart = topArea + titleSize;
-        startY = Math.max(minStart, startY);
+      
+      // Для очень низких форматов убеждаемся, что есть минимальный отступ после логотипа
+      if (isVeryLowHorizontal && state.showLogo && state.logo && logoBoundsForCalculations) {
+        const minStartAfterLogo = logoBottom + Math.max(logoTitleGap, titleSize * 0.3);
+        const calculatedTopArea = Math.max(currentPadding, minStartAfterLogo);
+        if (calculatedTopArea > topArea) {
+          const adjustedTopArea = calculatedTopArea;
+          const maxY = useSafeArea ? (verticalPadding + effectiveHeight) : height;
+          const bottomArea = maxY - currentPadding - legalBlockHeight;
+          const availableHeight = Math.max(0, bottomArea - adjustedTopArea);
+          if (availableHeight > 0 && totalTextHeight > 0) {
+            const centerY = adjustedTopArea + availableHeight / 2;
+            startY = centerY - totalTextHeight / 2 + titleSize;
+            const minStart = adjustedTopArea + titleSize;
+            startY = Math.max(minStart + (state.titleOffsetTopPx || 0), startY);
+          } else {
+            startY = adjustedTopArea + titleSize;
+          }
+          if (!isFinite(startY) || startY < currentPadding + titleSize) {
+            startY = Math.max(currentPadding + titleSize + (state.titleOffsetTopPx || 0), adjustedTopArea + titleSize + (state.titleOffsetTopPx || 0));
+          }
+        } else {
+          const maxY = useSafeArea ? (verticalPadding + effectiveHeight) : height;
+          const bottomArea = maxY - currentPadding - legalBlockHeight;
+          const availableHeight = Math.max(0, bottomArea - topArea);
+          if (availableHeight > 0 && totalTextHeight > 0) {
+            const centerY = topArea + availableHeight / 2;
+            startY = centerY - totalTextHeight / 2 + titleSize;
+            const minStart = topArea + titleSize;
+            startY = Math.max(minStart + (state.titleOffsetTopPx || 0), startY);
+          } else {
+            startY = topArea + titleSize;
+          }
+          if (!isFinite(startY) || startY < currentPadding + titleSize) {
+            startY = Math.max(currentPadding + titleSize + (state.titleOffsetTopPx || 0), topArea + titleSize + (state.titleOffsetTopPx || 0));
+          }
+        }
       } else {
-        startY = topArea + titleSize;
-      }
-      if (!isFinite(startY) || startY < currentPadding + titleSize) {
-        startY = Math.max(currentPadding + titleSize, topArea + titleSize);
+        const maxY = useSafeArea ? (verticalPadding + effectiveHeight) : height;
+        const bottomArea = maxY - currentPadding - legalBlockHeight;
+        const availableHeight = Math.max(0, bottomArea - topArea);
+        if (availableHeight > 0 && totalTextHeight > 0) {
+          const centerY = topArea + availableHeight / 2;
+          startY = centerY - totalTextHeight / 2 + titleSize;
+          const minStart = topArea + titleSize;
+          startY = Math.max(minStart, startY);
+        } else {
+          startY = topArea + titleSize;
+        }
+        if (!isFinite(startY) || startY < currentPadding + titleSize) {
+          startY = Math.max(currentPadding + titleSize, topArea + titleSize);
+        }
       }
     } else {
       // bottom
@@ -791,11 +800,13 @@ const renderToCanvas = (canvas, width, height, state) => {
   ctx.textAlign = effectiveTitleAlign;
 
   const computeTextBounds = (baseY) => {
+    // Применяем вертикальные отступы для заголовка и подзаголовка
+    const baseYWithTitleOffset = baseY + (state.titleOffsetTopPx || 0);
     const titleBoundsLocal = getTextBlockBounds(
       ctx,
       titleLines,
       titleX,
-      baseY,
+      baseYWithTitleOffset,
       titleSize,
       state.titleLineHeight,
       effectiveTitleAlign,
@@ -810,7 +821,7 @@ const renderToCanvas = (canvas, width, height, state) => {
       // For ultra-wide formats, reduce gap (closer to title)
       const effectiveSubtitleGap = isUltraWide ? state.subtitleGap - LAYOUT_CONSTANTS.SUBTITLE_GAP_REDUCTION_ULTRA_WIDE : state.subtitleGap;
       const subtitleGapPx = (effectiveSubtitleGap / 100) * effectiveHeight;
-      subtitleYLocal = baseY + titleBlockHeight + subtitleGapPx;
+      subtitleYLocal = baseYWithTitleOffset + titleBlockHeight + subtitleGapPx + (state.subtitleOffsetTopPx || 0);
       
       subtitleBoundsLocal = getTextBlockBounds(
         ctx,
@@ -860,54 +871,89 @@ const renderToCanvas = (canvas, width, height, state) => {
   drawTextGradient(ctx, width, height, state, logoBounds, titleBounds, subtitleBounds, null, null, null, paddingPx, state.titleVPos, isHorizontalLayout, isUltraWide, isSuperWide);
 
   // Проверяем, что есть текст для отрисовки
-  if (titleLines.length === 0) {
-    console.warn('Нет строк заголовка для отрисовки');
-  }
-  
   // Ограничиваем координаты заголовка границами canvas
   const titleMinX = 0;
   const titleMaxX = width;
   const titleMinY = 0;
   const titleMaxY = height;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(textArea.left, 0, textArea.right - textArea.left, height);
+  ctx.clip();
   
   titleLines.forEach((line, index) => {
     const lineY = startY + index * titleSize * state.titleLineHeight;
     // Проверяем, что строка видна (хотя бы частично)
     if (lineY >= titleMinY - titleSize && lineY <= titleMaxY + titleSize) {
-      // Ограничиваем X координату границами canvas
+      // Ограничиваем X координату границами canvas и textArea
       let clampedTitleX = titleX;
-      if (effectiveTitleAlign === 'left') {
-        clampedTitleX = Math.max(titleMinX, Math.min(titleX, titleMaxX));
-      } else if (effectiveTitleAlign === 'right') {
+      const availableWidth = textArea.right - textArea.left;
+      
+      // Проверяем, что текст не выходит за границы textArea
+      let lineToDraw = line;
+      if (state.titleLetterSpacing) {
+        const letterSpacingPx = (state.titleLetterSpacing / 100) * titleSize;
+        const characters = Array.from(line);
+        const widths = characters.map((char) => measureLineWidth(ctx, char));
+        const totalWidth = widths.reduce((acc, width) => acc + width, 0) + letterSpacingPx * (characters.length - 1);
+        
+        if (totalWidth > availableWidth) {
+          // Обрезаем строку до нужной длины
+          let truncatedLine = '';
+          let truncatedWidth = 0;
+          for (let i = 0; i < characters.length; i++) {
+            const char = characters[i];
+            const charWidth = widths[i];
+            const spacing = i > 0 ? letterSpacingPx : 0;
+            if (truncatedWidth + charWidth + spacing <= availableWidth) {
+              truncatedLine += char;
+              truncatedWidth += charWidth + spacing;
+            } else {
+              break;
+            }
+          }
+          lineToDraw = truncatedLine;
+        }
+      } else {
         const lineWidth = measureLineWidth(ctx, line);
-        clampedTitleX = Math.max(titleMinX, Math.min(titleX, titleMaxX - lineWidth));
+        if (lineWidth > availableWidth) {
+          // Обрезаем строку
+          let truncatedLine = '';
+          let truncatedWidth = 0;
+          const characters = Array.from(line);
+          for (const char of characters) {
+            const charWidth = measureLineWidth(ctx, char);
+            if (truncatedWidth + charWidth <= availableWidth) {
+              truncatedLine += char;
+              truncatedWidth += charWidth;
+            } else {
+              break;
+            }
+          }
+          lineToDraw = truncatedLine;
+        }
+      }
+      
+      if (effectiveTitleAlign === 'left') {
+        clampedTitleX = Math.max(textArea.left, Math.min(titleX, textArea.right));
+      } else if (effectiveTitleAlign === 'right') {
+        const lineWidth = measureLineWidth(ctx, lineToDraw);
+        clampedTitleX = Math.max(textArea.left, Math.min(titleX, textArea.right - lineWidth));
       } else {
         // center
-        const lineWidth = measureLineWidth(ctx, line);
-        clampedTitleX = Math.max(titleMinX + lineWidth / 2, Math.min(titleX, titleMaxX - lineWidth / 2));
+        const lineWidth = measureLineWidth(ctx, lineToDraw);
+        clampedTitleX = Math.max(textArea.left + lineWidth / 2, Math.min(titleX, textArea.right - lineWidth / 2));
       }
       
       if (state.titleLetterSpacing) {
-        drawTextWithSpacing(ctx, line, clampedTitleX, lineY, state.titleLetterSpacing, titleSize, effectiveTitleAlign);
+        drawTextWithSpacing(ctx, lineToDraw, clampedTitleX, lineY, state.titleLetterSpacing, titleSize, effectiveTitleAlign);
       } else {
-        ctx.fillText(line, clampedTitleX, lineY);
+        ctx.fillText(lineToDraw, clampedTitleX, lineY);
       }
     }
   });
   
-  // Логируем информацию о тексте (только один раз)
-  if (!renderToCanvas._textLogged && titleLines.length > 0) {
-    console.log('Текст заголовка отрисован:', {
-      lines: titleLines.length,
-      firstLine: titleLines[0],
-      color: state.titleColor,
-      fontSize: titleSize,
-      font: ctx.font,
-      position: { x: titleX, y: startY }
-    });
-    renderToCanvas._textLogged = true;
-  }
-
   // Draw subtitle if it's enabled and has content
   if (shouldShowSubtitle && subtitleLines.length > 0) {
     // Ensure subtitleY is calculated if it wasn't set
@@ -1001,6 +1047,8 @@ const renderToCanvas = (canvas, width, height, state) => {
     });
   }
 
+  ctx.restore();
+
   const textBlockBottom = Math.max(
     titleBounds ? titleBounds.y + titleBounds.height : startY,
     subtitleBounds ? subtitleBounds.y + subtitleBounds.height : 0
@@ -1009,19 +1057,6 @@ const renderToCanvas = (canvas, width, height, state) => {
   // Используем проверку валидности KV
   // Для вертикальных форматов (не широких) рассчитываем KV здесь
   if (state.showKV && isKVValid && !kvPlannedMeta) {
-    // Отладка для вертикальных форматов
-    if (useSafeArea && safeArea) {
-      console.log('Calculating KV for vertical format with safe area:', {
-        isUltraWide,
-        isHorizontalLayout,
-        isSuperWide,
-        effectiveWidth,
-        effectiveHeight,
-        showKV: state.showKV,
-        isKVValid
-      });
-    }
-    
     if (!isUltraWide && !isHorizontalLayout) {
       // Определяем, является ли формат узким или квадратным
       // Для охранных областей используем effectiveWidth и effectiveHeight
@@ -1103,19 +1138,6 @@ const renderToCanvas = (canvas, width, height, state) => {
         placement = topFit;
       }
 
-      // Отладка placement для вертикальных форматов
-      if (useSafeArea && safeArea) {
-        console.log('KV placement calculation:', {
-          topFit: topFit ? { kvX: topFit.kvX, kvY: topFit.kvY, kvW: topFit.kvW, kvH: topFit.kvH } : null,
-          bottomFit: bottomFit ? { kvX: bottomFit.kvX, kvY: bottomFit.kvY, kvW: bottomFit.kvW, kvH: bottomFit.kvH } : null,
-          placement: placement ? { kvX: placement.kvX, kvY: placement.kvY, kvW: placement.kvW, kvH: placement.kvH } : null,
-          topAreaHeight,
-          bottomAreaHeight,
-          topAreaStart,
-          bottomAreaStart
-        });
-      }
-
       // Если не помещается ни в top, ни в bottom, не размещаем Визуал (placement остается null)
       // Визуал будет автоматически скрыт в конце функции, если kvRenderMeta будет null
 
@@ -1129,18 +1151,7 @@ const renderToCanvas = (canvas, width, height, state) => {
             kvX: kvPlannedMeta.kvX + horizontalPadding,
             kvY: kvPlannedMeta.kvY + verticalPadding
           };
-          
-          // Отладка смещения для вертикальных форматов
-          console.log('KV placement shifted for vertical format:', {
-            before: beforeShift,
-            after: { kvX: kvPlannedMeta.kvX, kvY: kvPlannedMeta.kvY },
-            horizontalPadding,
-            verticalPadding
-          });
         }
-      } else if (useSafeArea && safeArea) {
-        console.warn('KV placement is null - KV will not be rendered');
-      }
     }
   }
 
@@ -1382,23 +1393,10 @@ const renderToCanvas = (canvas, width, height, state) => {
     let ageWasAdjusted = false;
     
     if (ageBoundsRect.x < 0 || ageBoundsRect.y < 0 || ageRight > width || ageBottom > height) {
-      console.warn('Age выходит за границы canvas, корректируем:', {
-        before: originalAgeCoords,
-        ageRight,
-        ageBottom,
-        canvasWidth: width,
-        canvasHeight: height
-      });
-      
       // Корректируем координаты, чтобы age был в пределах canvas
       ageBoundsRect.x = Math.max(0, Math.min(ageBoundsRect.x, width - ageBoundsRect.width));
       ageBoundsRect.y = Math.max(0, Math.min(ageBoundsRect.y, height - ageBoundsRect.height));
       ageWasAdjusted = true;
-      
-      console.log('Age coordinates adjusted:', {
-        before: originalAgeCoords,
-        after: { x: ageBoundsRect.x, y: ageBoundsRect.y, width: ageBoundsRect.width, height: ageBoundsRect.height }
-      });
     }
     
     const ageWeight = getFontWeight(state.ageWeight || state.legalWeight);
@@ -1417,19 +1415,6 @@ const renderToCanvas = (canvas, width, height, state) => {
 
   let kvRenderMeta = null;
   if (kvPlannedMeta) {
-    // Логируем начальные координаты KV
-    console.log('KV calculation started:', {
-      kvX: kvPlannedMeta.kvX,
-      kvY: kvPlannedMeta.kvY,
-      kvW: kvPlannedMeta.kvW,
-      kvH: kvPlannedMeta.kvH,
-      canvasWidth: width,
-      canvasHeight: height,
-      useSafeArea,
-      horizontalPadding: useSafeArea ? horizontalPadding : undefined,
-      verticalPadding: useSafeArea ? verticalPadding : undefined
-    });
-    
     // KV всегда должен быть немного выше legal текста
     if (legalTextBounds || legalContentBounds || ageBoundsRect) {
       const kvBottom = kvPlannedMeta.kvY + kvPlannedMeta.kvH;
@@ -1495,11 +1480,6 @@ const renderToCanvas = (canvas, width, height, state) => {
     
     // Проверяем, что изображение загружено и валидно
     if (!state.kv.complete || state.kv.naturalWidth <= 0 || state.kv.naturalHeight <= 0) {
-      console.warn('KV не загружен или невалиден:', {
-        complete: state.kv.complete,
-        naturalWidth: state.kv.naturalWidth,
-        naturalHeight: state.kv.naturalHeight
-      });
       kvRenderMeta = null;
     } else {
       // Проверяем и корректируем границы canvas ПЕРЕД отрисовкой
@@ -1509,39 +1489,11 @@ const renderToCanvas = (canvas, width, height, state) => {
       let wasAdjusted = false;
       
       if (kvPlannedMeta.kvX < 0 || kvPlannedMeta.kvY < 0 || kvRight > width || kvBottom > height) {
-        console.warn('KV выходит за границы canvas, корректируем:', {
-          before: originalCoords,
-          kvRight,
-          kvBottom,
-          canvasWidth: width,
-          canvasHeight: height
-        });
-        
         // Корректируем координаты, чтобы KV был в пределах canvas
         kvPlannedMeta.kvX = Math.max(0, Math.min(kvPlannedMeta.kvX, width - kvPlannedMeta.kvW));
         kvPlannedMeta.kvY = Math.max(0, Math.min(kvPlannedMeta.kvY, height - kvPlannedMeta.kvH));
         wasAdjusted = true;
-        
-        console.log('KV coordinates adjusted:', {
-          before: originalCoords,
-          after: { kvX: kvPlannedMeta.kvX, kvY: kvPlannedMeta.kvY, kvW: kvPlannedMeta.kvW, kvH: kvPlannedMeta.kvH }
-        });
       }
-      
-      // Логируем финальные координаты перед отрисовкой
-      console.log('Rendering KV:', {
-        kvX: kvPlannedMeta.kvX,
-        kvY: kvPlannedMeta.kvY,
-        kvW: kvPlannedMeta.kvW,
-        kvH: kvPlannedMeta.kvH,
-        canvasWidth: width,
-        canvasHeight: height,
-        useSafeArea,
-        horizontalPadding: useSafeArea ? horizontalPadding : undefined,
-        verticalPadding: useSafeArea ? verticalPadding : undefined,
-        wasAdjusted,
-        willFit: kvPlannedMeta.kvX + kvPlannedMeta.kvW <= width && kvPlannedMeta.kvY + kvPlannedMeta.kvH <= height
-      });
       
       // Применяем скругление углов для KV
       if (state.kvBorderRadius > 0) {
@@ -1577,9 +1529,7 @@ const renderToCanvas = (canvas, width, height, state) => {
       }
       
       try {
-        console.log('Drawing KV at:', { x: kvPlannedMeta.kvX, y: kvPlannedMeta.kvY, w: kvPlannedMeta.kvW, h: kvPlannedMeta.kvH });
         ctx.drawImage(state.kv, kvPlannedMeta.kvX, kvPlannedMeta.kvY, kvPlannedMeta.kvW, kvPlannedMeta.kvH);
-        console.log('KV drawn successfully');
       } catch (error) {
         console.error('Ошибка отрисовки KV:', error);
       }
@@ -1621,16 +1571,6 @@ const renderToCanvas = (canvas, width, height, state) => {
         y: constrainedY
       };
       
-      // Отладка для РСЯ 1600x1200
-      console.log('РСЯ 1600x1200 Logo positioning:', {
-        centered: { x: centeredX, y: centeredY },
-        constrained: { x: constrainedX, y: constrainedY },
-        safeAreaBounds: { minX, minY, maxX, maxY },
-        logoSize: { width: logoBoundsForCalculations.totalWidth, height: logoBoundsForCalculations.height },
-        safeAreaSize: { width: safeAreaWidth, height: safeAreaHeight },
-        horizontalPadding,
-        verticalPadding
-      });
     } else {
       // Для остальных случаев применяем смещение
       logoBounds = {
@@ -1639,42 +1579,14 @@ const renderToCanvas = (canvas, width, height, state) => {
         y: logoBoundsForCalculations.y + verticalPadding
       };
     }
-    
-    // Отладка смещения логотипа
-    console.log('Logo bounds shifted:', {
-      original: { x: logoBoundsForCalculations.x, y: logoBoundsForCalculations.y },
-      shifted: { x: logoBounds.x, y: logoBounds.y },
-      horizontalPadding,
-      verticalPadding
-    });
   } else if (logoBoundsForCalculations) {
     // Если нет охранной области, просто используем оригинальные координаты
     logoBounds = logoBoundsForCalculations;
   }
   
   if (state.showLogo && state.logo && logoBounds) {
-    // Логируем начальные координаты логотипа
-    console.log('Logo calculation started:', {
-      logoBounds: { x: logoBounds.x, y: logoBounds.y, width: logoBounds.width, height: logoBounds.height },
-      canvasWidth: width,
-      canvasHeight: height,
-      useSafeArea,
-      horizontalPadding: useSafeArea ? horizontalPadding : undefined,
-      verticalPadding: useSafeArea ? verticalPadding : undefined
-    });
-    
     // Проверяем, что изображение загружено и валидно
-    if (!state.logo.complete || state.logo.naturalWidth <= 0 || state.logo.naturalHeight <= 0) {
-      console.warn('Логотип не загружен или невалиден:', {
-        complete: state.logo.complete,
-        naturalWidth: state.logo.naturalWidth,
-        naturalHeight: state.logo.naturalHeight,
-        showLogo: state.showLogo,
-        hasLogo: !!state.logo,
-        hasLogoBounds: !!logoBounds,
-        useSafeArea
-      });
-    } else {
+    if (state.logo.complete && state.logo.naturalWidth > 0 && state.logo.naturalHeight > 0) {
       // Проверяем и корректируем границы canvas ПЕРЕД отрисовкой
       const logoRight = logoBounds.x + logoBounds.width;
       const logoBottom = logoBounds.y + logoBounds.height;
@@ -1682,44 +1594,14 @@ const renderToCanvas = (canvas, width, height, state) => {
       let wasAdjusted = false;
       
       if (logoBounds.x < 0 || logoBounds.y < 0 || logoRight > width || logoBottom > height) {
-        console.warn('Логотип выходит за границы canvas, корректируем:', {
-          before: originalCoords,
-          logoRight,
-          logoBottom,
-          canvasWidth: width,
-          canvasHeight: height
-        });
-        
         // Корректируем координаты, чтобы логотип был в пределах canvas
         logoBounds.x = Math.max(0, Math.min(logoBounds.x, width - logoBounds.width));
         logoBounds.y = Math.max(0, Math.min(logoBounds.y, height - logoBounds.height));
         wasAdjusted = true;
-        
-        console.log('Logo coordinates adjusted:', {
-          before: originalCoords,
-          after: { x: logoBounds.x, y: logoBounds.y, width: logoBounds.width, height: logoBounds.height }
-        });
       }
       
-      // Логируем финальные координаты перед отрисовкой
-      console.log('Rendering logo:', {
-        logoBounds: { x: logoBounds.x, y: logoBounds.y, width: logoBounds.width, height: logoBounds.height },
-        canvasWidth: width,
-        canvasHeight: height,
-        logoComplete: state.logo.complete,
-        logoNaturalWidth: state.logo.naturalWidth,
-        logoNaturalHeight: state.logo.naturalHeight,
-        useSafeArea,
-        horizontalPadding: useSafeArea ? horizontalPadding : undefined,
-        verticalPadding: useSafeArea ? verticalPadding : undefined,
-        wasAdjusted,
-        willFit: logoBounds.x + logoBounds.width <= width && logoBounds.y + logoBounds.height <= height
-      });
-      
       try {
-        console.log('Drawing logo at:', { x: logoBounds.x, y: logoBounds.y, w: logoBounds.width, h: logoBounds.height });
         ctx.drawImage(state.logo, logoBounds.x, logoBounds.y, logoBounds.width, logoBounds.height);
-        console.log('Logo drawn successfully');
         
         // Рисуем партнерский логотип, если есть
         if (logoBounds.hasPartnerLogo && state.partnerLogo && state.partnerLogo.complete) {
@@ -1778,16 +1660,6 @@ const renderToCanvas = (canvas, width, height, state) => {
           });
         }
       }
-    }
-  } else {
-    // Отладка: почему логотип не рисуется
-    if (useSafeArea && safeArea) {
-      console.warn('Logo not rendered:', {
-        showLogo: state.showLogo,
-        hasLogo: !!state.logo,
-        hasLogoBounds: !!logoBounds,
-        logoBounds: logoBounds ? { x: logoBounds.x, y: logoBounds.y } : null
-      });
     }
   }
 
@@ -1931,18 +1803,12 @@ const renderToCanvas = (canvas, width, height, state) => {
     ctx.restore();
   }
 
-    return {
-      kvRenderMeta,
-      canvasWidth: width,
-      canvasHeight: height
-    };
-  } catch (error) {
-    console.error('Критическая ошибка в renderToCanvas:', error);
-    console.error('Параметры:', { canvasId: canvas?.id, width, height });
-    console.error('Стек ошибки:', error.stack);
-    // Возвращаем null вместо проброса ошибки
-    return null;
-  }
+  return {
+    kvRenderMeta,
+    canvasWidth: width,
+    canvasHeight: height
+  };
+}
 };
 
 // Функция doRender перенесена в canvasManager

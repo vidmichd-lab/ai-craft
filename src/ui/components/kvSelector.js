@@ -656,10 +656,11 @@ const populateKVColumns = async (forceRefresh = false) => {
       }
     }
   } else {
-    // Если нет известных данных, показываем базовую структуру папок (3d, photo)
+    // Если нет известных данных, показываем базовую структуру папок (3d, photo, pro)
     const basicStructure = {
       '3d': {},
-      'photo': {}
+      'photo': {},
+      'pro': {}
     };
     initialStructure = basicStructure;
     selectedFolder1 = null;
@@ -677,89 +678,13 @@ const populateKVColumns = async (forceRefresh = false) => {
   // Сканируем в фоне по папкам постепенно и обновляем структуру
   kvScanning = true;
   
-  // Начинаем с текущей структуры
-  let kvStructure = JSON.parse(JSON.stringify(initialStructure));
-  
-  // Импортируем функцию проверки файлов
-  const { checkFileExists } = await import('../../utils/assetScanner.js');
-  
-  // Сканируем по папкам постепенно
-  const firstLevelFolders = ['3d', 'photo'];
-  const knownSecondLevelFolders3d = ['sign', 'icons', 'logos', 'numbers', 'other', 'shapes', 'tech', 'yandex'];
-  const knownSecondLevelFoldersPhoto = ['pro', 'ai_reskill', 'old_reskill'];
-  
-  // Подсчитываем общее количество папок для сканирования
-  let totalFolders = 0;
-  for (const folder1 of firstLevelFolders) {
-    const knownSecondLevelFolders = folder1 === 'photo' 
-      ? knownSecondLevelFoldersPhoto 
-      : knownSecondLevelFolders3d;
-    totalFolders += knownSecondLevelFolders.length;
-  }
-  let scannedFolders = 0;
-  
   // Инициализируем прогресс-бар
   updateKVProgress(0);
   
-  // Сканируем каждую папку отдельно и обновляем UI
-  // Используем батчинг для параллельной проверки нескольких файлов
-  for (const folder1 of firstLevelFolders) {
-    const knownSecondLevelFolders = folder1 === 'photo' 
-      ? knownSecondLevelFoldersPhoto 
-      : knownSecondLevelFolders3d;
-    
-    // Сканируем папки второго уровня параллельно (батчами по 3)
-    for (let i = 0; i < knownSecondLevelFolders.length; i += 3) {
-      const batch = knownSecondLevelFolders.slice(i, i + 3);
-      const batchPromises = batch.map(async (folder2) => {
-        const basePath = `assets/${folder1}/${folder2}`;
-        
-        // Используем умную проверку файлов с ранней остановкой
-        const { checkFilesSmart } = await import('../../utils/assetScanner.js');
-        const folderFiles = await checkFilesSmart(basePath, 1, 99, 5);
-        
-        return { folder2, folderFiles };
-      });
-      
-      const batchResults = await Promise.all(batchPromises);
-      
-      // Обновляем структуру после каждого батча
-      for (const { folder2, folderFiles } of batchResults) {
-        if (folderFiles.length > 0) {
-          if (!kvStructure[folder1]) {
-            kvStructure[folder1] = {};
-          }
-          if (!kvStructure[folder1][folder2]) {
-            kvStructure[folder1][folder2] = [];
-          }
-          folderFiles.forEach(file => {
-            if (!kvStructure[folder1][folder2].find(k => k.file === file.file)) {
-              kvStructure[folder1][folder2].push(file);
-            }
-          });
-        }
-        
-        // Обновляем прогресс после каждой папки
-        scannedFolders++;
-        const progress = (scannedFolders / totalFolders) * 100;
-        updateKVProgress(progress);
-      }
-      
-      // Обновляем UI после каждого батча папок
-      cachedKV = kvStructure;
-      renderKVColumn1(kvStructure);
-      
-      // Обновляем вторую колонку, если выбрана соответствующая папка первого уровня
-      if (selectedFolder1 === folder1) {
-        renderKVColumn2(kvStructure, false);
-      }
-      
-      // Небольшая задержка для плавности UI
-      await new Promise(resolve => setTimeout(resolve, 30));
-    }
-  }
+  // Используем scanKV для автоматического обнаружения всех папок
+  const kvStructure = await scanKV();
   
-  // Завершаем прогресс
+  // Обновляем прогресс
   updateKVProgress(100);
   
   // Небольшая задержка, чтобы показать 100% перед скрытием прогресс-бара

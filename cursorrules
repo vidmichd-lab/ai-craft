@@ -1,0 +1,212 @@
+# Practicum AI-Craft — Cursor Project Rules
+
+## Project Overview
+Banner/layout generator for Yandex Practicum marketing team. Creates multi-format banner exports (PNG/JPG ZIP) from a visual editor with live Canvas preview.
+
+**Stack:** Vanilla JS (ES Modules, no bundler), HTML5 Canvas 2D API, CSS Custom Properties, deployed as static site on Yandex Cloud Object Storage.
+
+**No frameworks. No React. No TypeScript. No npm. No build step.**
+All JS files are native ES modules loaded directly by the browser via `<script type="module">`.
+
+---
+
+## Architecture
+
+```
+index.html                    — Full UI markup (3-panel layout, 7 tabs, modals)
+styles.css                    — All styles, CSS variables, dark/light themes
+│
+src/
+├── main.js                   — Orchestrator: init sequence (18 steps), exposeGlobals()
+├── constants.js              — Font mappings, preset colors, dynamic asset lists
+├── exporter.js               — ZIP export via JSZip (PNG/JPG, batch, compression)
+├── renderer.js               — ⚠️ GOD FILE (2000 lines) — renderToCanvas() pipeline
+│
+├── renderer/                 — Rendering sub-modules (refactored out of renderer.js)
+│   ├── canvas.js             — CanvasManager singleton, 3-canvas multi-preview (narrow/wide/square)
+│   ├── layout.js             — 7 layout types by aspect ratio, size multipliers
+│   ├── text.js               — Text measurement cache, word wrapping, Russian typographic rules
+│   ├── textGradient.js       — Semi-transparent gradient overlays for text readability
+│   ├── background.js         — Solid/gradient/image backgrounds (4 gradient types, 4 image modes)
+│   ├── kv.js                 — Key Visual positioning (cover/contain for all layout types)
+│   ├── constants.js          — Layout thresholds and magic numbers
+│   └── utils.js              — hexToRgb, clamp, isHangingPreposition, getAlignedX
+│
+├── state/
+│   └── store.js              — Observer-pattern store (~80 keys), batch(), applyDerivedState()
+│
+├── ui/
+│   ├── ui.js                 — ~120 UI functions (sync forms, modals, previews)
+│   ├── eventHandler.js       — Event delegation via data-attributes
+│   ├── domCache.js           — DOM element caching
+│   └── components/
+│       ├── sizesAdmin.js     — ⚠️ LARGEST FILE (5173 lines) — admin panel for sizes
+│       ├── backgroundSelector.js — Background picker + library modal
+│       ├── logoSelector.js   — Logo picker + library modal
+│       ├── fontSelector.js   — Font picker with custom upload
+│       ├── kvSelector.js     — KV picker + library modal
+│       ├── fileManager.js    — File management
+│       ├── sizeManager.js    — Size list rendering + toggle
+│       ├── logoAssetsAdmin.js — Logo assets admin
+│       └── figmaImporter.js  — Figma API import
+│
+└── utils/
+    ├── i18n.js               — RU/EN translation dictionaries
+    ├── assetScanner.js       — Dynamic asset discovery (fonts, logos, KV, BG)
+    ├── figmaSmartResizer.js  — Smart Figma-to-banner resize
+    ├── figmaApi.js           — Figma REST API wrapper
+    ├── figmaParser.js        — Figma node structure parser
+    ├── imageCache.js         — IndexedDB + memory cache for images
+    ├── sizesConfig.js        — Preset sizes load/save
+    ├── fullConfig.js         — Full config export/import (localStorage-based)
+    ├── panelResizer.js       — Draggable panel resize
+    ├── passwordManager.js    — Admin password (localStorage, plaintext)
+    └── fontConverter.js      — Font format conversion
+```
+
+---
+
+## Critical Rules — NEVER violate these
+
+### 1. No new dependencies
+Do NOT add npm packages, CDN libraries, or build tools. The project runs as raw ES modules. Only existing CDN deps: JSZip, browser-image-compression, Material Icons.
+
+### 2. No framework patterns
+Do NOT introduce React, Vue, Lit, or any component framework. UI is built with vanilla DOM manipulation and innerHTML strings. Follow the existing pattern.
+
+### 3. Preserve the data-attribute system
+HTML ↔ JS binding uses `data-*` attributes:
+- `data-state-key="paddingPercent"` — binds input to store key
+- `data-function="updateBgColor"` — calls window[functionName] on click
+- `data-action="trigger-file-input"` — handled by eventHandler.js delegation
+- `data-i18n="layout.padding"` — translation key
+- `data-group="paddingPercent"` — chip group toggle
+
+### 4. Global functions via window
+~90 functions are exposed to `window` in main.js `exposeGlobals()`. This is the bridge between HTML data-attributes and JS logic. When adding a new function that HTML needs to call, add it to `exposeGlobals()`.
+
+### 5. Store update flow
+```
+User interaction → eventHandler.js or data-function
+  → window.updateState(key, value)  [main.js]
+    → store.setKey(key, value)       [store.js]
+      → applyDerivedState()          [store.js — auto-sync title↔subtitle, fonts, legal]
+        → store.notify()
+          → renderer.render()         [RAF-scheduled]
+            → renderToCanvas()        [23-step pipeline on Canvas 2D]
+```
+**NEVER call store.state directly. Always use setKey() or setState().**
+
+### 6. Rendering pipeline
+`renderToCanvas()` in renderer.js is a single ~1900-line function. The drawing order matters:
+1. Background (color → gradient → image)
+2. Legal pre-calculation (reserves space at bottom)
+3. Layout type detection (7 types by aspect ratio)
+4. Size multipliers
+5. Logo bounds
+6. KV for wide formats
+7. Text area calculation
+8. Text gradient overlay
+9. Title → Subtitle
+10. KV for vertical formats
+11. Legal → Age
+12. KV draw → Logo draw
+13. Debug overlays → Habr border → Safe area
+
+**When modifying rendering: specify which step(s) you're changing. Do not restructure the order without explicit request.**
+
+### 7. CSS font strings for Canvas
+Multi-word font families MUST be quoted: `"YS Text"`, `"Yandex Serif Display"`.
+Use `getFontString()` from renderer.js for all Canvas font assignments.
+
+### 8. applyDerivedState() side effects
+When changing `titleSize` → `subtitleSize` auto-recalculates (and vice versa).
+When changing `fontFamily` → cascades to title/subtitle/legal/age if they matched old value.
+When changing `logoLanguage` → legal text auto-switches RU↔KZ.
+When changing `activePairIndex` → title/subtitle/kvSelected/bgImage sync from active pair.
+**Always check applyDerivedState() when adding new state keys that depend on other keys.**
+
+---
+
+## State Shape (key groups)
+
+| Group | Keys | Notes |
+|-------|------|-------|
+| Layout | `paddingPercent` | 2–8% of min dimension |
+| Pairs | `titleSubtitlePairs[]`, `activePairIndex` | Each pair: {title, subtitle, kvSelected, bgImageSelected, bgColor} |
+| Title | `titleColor`, `titleAlign`, `titleVPos`, `titleSize`, `titleWeight`, `titleLetterSpacing`, `titleLineHeight`, `titleFontFamily`, `titleTransform` | + CustomFont, FontFamilyFile |
+| Subtitle | Same as title + `subtitleOpacity`, `subtitleGap`, `titleSubtitleRatio` | Size auto-linked to titleSize |
+| Legal | `legal`, `legalKZ`, `legalColor`, `legalOpacity`, `legalAlign`, `legalSize`, `legalWeight`, `legalFontFamily`, `legalTransform` | Auto-switches on logoLanguage change |
+| Age | `age`, `ageGapPercent`, `ageSize`, `ageWeight`, `ageFontFamily` | |
+| Visibility | `showLogo`, `showSubtitle`, `showLegal`, `showAge`, `showKV`, `showBlocks`, `showGuides` | |
+| Logo | `logoSelected`, `logoSize`, `logoLanguage`, `logoPos`, `partnerLogo` | |
+| KV | `kvSelected`, `kvBorderRadius`, `kvPosition` | |
+| Background | `bgColor`, `bgGradient`, `bgGradientAngle`, `bgImage`, `bgSize`, `bgPosition` | |
+| Export | `exportScale` (1-4), `namePrefix`, `maxFileSizeUnit`, `maxFileSizeValue` | |
+| Sizes | `presetSizes` {platform: [...]}, `customSizes` [] | 7 platforms, 44 presets |
+| Safe Areas | `safeAreas` {platform: {size: {w,h}}} | Ozon, РСЯ |
+
+---
+
+## Layout Types (renderer/layout.js)
+
+| Type | Condition | Example |
+|------|-----------|---------|
+| superWide | width ≥ height×8 AND height < 120 | 728×90 |
+| ultraWide | width ≥ height×8 | 2832×300 |
+| veryWide | width ≥ height×4 | 1456×180 |
+| horizontal | width ≥ height×1.35 | 1920×720 |
+| tall | height/width ≥ 2 | 1080×1920 |
+| vertical | height ≥ width×1.5 | 300×600 |
+| square | everything else | 1080×1080 |
+
+---
+
+## File Size Awareness
+These files are very large. When editing them, make MINIMAL targeted changes:
+- `sizesAdmin.js` — 323 KB / 5173 lines
+- `ui.js` — 126 KB / 3270 lines
+- `renderer.js` — 106 KB / 1997 lines
+- `i18n.js` — 85 KB (translation strings)
+
+---
+
+## Fonts
+Yandex Sans family: YS Text, YS Display, YS Text Cond, YS Text Wide, YS Display Cond, YS Display Wide, YS Logotype, Yandex Serif Display.
+Weights: Thin(100)–Black(900). Mappings in constants.js: FONT_NAME_TO_WEIGHT / FONT_WEIGHT_TO_NAME.
+Font files: /font/{family}/{family}-{weight}.woff2 (and .ttf).
+
+## Assets
+- Logos: /logo/{black|white}/{ru|kz|en}/{main|long|mono}.svg
+- 3D assets: /assets/3d/{icons|logos|numbers|other|shapes|sign|tech|yandex}/NN.webp
+- Photos: /assets/photo/pro/NN.webp
+- Assets are scanned dynamically by assetScanner.js — just add files to folders.
+
+## Themes
+Dark theme (default): CSS variables in `:root`
+Light theme: overrides in `[data-theme="light"]`
+Toggle stored in localStorage('theme'), applied via `data-theme` attr on `<html>`.
+
+## i18n
+Two languages: RU (default), EN. Keys in src/utils/i18n.js.
+HTML elements with `data-i18n="key"` are auto-translated.
+Use `t('key')` function in JS code.
+
+## Persistence
+All user data in localStorage:
+- `default-values` — user's default settings
+- `sizes-config` — custom size presets
+- `format-multipliers` — per-format size adjustments
+- `adminBackgrounds` — admin background library
+- `theme` — dark/light
+- `brandName` — brand name displayed in header
+- `figma_token` — Figma Personal Access Token
+- `admin_password` — admin panel password (plaintext)
+
+## Testing
+No test framework. Manual testing only. After any change:
+1. Check all 3 preview canvases render correctly
+2. Test narrow (1080×1920), square (1080×1080), wide (1920×720) formats
+3. Test export PNG/JPG
+4. Test light/dark theme
+5. Test RU/EN language switch

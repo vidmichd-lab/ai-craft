@@ -7,64 +7,55 @@ const cloneDeep = (value) => JSON.parse(JSON.stringify(value));
 
 const createTitleSubtitlePair = (index = 0, baseState = null) => {
   const brandName = (baseState && baseState.brandName) || 'Практикума';
-  
-  // Получаем значения по умолчанию из localStorage, если есть
+
+  const savedDefaults = (() => {
+    if (typeof localStorage === 'undefined') return {};
+    try {
+      return JSON.parse(localStorage.getItem('default-values') || '{}');
+    } catch (e) {
+      return {};
+    }
+  })();
+
+  // Контент: для первой пары — из сохранённых или встроенные дефолты, для новых пар — пусто
   let defaultTitle = `Курс «Frontend-разработчик» от ${brandName}`;
   let defaultSubtitle = 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев';
   let defaultKV = 'assets/3d/sign/01.webp';
-  
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('default-values');
-      if (saved) {
-        const savedDefaults = JSON.parse(saved);
-        if (savedDefaults.title) defaultTitle = savedDefaults.title;
-        if (savedDefaults.subtitle) defaultSubtitle = savedDefaults.subtitle;
-        if (savedDefaults.kvSelected) defaultKV = savedDefaults.kvSelected;
-      }
-    } catch (e) {
-      // Игнорируем ошибки
-    }
-  }
-  
+  if (savedDefaults.title !== undefined) defaultTitle = savedDefaults.title;
+  if (savedDefaults.subtitle !== undefined) defaultSubtitle = savedDefaults.subtitle;
+  if (savedDefaults.kvSelected !== undefined) defaultKV = savedDefaults.kvSelected;
+
+  // Визуальные свойства новой пары — всегда из admin defaults (savedDefaults)
+  const bgColor = savedDefaults.bgColor !== undefined ? savedDefaults.bgColor : '#1e1e1e';
+
   return {
     id: `pair-${Date.now()}-${index}`,
     title: index === 0 ? defaultTitle : '',
     subtitle: index === 0 ? defaultSubtitle : '',
-    kvSelected: index === 0 ? defaultKV : '', // KV для этой пары
-    bgImageSelected: null, // Фоновое изображение для этой пары
-    bgColor: (baseState && baseState.bgColor) || '#1e1e1e'
+    kvSelected: index === 0 ? defaultKV : '',
+    bgImageSelected: null,
+    bgColor
   };
 };
 
 const createInitialState = () => {
+  const savedDefaults = (() => {
+    if (typeof localStorage === 'undefined') return {};
+    try {
+      return JSON.parse(localStorage.getItem('default-values') || '{}');
+    } catch (e) {
+      console.warn('Ошибка при загрузке default-values из localStorage:', e);
+      return {};
+    }
+  })();
+  const d = (key, fallback) => savedDefaults[key] !== undefined ? savedDefaults[key] : fallback;
+
   // Получаем размеры из конфига (или дефолтные, если еще не загружены)
   const sizes = getPresetSizes();
   // Получаем brandName из localStorage, если есть
   const savedBrandName = typeof localStorage !== 'undefined' ? localStorage.getItem('brandName') : null;
   const brandName = savedBrandName || 'Практикума';
-  
-  // Загружаем значения по умолчанию из localStorage (если есть)
-  let savedDefaults = null;
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('default-values');
-      if (saved) {
-        savedDefaults = JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Ошибка при загрузке default-values из localStorage:', e);
-    }
-  }
-  
-  // Функция-хелпер для получения значения из savedDefaults или дефолтного значения
-  const getValue = (key, defaultValue) => {
-    if (savedDefaults && savedDefaults.hasOwnProperty(key)) {
-      return savedDefaults[key];
-    }
-    return defaultValue;
-  };
-  
+
   // Загружаем пользовательские охранные области из localStorage
   let userSafeAreas = null;
   if (typeof localStorage !== 'undefined') {
@@ -77,7 +68,7 @@ const createInitialState = () => {
       console.warn('Ошибка при загрузке user-safe-areas из localStorage:', e);
     }
   }
-  
+
   // Загружаем множители размера логотипа из localStorage
   let logoSizeMultipliers = null;
   if (typeof localStorage !== 'undefined') {
@@ -90,57 +81,67 @@ const createInitialState = () => {
       console.warn('Ошибка при загрузке logoSizeMultipliers из localStorage:', e);
     }
   }
-  
+
   return {
-    paddingPercent: getValue('paddingPercent', 5),
+    paddingPercent: d('paddingPercent', 5),
     // Массивы заголовков и подзаголовков
-    titleSubtitlePairs: [createTitleSubtitlePair(0, { bgColor: getValue('bgColor', '#1e1e1e'), brandName })],
+    titleSubtitlePairs: [createTitleSubtitlePair(0, { brandName })],
     activePairIndex: 0, // Индекс активной пары для отображения на превью
     // Общие настройки для всех заголовков
-    titleColor: getValue('titleColor', '#ffffff'),
-    titleAlign: getValue('titleAlign', 'left'),
-    titleVPos: getValue('titleVPos', 'top'),
-    titleSize: getValue('titleSize', 8),
-    titleWeight: getValue('titleWeight', 'Regular'), // Используем название начертания вместо цифр
-    titleLetterSpacing: getValue('titleLetterSpacing', 0),
-    titleLineHeight: getValue('titleLineHeight', 1.1),
-    titleFontFamily: getValue('titleFontFamily', null) || getValue('fontFamily', 'YS Text'),
+    titleColor: d('titleColor', '#ffffff'),
+    titleAlign: d('titleAlign', 'left'),
+    titleVPos: d('titleVPos', 'top'),
+    titleSize: d('titleSize', 8),
+    titleSizeBeforePro: d('titleSizeBeforePro', null), // Сохраняем исходный размер заголовка перед увеличением в PRO режиме
+    titleWeight: d('titleWeight', 'Regular'), // Используем название начертания вместо цифр
+    titleLetterSpacing: d('titleLetterSpacing', 0),
+    titleLineHeight: d('titleLineHeight', 1.1),
+    titleFontFamily: d('titleFontFamily', null) || d('fontFamily', 'YS Text'),
     titleFontFamilyFile: null,
     titleCustomFont: null, // URL blob для загруженного шрифта
     titleCustomFontName: null, // Имя загруженного файла
     titleTransform: 'none', // Преобразование регистра заголовка
     // Общие настройки для всех подзаголовков
-    subtitleColor: getValue('subtitleColor', '#e0e0e0'),
-    subtitleOpacity: getValue('subtitleOpacity', 90),
-    subtitleAlign: getValue('subtitleAlign', 'left'),
-    subtitleSize: getValue('subtitleSize', 4),
-    subtitleWeight: getValue('subtitleWeight', 'Regular'), // Используем название начертания вместо цифр
-    subtitleLetterSpacing: getValue('subtitleLetterSpacing', 0),
-    subtitleLineHeight: getValue('subtitleLineHeight', 1.2),
-    subtitleGap: getValue('subtitleGap', -1),
-    titleSubtitleRatio: getValue('titleSubtitleRatio', 0.5), // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
-    subtitleFontFamily: getValue('subtitleFontFamily', null) || getValue('fontFamily', 'YS Text'),
+    subtitleColor: d('subtitleColor', '#e0e0e0'),
+    subtitleOpacity: d('subtitleOpacity', 90),
+    subtitleAlign: d('subtitleAlign', 'left'),
+    subtitleSize: d('subtitleSize', 4),
+    subtitleWeight: d('subtitleWeight', 'Regular'), // Используем название начертания вместо цифр
+    subtitleLetterSpacing: d('subtitleLetterSpacing', 0),
+    subtitleLineHeight: d('subtitleLineHeight', 1.2),
+    subtitleGap: d('subtitleGap', -1),
+    titleSubtitleRatio: d('titleSubtitleRatio', 0.5), // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
+    subtitleFontFamily: d('subtitleFontFamily', null) || d('fontFamily', 'YS Text'),
     subtitleFontFamilyFile: null,
     subtitleCustomFont: null,
     subtitleCustomFontName: null,
     subtitleTransform: 'none', // Преобразование регистра подзаголовка
     // Обратная совместимость (используются для рендеринга активной пары)
-    title: getValue('title', `Курс «Frontend-разработчик» от ${brandName}`), // Использует brandName из state
-    subtitle: getValue('subtitle', 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев'),
-    legal: getValue('legal', 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/'),
+    title: d('title', `Курс «Frontend-разработчик» от ${brandName}`), // Использует brandName из state
+    subtitle: d('subtitle', 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев'),
+    legal: d('legal', 'Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/'),
     legalKZ: '*Жарнама / Реклама. ТОО "Y. Izdeu men Jarnama", регистрационный номер:170240015454 Сайт: https://practicum.yandex.kz/.',
-    legalColor: getValue('legalColor', '#ffffff'),
-    legalOpacity: getValue('legalOpacity', 60),
-    legalAlign: getValue('legalAlign', 'left'),
-    legalSize: getValue('legalSize', 2),
+    legalColor: d('legalColor', '#ffffff'),
+    legalOpacity: d('legalOpacity', 60),
+    legalAlign: d('legalAlign', 'left'),
+    legalSize: d('legalSize', 2),
     legalTransform: 'none', // Преобразование регистра юридического текста
-    legalWeight: getValue('legalWeight', 'Regular'), // Используем название начертания вместо цифр
-    legalLetterSpacing: getValue('legalLetterSpacing', 0),
-    legalLineHeight: getValue('legalLineHeight', 1.4),
-    age: getValue('age', '18+'),
-    ageGapPercent: getValue('ageGapPercent', 1),
-    ageSize: getValue('ageSize', 4),
-    ageWeight: getValue('ageWeight', 'Regular'), // Используем название начертания вместо цифр
+    legalWeight: d('legalWeight', 'Regular'), // Используем название начертания вместо цифр
+    legalLetterSpacing: d('legalLetterSpacing', 0),
+    legalLineHeight: d('legalLineHeight', 1.4),
+    age: d('age', '18+'),
+    ageGapPercent: d('ageGapPercent', 1),
+    // Вертикальные отступы для элементов (в пикселях)
+    titleOffsetTopPx: d('titleOffsetTopPx', 0),
+    titleOffsetBottomPx: d('titleOffsetBottomPx', 0),
+    subtitleOffsetTopPx: d('subtitleOffsetTopPx', 0),
+    subtitleOffsetBottomPx: d('subtitleOffsetBottomPx', 0),
+    legalOffsetTopPx: d('legalOffsetTopPx', 0),
+    legalOffsetBottomPx: d('legalOffsetBottomPx', 0),
+    ageOffsetTopPx: d('ageOffsetTopPx', 0),
+    ageOffsetBottomPx: d('ageOffsetBottomPx', 0),
+    ageSize: d('ageSize', 4),
+    ageWeight: d('ageWeight', 'Regular'), // Используем название начертания вместо цифр
     showLogo: true,
     showSubtitle: true,
     hideSubtitleOnWide: false,
@@ -150,38 +151,37 @@ const createInitialState = () => {
     showBlocks: false,
     showGuides: false,
     logo: null,
-    logoSelected: getValue('logoSelected', 'logo/white/ru/main.svg'),
-    logoSize: getValue('logoSize', 40),
-    logoLanguage: getValue('logoLanguage', 'ru'), // ru или kz
+    logoSelected: d('logoSelected', 'logo/white/ru/main.svg'),
+    logoSize: d('logoSize', 40),
+    logoOffsetTopPx: d('logoOffsetTopPx', 0),
+    logoOffsetBottomPx: d('logoOffsetBottomPx', 0),
+    logoLanguage: d('logoLanguage', 'ru'), // ru или kz
+    proMode: d('proMode', false), // PRO режим
     partnerLogo: null,
-    partnerLogoFile: getValue('partnerLogoFile', null),
+    partnerLogoFile: d('partnerLogoFile', null),
     kv: null,
-    kvSelected: getValue('kvSelected', 'assets/3d/sign/01.webp'),
-    kvBorderRadius: getValue('kvBorderRadius', 0),
-    kvPosition: getValue('kvPosition', 'center'), // 'left', 'center', 'right' - позиция KV (не применяется к широким макетам)
-    bgColor: getValue('bgColor', '#1e1e1e'),
-    bgGradient: getValue('bgGradient', null), // { type: 'linear'|'radial'|'angular'|'diamond', stops: [{color, position, alpha}], angle: number }
-    bgGradientAngle: getValue('bgGradientAngle', 0), // Угол градиента (0-360)
+    kvSelected: d('kvSelected', 'assets/3d/sign/01.webp'),
+    kvBorderRadius: d('kvBorderRadius', 0),
+    kvPosition: d('kvPosition', 'center'), // 'left', 'center', 'right' - позиция KV
+    bgColor: d('bgColor', '#1e1e1e'),
+    bgGradient: d('bgGradient', null), // { type: 'linear'|'radial'|'angular'|'diamond', stops: [{color, position, alpha}], angle: number }
+    bgGradientAngle: d('bgGradientAngle', 0), // Угол градиента (0-360)
     bgImage: null,
-    bgSize: getValue('bgSize', 'cover'),
-    bgPosition: getValue('bgPosition', 'center'),
-    bgVPosition: getValue('bgVPosition', 'center'), // 'top', 'center', 'bottom' - вертикальная позиция фона
-    bgImageSize: getValue('bgImageSize', 100), // Размер изображения в процентах (10-500)
-    textGradientOpacity: getValue('textGradientOpacity', 100), // Прозрачность градиентной подложки под текстом (0-100)
+    bgSize: d('bgSize', 'cover'),
+    bgPosition: d('bgPosition', 'center'),
+    bgVPosition: d('bgVPosition', 'center'), // 'top', 'center', 'bottom' - вертикальная позиция фона
+    bgImageSize: d('bgImageSize', 100), // Размер изображения в процентах (10-500)
+    textGradientOpacity: d('textGradientOpacity', 100), // Прозрачность градиентной подложки под текстом (0-100)
     centerTextOverlayOpacity: 20, // Прозрачность подложки для центрированного текста (0-100)
-    logoPos: getValue('logoPos', 'left'),
-    fontFamily: getValue('fontFamily', 'YS Text'), // Общая гарнитура (для обратной совместимости)
+    logoPos: d('logoPos', 'left'),
+    fontFamily: d('fontFamily', 'YS Text'), // Общая гарнитура (для обратной совместимости)
     fontFamilyFile: null,
     customFont: null,
-    legalFontFamily: getValue('legalFontFamily', null) || getValue('fontFamily', 'YS Text'),
+    legalFontFamily: d('legalFontFamily', null) || d('fontFamily', 'YS Text'),
     legalFontFamilyFile: null,
     legalCustomFont: null,
-    // Figma интеграция
-    figmaMode: getValue('figmaMode', 'constructor'), // 'constructor' или 'figma'
-    figmaUrl: getValue('figmaUrl', ''),
-    figmaData: getValue('figmaData', null), // { fileKey, nodeId, imageUrl, image, bounds }
     legalCustomFontName: null,
-    ageFontFamily: (getValue('ageFontFamily', null) || getValue('fontFamily', 'YS Text')),
+    ageFontFamily: (d('ageFontFamily', null) || d('fontFamily', 'YS Text')),
     ageFontFamilyFile: null,
     ageCustomFont: null,
     ageCustomFontName: null,
@@ -192,26 +192,28 @@ const createInitialState = () => {
     kvCanvasHeight: null,
     exportScale: 1, // Масштаб экспорта: 1, 2, 3 или 4
     brandName: brandName, // Название бренда для использования в интерфейсе
-    layoutMode: getValue('layoutMode', 'auto'),
+    layoutMode: d('layoutMode', 'auto'),
     // Настройки веса файла при экспорте
-    maxFileSizeUnit: getValue('maxFileSizeUnit', 'KB'), // 'KB' или 'MB'
-    maxFileSizeValue: getValue('maxFileSizeValue', 150), // Значение (например, 1 для 1MB или 150 для 150KB)
+    maxFileSizeUnit: d('maxFileSizeUnit', 'KB'), // 'KB' или 'MB'
+    maxFileSizeValue: d('maxFileSizeValue', 150), // Значение (например, 1 для 1MB или 150 для 150KB)
     // Настройки рамки для Хабра
-    habrBorderEnabled: getValue('habrBorderEnabled', false), // Включена ли рамка для Хабра
-    habrBorderColor: getValue('habrBorderColor', '#D5DDDF'), // Цвет рамки для Хабра
+    habrBorderEnabled: d('habrBorderEnabled', false), // Включена ли рамка для Хабра
+    habrBorderColor: d('habrBorderColor', '#D5DDDF'), // Цвет рамки для Хабра
     // Охранные области для специфичных платформ (игнорируют paddingPercent)
-    // Пользовательские значения имеют приоритет над дефолтными
-    safeAreas: userSafeAreas || getValue('safeAreas', {
+    safeAreas: userSafeAreas || d('safeAreas', {
       'Ozon': {
         '2832x600': { width: 2100, height: 570 },
         '1080x450': { width: 1020, height: 405 }
+      },
+      'Я.Директ': {
+        '1600x1200': { width: 900, height: 900 }
       },
       'РСЯ': {
         '1600x1200': { width: 900, height: 900 }
       }
     }),
     // Множители размера логотипа для конкретных размеров
-    logoSizeMultipliers: logoSizeMultipliers || getValue('logoSizeMultipliers', {})
+    logoSizeMultipliers: logoSizeMultipliers || d('logoSizeMultipliers', {})
   };
 };
 
@@ -380,6 +382,40 @@ const applyDerivedState = (state, delta) => {
 
       if (activePair.bgColor !== undefined && !('bgColor' in deltaKeys)) {
         next.bgColor = activePair.bgColor || '#1e1e1e';
+      }
+    }
+  }
+
+  // Обратная синхронизация: если bgColor или bgImage изменены через основной UI,
+  // сохраняем их в активную пару
+  if (next.titleSubtitlePairs && next.titleSubtitlePairs.length > 0) {
+    const activeIndex = next.activePairIndex || 0;
+    const activePair = next.titleSubtitlePairs[activeIndex];
+    if (activePair) {
+      let pairChanged = false;
+
+      if ('bgColor' in deltaKeys && delta.bgColor !== undefined) {
+        if (activePair.bgColor !== delta.bgColor) {
+          activePair.bgColor = delta.bgColor;
+          pairChanged = true;
+        }
+      }
+
+      if ('bgImage' in deltaKeys || 'bgImageSelected' in deltaKeys) {
+        const newBgImage = delta.bgImageSelected ?? delta.bgImage ?? null;
+        const currentPairBg = activePair.bgImageSelected;
+        if (typeof newBgImage === 'string' && newBgImage !== currentPairBg) {
+          activePair.bgImageSelected = newBgImage;
+          pairChanged = true;
+        } else if (newBgImage === null && currentPairBg !== null) {
+          activePair.bgImageSelected = null;
+          pairChanged = true;
+        }
+      }
+
+      if (pairChanged) {
+        next.titleSubtitlePairs = [...next.titleSubtitlePairs];
+        next.titleSubtitlePairs[activeIndex] = { ...activePair };
       }
     }
   }
@@ -568,10 +604,74 @@ export const removeTitleSubtitlePair = (index) => {
   });
 };
 
-export const setActivePairIndex = (index) => {
+export const setActivePairIndex = async (index) => {
   const state = getState();
   if (index >= 0 && index < state.titleSubtitlePairs.length) {
+    const activePair = state.titleSubtitlePairs[index];
+    // Синхронизируем фон из активной пары с основным state
+    if (activePair) {
+      // Обновляем bgColor из пары
+      if (activePair.bgColor !== undefined) {
+        setKey('bgColor', activePair.bgColor || '#1e1e1e');
+      }
+      // Обновляем bgImage из пары
+      if (activePair.bgImageSelected !== undefined) {
+        const bgImageSelected = activePair.bgImageSelected;
+        if (bgImageSelected === null || bgImageSelected === '') {
+          setKey('bgImage', null);
+          setKey('bgImageSelected', null);
+        } else if (typeof bgImageSelected === 'string') {
+          // Если это строка (путь), устанавливаем её
+          setKey('bgImage', bgImageSelected);
+          setKey('bgImageSelected', bgImageSelected);
+          // Загружаем изображение асинхронно
+          try {
+            const imageCacheModule = await import('../utils/imageCache.js');
+            const loadImageCached = imageCacheModule.loadImage;
+            const img = await loadImageCached(bgImageSelected, { useCache: true, showBlur: false });
+            if (img && img.url) {
+              // Обновляем bgImage на загруженный объект
+              const imgObj = new Image();
+              imgObj.crossOrigin = 'anonymous';
+              await new Promise((resolve, reject) => {
+                imgObj.onload = resolve;
+                imgObj.onerror = reject;
+                imgObj.src = img.url;
+              });
+              // Обновляем пару с загруженным изображением
+              const currentState = getState();
+              const newPairs = [...currentState.titleSubtitlePairs];
+              if (newPairs[index]) {
+                newPairs[index] = { ...newPairs[index], bgImageSelected: imgObj };
+                setState({ titleSubtitlePairs: newPairs });
+              }
+              setKey('bgImage', imgObj);
+            }
+          } catch (e) {
+            console.warn('Не удалось загрузить фоновое изображение при переключении пары:', e);
+            // Продолжаем со строкой, UI попытается загрузить позже
+          }
+        } else {
+          // bgImageSelected уже является объектом Image
+          setKey('bgImage', bgImageSelected);
+          setKey('bgImageSelected', bgImageSelected);
+        }
+      }
+    }
     setKey('activePairIndex', index);
+    
+    // Обновляем UI после переключения пары
+    // Импортируем функции обновления UI
+    try {
+      const { updateBgUI } = await import('../ui/components/backgroundSelector.js');
+      const { syncFormFields } = await import('../ui/ui.js');
+      const { renderer } = await import('../renderer.js');
+      updateBgUI();
+      syncFormFields();
+      renderer.render();
+    } catch (e) {
+      console.warn('Не удалось обновить UI после переключения пары:', e);
+    }
   }
 };
 

@@ -7,11 +7,17 @@ import { getState } from '../state/store.js';
 
 /**
  * Определяет тип макета на основе размеров
+ * Явно горизонтальный (>= 1.35) — всегда horizontal; явно вертикальный (<= 1/1.35) — vertical.
+ * Квадрат (между порогами): только при layoutMode === 'horizontal' считаем горизонтальным, иначе вертикальный.
  */
 export const getLayoutType = (width, height, layoutMode = 'auto') => {
   const aspectRatio = width / height;
   const horizontalThreshold = 1.35;
-  const isHorizontalLayout = layoutMode === 'horizontal' || (layoutMode === 'auto' && aspectRatio >= horizontalThreshold);
+  const stronglyHorizontal = aspectRatio >= horizontalThreshold;
+  const stronglyVertical = aspectRatio <= 1 / horizontalThreshold;
+  const isHorizontalLayout = stronglyHorizontal
+    ? true
+    : (stronglyVertical ? false : (layoutMode === 'horizontal'));
   const isUltraWide = width >= height * LAYOUT_CONSTANTS.ULTRA_WIDE_THRESHOLD;
   const isSuperWide = isUltraWide && height < LAYOUT_CONSTANTS.SUPER_WIDE_HEIGHT;
   
@@ -351,6 +357,28 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
       hasPartnerLogo
     };
   } else if (isHorizontalLayout) {
+    // Для очень низких горизонтальных форматов (height < 150) ограничиваем высоту логотипа
+    const isVeryLowHorizontal = height < 150;
+    // Для форматов с высотой 400-500px также немного ограничиваем логотип, чтобы не мешал тексту
+    const isMediumHeight = height >= 400 && height <= 500;
+    
+    if (isVeryLowHorizontal) {
+      const maxLogoHeight = Math.min(height * 0.4, height - paddingPx * 2);
+      if (logoHeight > maxLogoHeight) {
+        logoHeight = maxLogoHeight;
+        logoScale = logoHeight / state.logo.height;
+        mainLogoWidth = state.logo.width * logoScale;
+      }
+    } else if (isMediumHeight) {
+      // Для средних форматов ограничиваем логотип, чтобы оставить больше места для текста
+      const maxLogoHeight = Math.min(height * 0.25, height - paddingPx * 3);
+      if (logoHeight > maxLogoHeight) {
+        logoHeight = maxLogoHeight;
+        logoScale = logoHeight / state.logo.height;
+        mainLogoWidth = state.logo.width * logoScale;
+      }
+    }
+    
     // Пересчитываем для партнерского логотипа
     if (hasPartnerLogo) {
       const partnerLogoScale = logoHeight / state.partnerLogo.height;

@@ -184,6 +184,18 @@ export const clearBgImage = () => {
   // Очищаем фоновое изображение для активной пары
   updatePairBgImage(activePairIndex, null);
   
+  // Восстанавливаем затемнение, если не в PRO режиме
+  if (!state.proMode) {
+    setKey('textGradientOpacity', 100);
+    const domGradient = getDom();
+    if (domGradient.textGradientOpacity) {
+      domGradient.textGradientOpacity.value = 100;
+    }
+    if (domGradient.textGradientOpacityValue) {
+      domGradient.textGradientOpacityValue.textContent = '100%';
+    }
+  }
+  
   updateBgUI();
   renderer.render();
 };
@@ -786,6 +798,20 @@ export const selectPreloadedBG = async (bgFile) => {
     // Очищаем фоновое изображение для активной пары
     updatePairBgImage(activePairIndex, null);
     setState({ bgImage: null });
+    
+    // Восстанавливаем затемнение, если не в PRO режиме
+    const currentState = getState();
+    if (!currentState.proMode) {
+      setKey('textGradientOpacity', 100);
+      const domGradient = getDom();
+      if (domGradient.textGradientOpacity) {
+        domGradient.textGradientOpacity.value = 100;
+      }
+      if (domGradient.textGradientOpacityValue) {
+        domGradient.textGradientOpacityValue.textContent = '100%';
+      }
+    }
+    
     updateBgUI();
     renderer.render();
     return;
@@ -793,6 +819,42 @@ export const selectPreloadedBG = async (bgFile) => {
   
   // Обновляем фоновое изображение для активной пары (сохраняем путь как строку)
   updatePairBgImage(activePairIndex, bgFile);
+  
+  // Если фон из папки pro/bg, убираем затемнение градиентом и устанавливаем размер 110%
+  const isProBg = bgFile && (bgFile.includes('pro/bg') || bgFile.includes('assets/pro/bg'));
+  if (isProBg) {
+    setKey('textGradientOpacity', 0);
+    const domGradient = getDom();
+    if (domGradient.textGradientOpacity) {
+      domGradient.textGradientOpacity.value = 0;
+    }
+    if (domGradient.textGradientOpacityValue) {
+      domGradient.textGradientOpacityValue.textContent = '0%';
+    }
+    
+    // Устанавливаем размер фона 110% для pro/bg
+    setKey('bgImageSize', 110);
+    const domBgSize = getDom();
+    if (domBgSize.bgImageSize) {
+      domBgSize.bgImageSize.value = 110;
+    }
+    if (domBgSize.bgImageSizeValue) {
+      domBgSize.bgImageSizeValue.textContent = '110%';
+    }
+  } else {
+    // Если фон не из pro/bg и не в PRO режиме, восстанавливаем затемнение
+    const currentState = getState();
+    if (!currentState.proMode) {
+      setKey('textGradientOpacity', 100);
+      const domGradient = getDom();
+      if (domGradient.textGradientOpacity) {
+        domGradient.textGradientOpacity.value = 100;
+      }
+      if (domGradient.textGradientOpacityValue) {
+        domGradient.textGradientOpacityValue.textContent = '100%';
+      }
+    }
+  }
   
   // При выборе фонового изображения автоматически выключаем Визуал и очищаем дефолтный Визуал
   setKey('showKV', false);
@@ -830,6 +892,42 @@ export const selectPairBG = async (pairIndex, bgFile) => {
       setState({ bgImage: null });
       updateBgUI();
     } else {
+      // Если фон из папки pro/bg, убираем затемнение градиентом и устанавливаем размер 110%
+      const isProBg = bgFile && (bgFile.includes('pro/bg') || bgFile.includes('assets/pro/bg'));
+      if (isProBg) {
+        setKey('textGradientOpacity', 0);
+        const domGradient = getDom();
+        if (domGradient.textGradientOpacity) {
+          domGradient.textGradientOpacity.value = 0;
+        }
+        if (domGradient.textGradientOpacityValue) {
+          domGradient.textGradientOpacityValue.textContent = '0%';
+        }
+        
+        // Устанавливаем размер фона 110% для pro/bg
+        setKey('bgImageSize', 110);
+        const domBgSize = getDom();
+        if (domBgSize.bgImageSize) {
+          domBgSize.bgImageSize.value = 110;
+        }
+        if (domBgSize.bgImageSizeValue) {
+          domBgSize.bgImageSizeValue.textContent = '110%';
+        }
+      } else {
+        // Если фон не из pro/bg и не в PRO режиме, восстанавливаем затемнение
+        const currentState = getState();
+        if (!currentState.proMode) {
+          setKey('textGradientOpacity', 100);
+          const domGradient = getDom();
+          if (domGradient.textGradientOpacity) {
+            domGradient.textGradientOpacity.value = 100;
+          }
+          if (domGradient.textGradientOpacityValue) {
+            domGradient.textGradientOpacityValue.textContent = '100%';
+          }
+        }
+      }
+      
       // При выборе фонового изображения автоматически выключаем Визуал и очищаем дефолтный Визуал
       setKey('showKV', false);
       setKey('kvSelected', '');
@@ -1153,10 +1251,11 @@ const populateBGColumns = async (forceRefresh = false) => {
       }
     }
   } else {
-    // Если нет известных данных, показываем базовую структуру папок (3d, photo)
+    // Если нет известных данных, показываем базовую структуру папок (3d, photo, pro)
     const basicStructure = {
       '3d': {},
-      'photo': {}
+      'photo': {},
+      'pro': {}
     };
     initialStructure = basicStructure;
     selectedBGFolder1 = null;
@@ -1174,72 +1273,18 @@ const populateBGColumns = async (forceRefresh = false) => {
   // Сканируем в фоне по папкам постепенно и обновляем структуру
   bgScanning = true;
   
-  // Начинаем с текущей структуры
-  let bgStructure = JSON.parse(JSON.stringify(initialStructure));
+  // Используем scanBG для автоматического обнаружения всех папок
+  const bgStructure = await scanBG();
   
-  // Импортируем функцию проверки файлов
-  const { checkFileExists } = await import('../../utils/assetScanner.js');
+  // Обновляем кэш и UI
+  cachedBG = bgStructure;
+  renderBGColumn1(bgStructure);
   
-  // Сканируем по папкам постепенно
-  const firstLevelFolders = ['3d', 'photo'];
-  const knownSecondLevelFolders3d = ['sign', 'icons', 'logos', 'numbers', 'other', 'shapes', 'tech', 'yandex'];
-  const knownSecondLevelFoldersPhoto = ['pro', 'ai_reskill', 'old_reskill'];
-  
-  // Сканируем каждую папку отдельно и обновляем UI
-  // Используем батчинг для параллельной проверки нескольких файлов
-  for (const folder1 of firstLevelFolders) {
-    const knownSecondLevelFolders = folder1 === 'photo' 
-      ? knownSecondLevelFoldersPhoto 
-      : knownSecondLevelFolders3d;
-    
-    // Сканируем папки второго уровня параллельно (батчами по 3)
-    for (let i = 0; i < knownSecondLevelFolders.length; i += 3) {
-      const batch = knownSecondLevelFolders.slice(i, i + 3);
-      const batchPromises = batch.map(async (folder2) => {
-        const basePath = `assets/${folder1}/${folder2}`;
-        
-        // Используем умную проверку файлов с ранней остановкой
-        const { checkFilesSmart } = await import('../../utils/assetScanner.js');
-        const folderFiles = await checkFilesSmart(basePath, 1, 99, 5);
-        
-        return { folder2, folderFiles };
-      });
-      
-      const batchResults = await Promise.all(batchPromises);
-      
-      // Обновляем структуру после каждого батча
-      for (const { folder2, folderFiles } of batchResults) {
-        if (folderFiles.length > 0) {
-          if (!bgStructure[folder1]) {
-            bgStructure[folder1] = {};
-          }
-          if (!bgStructure[folder1][folder2]) {
-            bgStructure[folder1][folder2] = [];
-          }
-          folderFiles.forEach(file => {
-            if (!bgStructure[folder1][folder2].find(b => b.file === file.file)) {
-              bgStructure[folder1][folder2].push(file);
-            }
-          });
-        }
-      }
-      
-      // Обновляем UI после каждого батча папок
-      cachedBG = bgStructure;
-      renderBGColumn1(bgStructure);
-      
-      // Обновляем вторую колонку, если выбрана соответствующая папка первого уровня
-      if (selectedBGFolder1 === folder1) {
-        renderBGColumn2(bgStructure, false);
-      }
-      
-      // Небольшая задержка для плавности UI
-      await new Promise(resolve => setTimeout(resolve, 30));
-    }
+  // Обновляем вторую колонку, если выбрана папка первого уровня
+  if (selectedBGFolder1) {
+    renderBGColumn2(bgStructure, false);
   }
   
-  // Финальное обновление
-  cachedBG = bgStructure;
   bgScanning = false;
   
   // Сохраняем текущие выбранные папки, чтобы восстановить состояние после обновления
@@ -1249,35 +1294,22 @@ const populateBGColumns = async (forceRefresh = false) => {
   // Обновляем колонки с полной структурой
   renderBGColumn1(bgStructure);
   
-  // Восстанавливаем выбранные папки и обновляем остальные колонки, если они были открыты
+  // Восстанавливаем выбранные папки
   if (currentFolder1) {
     selectedBGFolder1 = currentFolder1;
-    const folder1Item = document.querySelector(`[data-folder1="${currentFolder1}"]`);
+    const folder1Item = column1.querySelector(`[data-folder1="${currentFolder1}"]`);
     if (folder1Item) {
       folder1Item.classList.add('active');
       renderBGColumn2(bgStructure, false);
       
       if (currentFolder2) {
         selectedBGFolder2 = currentFolder2;
-        const folder2Item = document.querySelector(`[data-folder2="${currentFolder2}"]`);
-        if (folder2Item) {
-          folder2Item.classList.add('active');
-          const images = bgStructure[currentFolder1]?.[currentFolder2] || [];
-          renderBGColumn3(images);
-        }
-      } else {
-        // Если папка второго уровня не выбрана, выбираем первую
-        const folders2 = Object.keys(bgStructure[currentFolder1] || {});
-        if (folders2.length > 0) {
-          selectedBGFolder2 = folders2[0];
-          const column2 = document.getElementById('bgFolder2Column');
-          if (column2) {
-            const firstItem = column2.querySelector(`[data-folder2="${folders2[0]}"]`);
-            if (firstItem) {
-              firstItem.classList.add('active');
-              const images = bgStructure[currentFolder1][folders2[0]] || [];
-              renderBGColumn3(images);
-            }
+        const column2 = document.getElementById('bgFolder2Column');
+        if (column2) {
+          const folder2Item = column2.querySelector(`[data-folder2="${currentFolder2}"]`);
+          if (folder2Item) {
+            folder2Item.classList.add('active');
+            renderBGImages(bgStructure, currentFolder1, currentFolder2);
           }
         }
       }
