@@ -69,22 +69,14 @@
   <div class="app">
     <div class="header">
       <div class="header-title-container">
-        <h1 data-i18n="app.title">Practicum AI-Craft <span class="app-version">V1.0</span></h1>
+        <img class="service-logo" src="assets/logo.svg" alt="Practicum AI-Craft">
         <div class="mode-control-surface">
           <div class="mode-groups">
             <div class="toggle-switch mode-toggle mode-toggle-primary" id="projectModeToggle" data-value="rsya" data-options="2">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
-                <div class="toggle-switch-option" data-value="layouts">Макеты</div>
                 <div class="toggle-switch-option active" data-value="rsya">РСЯ</div>
-              </div>
-            </div>
-            <div class="toggle-switch mode-toggle mode-toggle-3 mode-toggle-secondary" id="variantModeToggle" data-value="reskill" data-options="3">
-              <div class="toggle-switch-slider"></div>
-              <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="reskill">Reskill</div>
-                <div class="toggle-switch-option" data-value="pro">PRO</div>
-                <div class="toggle-switch-option" data-value="kz">KZ</div>
+                <div class="toggle-switch-option" data-value="layouts">Макеты</div>
               </div>
             </div>
           </div>
@@ -151,6 +143,16 @@
         <!-- Layout Section -->
         <div class="panel-section active" id="panel-section-layout">
             <div class="form-group">
+              <div class="toggle-switch mode-toggle mode-toggle-3 mode-toggle-secondary mode-toggle-panel" id="variantModeToggle" data-value="reskill" data-options="3">
+                <div class="toggle-switch-slider"></div>
+                <div class="toggle-switch-track">
+                  <div class="toggle-switch-option active" data-value="reskill">Reskill</div>
+                  <div class="toggle-switch-option" data-value="pro">PRO</div>
+                  <div class="toggle-switch-option" data-value="kz">KZ</div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
               <label for="paddingPercent" data-i18n="layout.padding">Отступ от края</label>
               <input type="range" id="paddingPercent" value="5" min="2" max="8" data-state-key="paddingPercent" data-update-handler="updatePadding">
               <div class="slider-value">
@@ -171,12 +173,6 @@
                     <span class="material-icons" style="font-size: 18px;">view_week</span>
                   </div>
                 </div>
-              </div>
-            </div>
-            <div class="form-group" id="rsyaCropGridControl">
-              <div class="checkbox-group">
-                <input type="checkbox" id="rsyaCropGridVisibleToggle" data-state-key="rsyaCropGridVisible">
-                <label for="rsyaCropGridVisibleToggle">Сетка кадрирования</label>
               </div>
             </div>
             <div class="form-group form-group-section">
@@ -386,7 +382,7 @@
               <span>60%</span>
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="logoPosGroup">
             <label data-i18n="logo.position">Позиция</label>
             <div class="toggle-switch" id="logoPosToggle" data-value="left" data-options="2">
               <div class="toggle-switch-slider"></div>
@@ -421,7 +417,6 @@
               <!-- Пары заголовок/подзаголовок будут добавлены динамически -->
             </div>
             <div class="form-group" id="titlePairEditor" style="display: none;">
-              <label for="title" data-i18n="title.text">Текст заголовка (для активной пары)</label>
               <textarea id="title" data-state-key="title" data-update-handler="updateActivePairTitle">Курс «Frontend-разработчик» от Практикума</textarea>
               <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
                 
@@ -478,6 +473,16 @@
             </div>
           </div>
           <div class="form-group">
+            <label for="titleOpacity">Непрозрачность</label>
+            <input type="range" id="titleOpacity" value="100" min="0" max="100" data-state-key="titleOpacity" data-update-handler="updateTitleOpacity">
+            <div class="slider-value">
+              <span>0%</span>
+              <span id="titleOpacityValue">100%</span>
+              <span>100%</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="titleSize">Размер</label>
             <input type="range" id="titleSize" value="8" min="6" max="10" step="0.1" data-state-key="titleSize" data-update-handler="updateTitleSize">
             <div class="slider-value">
               <span>6%</span>
@@ -530,6 +535,15 @@
             <label for="titleLineHeight" style="margin: 0; flex: 1;" data-i18n="title.lineHeight">Межстрочный интервал</label>
             <input type="number" id="titleLineHeight" value="1.1" min="1.0" max="3.0" step="0.1" data-state-key="titleLineHeight" style="width: 80px;">
           </div>
+          <div class="form-group">
+            <label for="titleLogoGap">Отступ от логотипа</label>
+            <input type="range" id="titleLogoGap" value="0" min="-20" max="20" step="0.5" data-state-key="titleLogoGap" data-update-handler="updateTitleLogoGap">
+            <div class="slider-value">
+              <span>-20%</span>
+              <span id="titleLogoGapValue">0%</span>
+              <span>20%</span>
+            </div>
+          </div>
         </div>
         <!-- End Title Section -->
         
@@ -541,7 +555,7 @@
               <label for="showSubtitle" style="margin: 0" data-i18n="subtitle.show">Показывать подзаголовок</label>
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="hideSubtitleOnWideGroup">
             <div class="checkbox-group">
               <input type="checkbox" id="hideSubtitleOnWide" data-state-key="hideSubtitleOnWide">
               <label for="hideSubtitleOnWide" style="margin: 0" data-i18n="subtitle.hideOnWide">Скрывать подзаголовок на широких форматах</label>
@@ -552,7 +566,6 @@
               <!-- Пары заголовок/подзаголовок будут добавлены динамически -->
             </div>
             <div class="form-group" id="subtitlePairEditor" style="display: none;">
-              <label for="subtitle" data-i18n="subtitle.text">Текст подзаголовка (для активной пары)</label>
               <textarea id="subtitle" data-state-key="subtitle" data-update-handler="updateActivePairSubtitle">Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев</textarea>
               <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
                
@@ -589,6 +602,7 @@
             </div>
           </div>
           <div class="form-group">
+            <label for="subtitleOpacity">Непрозрачность</label>
             <input type="range" id="subtitleOpacity" value="90" min="0" max="100" data-state-key="subtitleOpacity" data-update-handler="updateSubtitleOpacity">
             <div class="slider-value">
               <span>0%</span>
@@ -597,6 +611,7 @@
             </div>
           </div>
           <div class="form-group">
+            <label for="subtitleSize">Размер</label>
             <input type="range" id="subtitleSize" value="4" min="1" max="12" step="0.1" data-state-key="subtitleSize" data-update-handler="updateSubtitleSize">
             <div class="slider-value">
               <span>1%</span>
@@ -649,9 +664,14 @@
             <label for="subtitleLineHeight" style="margin: 0; flex: 1;" data-i18n="subtitle.lineHeight">Межстрочный интервал</label>
             <input type="number" id="subtitleLineHeight" value="1.2" min="1.0" max="3.0" step="0.1" data-state-key="subtitleLineHeight" style="width: 80px;">
           </div>
-          <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-            <label for="subtitleGap" style="margin: 0; flex: 1;" data-i18n="subtitle.gap">Отступ от заголовка</label>
-            <input type="number" id="subtitleGap" value="-1" min="-20" max="20" step="0.5" data-state-key="subtitleGap" style="width: 80px;">
+          <div class="form-group">
+            <label for="subtitleGap" data-i18n="subtitle.gap">Отступ от заголовка</label>
+            <input type="range" id="subtitleGap" value="-1" min="-20" max="20" step="0.5" data-state-key="subtitleGap" data-update-handler="updateSubtitleGap">
+            <div class="slider-value">
+              <span>-20%</span>
+              <span id="subtitleGapValue">-1%</span>
+              <span>20%</span>
+            </div>
           </div>
         </div>
         <!-- End Subtitle Section -->

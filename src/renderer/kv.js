@@ -27,7 +27,7 @@ export const calculateSuperWideKV = (state, width, height, paddingPx, logoBounds
   if (!kvW0 || !kvH0) return null;
 
   // Учитываем legal текст внизу
-  const legalReserved = (state.showLegal || state.showAge) ? legalBlockHeight : 0;
+  const legalReserved = ((state.showLegal && state.legal) || (state.showAge && state.age)) ? legalBlockHeight : 0;
   const legalTop = height - paddingPx - legalReserved;
   const availableHeight = Math.max(0, legalTop - paddingPx);
   const availableWidth = Math.max(0, width - paddingPx * 2);
@@ -119,7 +119,7 @@ export const calculateUltraWideKV = (state, width, height, paddingPx, legalBlock
   if (!kvW0 || !kvH0) return null;
 
   // Учитываем legal текст внизу
-  const legalReserved = (state.showLegal || state.showAge) ? legalBlockHeight : 0;
+  const legalReserved = ((state.showLegal && state.legal) || (state.showAge && state.age)) ? legalBlockHeight : 0;
   const legalTop = height - paddingPx - legalReserved;
   const availableHeight = Math.max(0, legalTop - paddingPx);
   const availableWidth = Math.max(0, width - paddingPx * 2);
@@ -274,7 +274,7 @@ export const calculateVerticalKV = (state, width, height, paddingPx, titleBounds
     subtitleBounds ? subtitleBounds.y + subtitleBounds.height : -Infinity
   );
   
-  const legalReserved = (state.showLegal || state.showAge) ? legalBlockHeight : 0;
+  const legalReserved = ((state.showLegal && state.legal) || (state.showAge && state.age)) ? legalBlockHeight : 0;
   const legalTop = height - paddingPx - legalReserved;
   const safeGapY = paddingPx * 0.5;
   const availableWidth = Math.max(0, width - paddingPx * 2);
@@ -415,4 +415,3 @@ export const drawKV = (ctx, kvMeta, state) => {
     ctx.restore();
   }
 };
-

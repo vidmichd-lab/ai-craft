@@ -1564,12 +1564,6 @@ export const updateUI = () => {
     element.setAttribute('aria-label', t(key));
   });
   
-  // Обновляем заголовок страницы
-  const pageTitle = document.querySelector('.header h1');
-  if (pageTitle && !pageTitle.hasAttribute('data-i18n')) {
-    pageTitle.textContent = t('app.title');
-  }
-  
   // Вызываем событие изменения языка для других модулей
   window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: currentLanguage } }));
 };
@@ -1596,4 +1590,3 @@ if (typeof window !== 'undefined') {
     updateUI();
   }
 }
-

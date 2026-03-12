@@ -257,6 +257,9 @@ export const clearKV = () => {
   if (dom.showLogo) dom.showLogo.checked = visibilityFlags.showLogo !== false;
   if (dom.showLegal) dom.showLegal.checked = !!visibilityFlags.showLegal;
   if (dom.showAge) dom.showAge.checked = !!visibilityFlags.showAge;
+  if (typeof window.__refreshRsyaVisualReorder === 'function') {
+    window.__refreshRsyaVisualReorder();
+  }
   updateKVTriggerText('');
   updateKVUI();
   renderer.render();

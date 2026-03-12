@@ -3770,14 +3770,7 @@ const setupAdminHandlers = (initialSizes) => {
       const brandName = brandNameInput.value.trim() || 'Практикума';
       setKey('brandName', brandName);
       
-      // Обновляем заголовок страницы
-      const pageTitle = document.querySelector('.header h1');
-      if (pageTitle) {
-        // Сохраняем версию при обновлении заголовка
-        const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
-        const versionHTML = versionSpan ? versionSpan.outerHTML : '';
-        pageTitle.innerHTML = `Генератор макетов ${brandName}${versionHTML ? ' ' + versionHTML : ''}`;
-      }
+      document.title = 'Multi-Artboard Layout Generator';
       
       // Обновляем заголовки в парах, если они содержат старое название
       state = getState(); // Обновляем state после изменения brandName
@@ -3948,13 +3941,7 @@ const setupAdminHandlers = (initialSizes) => {
       // Обновляем название бренда, если оно было импортировано
       if (imported.brandName) {
         setKey('brandName', imported.brandName);
-        const pageTitle = document.querySelector('.header h1');
-        if (pageTitle) {
-          // Сохраняем версию при обновлении заголовка
-          const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
-          const versionHTML = versionSpan ? versionSpan.outerHTML : '';
-          pageTitle.innerHTML = `Генератор макетов ${imported.brandName}${versionHTML ? ' ' + versionHTML : ''}`;
-        }
+        document.title = 'Multi-Artboard Layout Generator';
       }
       
       // Перезагружаем страницу для применения всех изменений

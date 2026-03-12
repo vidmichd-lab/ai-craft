@@ -183,6 +183,9 @@ export const syncFormFields = () => {
   }
   dom.titleColor.value = state.titleColor || '#ffffff';
   if (dom.titleColorHex) dom.titleColorHex.value = state.titleColor || '#ffffff';
+  const titleOpacity = state.titleOpacity ?? 100;
+  if (dom.titleOpacity) dom.titleOpacity.value = titleOpacity;
+  if (dom.titleOpacityValue) dom.titleOpacityValue.textContent = `${titleOpacity}%`;
   const titleSize = state.titleSize ?? 8;
   dom.titleSize.value = titleSize;
   if (dom.titleSizeValue) {
@@ -308,6 +311,9 @@ export const syncFormFields = () => {
   dom.subtitleLetterSpacing.value = state.subtitleLetterSpacing;
   dom.subtitleLineHeight.value = state.subtitleLineHeight;
   dom.subtitleGap.value = state.subtitleGap;
+  if (dom.subtitleGapValue) dom.subtitleGapValue.textContent = `${state.subtitleGap}%`;
+  if (dom.titleLogoGap) dom.titleLogoGap.value = state.titleLogoGap ?? 0;
+  if (dom.titleLogoGapValue) dom.titleLogoGapValue.textContent = `${state.titleLogoGap ?? 0}%`;
 
   dom.legal.value = state.legal || '';
   dom.legalColor.value = state.legalColor || '#ffffff';
@@ -524,10 +530,6 @@ export const syncFormFields = () => {
   if (rsyaKVOffsetYInput) {
     rsyaKVOffsetYInput.value = state.rsyaKVOffsetY || 0;
     if (rsyaKVOffsetYValue) rsyaKVOffsetYValue.textContent = String(state.rsyaKVOffsetY || 0);
-  }
-  const rsyaCropGridVisibleToggle = document.getElementById('rsyaCropGridVisibleToggle');
-  if (rsyaCropGridVisibleToggle) {
-    rsyaCropGridVisibleToggle.checked = !!state.rsyaCropGridVisible;
   }
   renderRsyaVisualReorder();
 
@@ -1097,8 +1099,8 @@ const initializeRsyaVisualReorder = () => {
 
       if (action === 'clear') {
         if (slot === 0) {
-          setKey('kv', null);
-          setKey('kvSelected', '');
+          clearKV();
+          return;
         } else if (slot === 1) {
           clearRsyaKV2();
           return;
@@ -1106,10 +1108,6 @@ const initializeRsyaVisualReorder = () => {
           clearRsyaKV3();
           return;
         }
-        syncRsyaVisualCount();
-        renderRsyaVisualReorder();
-        renderer.render();
-        return;
       }
     }
 
@@ -1271,9 +1269,6 @@ const resolveRsyaCropAnchor = (key, state) => {
   }
   const layout = state?.rsyaLayout || 'center';
   if (layout === 'left') {
-    if (key === '1:1') {
-      return { x: 'center', y: 'center' };
-    }
     return { x: 'left', y: 'center' };
   }
   return { x: 'center', y: 'center' };
@@ -2041,12 +2036,6 @@ const setToggleSwitchValue = (toggleId, value) => {
   options.forEach((option) => {
     option.classList.toggle('active', option.dataset.value === value);
   });
-  const slider = toggle.querySelector('.toggle-switch-slider');
-  if (slider && options.length > 1) {
-    const idx = Math.max(0, options.findIndex((option) => option.dataset.value === value));
-    const shift = idx * (100 / options.length);
-    slider.style.transform = `translateX(${shift}%)`;
-  }
 };
 
 const updateProjectModeTags = (mode) => {
@@ -2072,8 +2061,10 @@ const updateProjectModeUI = () => {
   if (cropSection) cropSection.style.display = isRsya ? 'block' : 'none';
   const rsyaLayoutTypeGroup = document.getElementById('rsyaLayoutTypeGroup');
   if (rsyaLayoutTypeGroup) rsyaLayoutTypeGroup.style.display = isRsya ? 'block' : 'none';
-  const rsyaCropGridControl = document.getElementById('rsyaCropGridControl');
-  if (rsyaCropGridControl) rsyaCropGridControl.style.display = isRsya ? 'block' : 'none';
+  const logoPosGroup = document.getElementById('logoPosGroup');
+  if (logoPosGroup) logoPosGroup.style.display = isRsya ? 'none' : 'block';
+  const hideSubtitleOnWideGroup = document.getElementById('hideSubtitleOnWideGroup');
+  if (hideSubtitleOnWideGroup) hideSubtitleOnWideGroup.style.display = isRsya ? 'none' : 'block';
   const rsyaControls = document.getElementById('rsyaKVControls');
   if (rsyaControls) rsyaControls.style.display = 'block';
   const exportSizesControls = document.getElementById('exportSizesControls');
@@ -2431,15 +2422,12 @@ export const initializeProModeToggle = async () => {
 
   const rsyaLayoutToggle = document.getElementById('rsyaLayoutToggle');
   if (rsyaLayoutToggle) {
-    const value = state.rsyaLayout || 'center';
-    rsyaLayoutToggle.setAttribute('data-value', value);
+    setToggleSwitchValue('rsyaLayoutToggle', state.rsyaLayout || 'center');
     rsyaLayoutToggle.querySelectorAll('.toggle-switch-option').forEach((option) => {
-      option.classList.toggle('active', option.dataset.value === value);
       option.addEventListener('click', () => {
         const next = option.dataset.value;
         setKey('rsyaLayout', next);
-        rsyaLayoutToggle.setAttribute('data-value', next);
-        rsyaLayoutToggle.querySelectorAll('.toggle-switch-option').forEach((o) => o.classList.toggle('active', o === option));
+        setToggleSwitchValue('rsyaLayoutToggle', next);
         renderer.render();
       });
     });
@@ -2494,6 +2482,48 @@ export const updateSubtitleSize = (value) => {
   const dom = getDom();
   if (dom.subtitleSizeValue) {
     dom.subtitleSizeValue.textContent = `${numeric}%`;
+  }
+  renderer.render();
+};
+
+export const updateTitleOpacity = (value) => {
+  const numeric = parseFloat(value);
+  if (isNaN(numeric)) {
+    console.warn('Некорректное значение для titleOpacity:', value);
+    return;
+  }
+  setKey('titleOpacity', numeric);
+  const dom = getDom();
+  if (dom.titleOpacityValue) {
+    dom.titleOpacityValue.textContent = `${numeric}%`;
+  }
+  renderer.render();
+};
+
+export const updateSubtitleGap = (value) => {
+  const numeric = parseFloat(value);
+  if (isNaN(numeric)) {
+    console.warn('Некорректное значение для subtitleGap:', value);
+    return;
+  }
+  setKey('subtitleGap', numeric);
+  const dom = getDom();
+  if (dom.subtitleGapValue) {
+    dom.subtitleGapValue.textContent = `${numeric}%`;
+  }
+  renderer.render();
+};
+
+export const updateTitleLogoGap = (value) => {
+  const numeric = parseFloat(value);
+  if (isNaN(numeric)) {
+    console.warn('Некорректное значение для titleLogoGap:', value);
+    return;
+  }
+  setKey('titleLogoGap', numeric);
+  const dom = getDom();
+  if (dom.titleLogoGapValue) {
+    dom.titleLogoGapValue.textContent = `${numeric}%`;
   }
   renderer.render();
 };
@@ -3021,14 +3051,7 @@ export const loadSettings = () => {
   if (state.brandName) {
     localStorage.setItem('brandName', state.brandName);
     
-    // Обновляем заголовок страницы
-    const pageTitle = document.querySelector('.header h1');
-    if (pageTitle) {
-      // Сохраняем версию при обновлении заголовка
-      const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
-      const versionHTML = versionSpan ? versionSpan.outerHTML : '';
-      pageTitle.innerHTML = `Practicum AI-Craft${versionHTML ? ' ' + versionHTML : ''}`;
-    }
+    document.title = 'Multi-Artboard Layout Generator';
   }
 
   syncFormFields();
@@ -4342,14 +4365,7 @@ export const initializeStateSubscribers = () => {
       localStorage.setItem('brandName', state.brandName);
       lastBrandName = state.brandName;
       
-      // Обновляем заголовок страницы
-      const pageTitle = document.querySelector('.header h1');
-      if (pageTitle) {
-        // Сохраняем версию при обновлении заголовка
-        const versionSpan = pageTitle.querySelector('span[style*="color: var(--text-secondary"]');
-        const versionHTML = versionSpan ? versionSpan.outerHTML : '';
-        pageTitle.innerHTML = `Генератор макетов ${state.brandName}${versionHTML ? ' ' + versionHTML : ''}`;
-      }
+      document.title = 'Multi-Artboard Layout Generator';
     }
     
     // Перерисовываем только если изменилась структура (количество/ID) пар или активный индекс

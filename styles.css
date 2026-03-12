@@ -211,26 +211,17 @@ body {
 
 .header-title-container {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
+  align-items: center;
+  gap: var(--spacing-lg);
+  min-width: 0;
 }
 
-.header h1 {
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-xl);
-  font-weight: 400;
-  letter-spacing: -0.3px;
-  color: var(--text-primary);
-  transition: color 0.3s ease;
-  margin: 0;
-  line-height: 1.4;
-}
-
-.header h1 .app-version {
-  color: var(--text-secondary);
-  font-size: 0.6em;
-  font-weight: normal;
-  margin-left: var(--spacing-sm);
+.service-logo {
+  display: block;
+  height: 30px;
+  width: auto;
+  max-width: min(360px, 34vw);
+  flex-shrink: 0;
 }
 
 
@@ -304,6 +295,7 @@ body {
   border: none;
   background: transparent;
   box-shadow: none;
+  flex-shrink: 0;
 }
 
 .mode-toggle {
@@ -321,25 +313,58 @@ body {
   font-weight: 600;
   letter-spacing: 0;
   color: var(--text-muted) !important;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .mode-toggle .toggle-switch-option.active {
-  color: var(--text-primary) !important;
+  color: var(--accent-foreground) !important;
 }
 
 .mode-toggle .toggle-switch-slider {
-  display: none !important;
+  display: block !important;
+  background: var(--accent-color);
+  box-shadow: none;
 }
 
 .mode-toggle-3 {
   width: 260px;
 }
 
+.mode-toggle-panel {
+  width: 100%;
+}
+
 .mode-toggle-primary {
+  width: 240px;
   height: 34px;
 }
 
+#projectModeToggle {
+  width: 300px;
+}
+
+#projectModeToggle .toggle-switch-track {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+#projectModeToggle .toggle-switch-option {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+#projectModeToggle .toggle-switch-slider {
+  width: calc(50% - 4px);
+}
+
 @media (max-width: 980px) {
+  .header-title-container {
+    flex-wrap: wrap;
+    row-gap: var(--spacing-sm);
+  }
+
   .mode-groups {
     flex-wrap: wrap;
   }
@@ -1442,6 +1467,9 @@ input[type="checkbox"]:focus-visible {
   width: calc(50% - 4px);
 }
 
+.toggle-switch[data-options="2"][data-value="layouts"] .toggle-switch-slider,
+.toggle-switch[data-options="2"][data-value="left"] .toggle-switch-slider,
+.toggle-switch[data-options="2"][data-value="light"] .toggle-switch-slider,
 .toggle-switch[data-options="2"][data-value="kz"] .toggle-switch-slider,
 .toggle-switch[data-options="2"].lang-kz .toggle-switch-slider {
   transform: translateX(calc(100% - 4px));
@@ -1453,14 +1481,28 @@ input[type="checkbox"]:focus-visible {
 }
 
 .toggle-switch[data-options="3"][data-value="center"] .toggle-switch-slider,
+.toggle-switch[data-options="3"][data-value="pro"] .toggle-switch-slider,
 .toggle-switch[data-options="3"][data-value="uppercase"] .toggle-switch-slider {
   transform: translateX(calc(100% - 2.666667px));
 }
 
 .toggle-switch[data-options="3"][data-value="right"] .toggle-switch-slider,
 .toggle-switch[data-options="3"][data-value="bottom"] .toggle-switch-slider,
+.toggle-switch[data-options="3"][data-value="kz"] .toggle-switch-slider,
 .toggle-switch[data-options="3"][data-value="lowercase"] .toggle-switch-slider {
   transform: translateX(calc(200% - 5.333334px));
+}
+
+#rsyaLayoutToggle {
+  background: var(--bg-primary);
+}
+
+#rsyaLayoutToggle .toggle-switch-option {
+  color: var(--text-muted);
+}
+
+#rsyaLayoutToggle .toggle-switch-option.active {
+  color: var(--accent-foreground);
 }
 
 /* Для тумблера с 4 опциями (масштаб) */
@@ -2006,7 +2048,8 @@ input[type="range"]::-moz-range-thumb:hover {
         justify-content: space-between;
         transition: all var(--transition-base);
         line-height: 1.4;
-        min-height: var(--height-md);
+        height: var(--btn-height);
+        min-height: var(--btn-height);
         box-sizing: border-box;
     }
     
@@ -2039,7 +2082,7 @@ input[type="range"]::-moz-range-thumb:hover {
         background: var(--bg-primary);
         color: var(--text-primary);
         border: 1px solid var(--border-color);
-        border-radius: var(--radius-md);
+        border-radius: var(--interactive-radius);
         box-shadow: var(--shadow-md);
         scrollbar-width: none; /* Firefox */
         -ms-overflow-style: none; /* IE и Edge */
@@ -2052,7 +2095,8 @@ input[type="range"]::-moz-range-thumb:hover {
     }
     
     .custom-select-option {
-        padding: var(--spacing-md);
+        min-height: var(--btn-height);
+        padding: 0 var(--spacing-lg);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -2611,7 +2655,6 @@ input[type="range"]::-moz-range-thumb:hover {
         }
         
         /* Улучшенное выравнивание текста */
-        .header h1,
         .modal-title,
         .section-title {
             margin: 0;

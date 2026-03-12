@@ -9,8 +9,11 @@ import {
   updateLegalOpacity,
   updateSubtitleOpacity,
   updateLogoSize,
+  updateTitleOpacity,
   updateTitleSize,
   updateSubtitleSize,
+  updateSubtitleGap,
+  updateTitleLogoGap,
   updateLegalSize,
   updateAgeSize,
   updateAgeGapPercent,
@@ -354,8 +357,11 @@ const exposeGlobals = () => {
     updateLegalOpacity,
     updateSubtitleOpacity,
     updateLogoSize,
+    updateTitleOpacity,
     updateTitleSize,
     updateSubtitleSize,
+    updateSubtitleGap,
+    updateTitleLogoGap,
     updateAgeSize,
     updateAgeGapPercent,
     updateLegalSize,
@@ -739,24 +745,12 @@ const initialize = async () => {
       const savedBrandName = localStorage.getItem('brandName');
       if (savedBrandName) {
         setKey('brandName', savedBrandName);
-        const pageTitle = document.querySelector('.header h1');
-        if (pageTitle) {
-          // Сохраняем версию при обновлении заголовка
-          const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
-          const versionHTML = versionSpan ? versionSpan.outerHTML : '';
-          pageTitle.innerHTML = `Practicum AI-Craft${versionHTML ? ' ' + versionHTML : ''}`;
-        }
+        document.title = 'Multi-Artboard Layout Generator';
       } else {
         // Используем значение из state
         const state = getState();
         if (state.brandName) {
-          const pageTitle = document.querySelector('.header h1');
-        if (pageTitle) {
-          // Сохраняем версию при обновлении заголовка
-          const versionSpan = pageTitle.querySelector('span.app-version, span[style*="color: var(--text-secondary"]');
-          const versionHTML = versionSpan ? versionSpan.outerHTML : '';
-          pageTitle.innerHTML = `Practicum AI-Craft${versionHTML ? ' ' + versionHTML : ''}`;
-        }
+          document.title = 'Multi-Artboard Layout Generator';
         }
       }
     } catch (e) {

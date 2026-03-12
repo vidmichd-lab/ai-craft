@@ -189,6 +189,7 @@ const createInitialState = () => {
     activePairIndex: 0, // Индекс активной пары для отображения на превью
     // Общие настройки для всех заголовков
     titleColor: d('titleColor', '#ffffff'),
+    titleOpacity: d('titleOpacity', 100),
     titleAlign: d('titleAlign', 'left'),
     titleVPos: d('titleVPos', 'top'),
     titleSize: dn('titleSize', 8, { min: 0.1, max: 100 }),
@@ -210,6 +211,7 @@ const createInitialState = () => {
     subtitleLetterSpacing: d('subtitleLetterSpacing', 0),
     subtitleLineHeight: d('subtitleLineHeight', 1.2),
     subtitleGap: dn('subtitleGap', -1, { min: -20, max: 50 }),
+    titleLogoGap: dn('titleLogoGap', 0, { min: -20, max: 50 }),
     titleSubtitleRatio: dn('titleSubtitleRatio', 0.5, { min: 0.05, max: 3 }), // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
     subtitleFontFamily: d('subtitleFontFamily', null) || d('fontFamily', 'YS Text'),
     subtitleFontFamilyFile: null,
@@ -600,6 +602,7 @@ export const getDefaultValues = () => {
           bgColor: savedDefaults.bgColor,
           bgImage: savedDefaults.bgImage,
           titleColor: savedDefaults.titleColor,
+          titleOpacity: savedDefaults.titleOpacity,
           subtitleColor: savedDefaults.subtitleColor,
           subtitleOpacity: savedDefaults.subtitleOpacity,
           legalColor: savedDefaults.legalColor,
@@ -625,6 +628,7 @@ export const getDefaultValues = () => {
           subtitleLineHeight: savedDefaults.subtitleLineHeight,
           legalLineHeight: savedDefaults.legalLineHeight,
           subtitleGap: savedDefaults.subtitleGap,
+          titleLogoGap: savedDefaults.titleLogoGap,
           ageGapPercent: savedDefaults.ageGapPercent,
           logoPos: savedDefaults.logoPos,
           logoLanguage: savedDefaults.logoLanguage,
@@ -665,6 +669,7 @@ export const getDefaultValues = () => {
     bgColor: initialState.bgColor,
     bgImage: initialState.bgImage,
     titleColor: initialState.titleColor,
+    titleOpacity: initialState.titleOpacity,
     subtitleColor: initialState.subtitleColor,
     subtitleOpacity: initialState.subtitleOpacity,
     legalColor: initialState.legalColor,
@@ -690,6 +695,7 @@ export const getDefaultValues = () => {
     subtitleLineHeight: initialState.subtitleLineHeight,
     legalLineHeight: initialState.legalLineHeight,
     subtitleGap: initialState.subtitleGap,
+    titleLogoGap: initialState.titleLogoGap,
     ageGapPercent: initialState.ageGapPercent,
     logoPos: initialState.logoPos,
     logoLanguage: initialState.logoLanguage,

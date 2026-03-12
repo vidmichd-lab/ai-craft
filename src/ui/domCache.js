@@ -4,6 +4,8 @@ const ELEMENT_IDS = [
   'title',
   'titleColor',
   'titleColorHex',
+  'titleOpacity',
+  'titleOpacityValue',
   'titleSize',
   'titleSizeValue',
   'titleWeight',
@@ -22,6 +24,9 @@ const ELEMENT_IDS = [
   'subtitleLetterSpacing',
   'subtitleLineHeight',
   'subtitleGap',
+  'subtitleGapValue',
+  'titleLogoGap',
+  'titleLogoGapValue',
   'legal',
   'legalColor',
   'legalColorHex',
@@ -94,5 +99,3 @@ export const cacheDom = () => {
 };
 
 export const getDom = () => dom;
-
-
