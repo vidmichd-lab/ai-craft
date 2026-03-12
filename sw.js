@@ -24,7 +24,8 @@ const STATIC_ASSETS = [
   `/src/utils/assetScanner.js?v=${CACHE_VERSION}`,
   `/src/utils/sizesConfig.js?v=${CACHE_VERSION}`,
   `/src/utils/imageCache.js?v=${CACHE_VERSION}`,
-  `/sizes-config.json?v=${CACHE_VERSION}`
+  `/sizes-config.json?v=${CACHE_VERSION}`,
+  '/assets/asset-manifest.json'
 ];
 
 // Максимальное количество изображений в кеше
@@ -414,4 +415,3 @@ self.addEventListener('message', (event) => {
     );
   }
 });
-

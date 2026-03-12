@@ -1,6 +1,10 @@
 // Импорты для работы с размерами
 import { getPresetSizes, loadSizesConfig } from './utils/sizesConfig.js';
 
+// Единые дефолты ассетов
+export const DEFAULT_KV_PATH = 'assets/3d/logos/02.webp';
+export const DEFAULT_PRO_KV_PATH = 'assets/pro/assets/1.webp';
+
 export const AVAILABLE_LOGOS = [
   // Логотипы теперь сканируются динамически через scanLogos()
   // Оставляем пустым массив, так как все логотипы загружаются из папок
@@ -96,4 +100,3 @@ export const PRESET_BACKGROUND_COLORS = [
   '#1E1E1E',
   '#FFFFFF'
 ];
-

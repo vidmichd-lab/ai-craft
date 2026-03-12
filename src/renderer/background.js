@@ -49,6 +49,8 @@ export const drawBackground = (ctx, width, height, state) => {
     
     const bgSize = state.bgSize || 'cover';
     const bgPosition = state.bgPosition || 'center';
+    const bgOffsetX = Number(state.bgOffsetX) || 0;
+    const bgOffsetY = Number(state.bgOffsetY) || 0;
     const bgImageSize = state.bgImageSize || 100; // Размер изображения в процентах
     
     // Базовый размер изображения с учетом процента масштабирования
@@ -118,6 +120,14 @@ export const drawBackground = (ctx, width, height, state) => {
       } else if (bgVPosition === 'center') {
         startY = (height % drawHeight) / 2;
       }
+
+      // Смещение тайлов вручную.
+      if (drawWidth > 0) {
+        startX = ((startX + bgOffsetX) % drawWidth + drawWidth) % drawWidth;
+      }
+      if (drawHeight > 0) {
+        startY = ((startY + bgOffsetY) % drawHeight + drawHeight) % drawHeight;
+      }
       
       // Рисуем мозаику
       for (let y = -startY; y < height; y += drawHeight) {
@@ -148,6 +158,10 @@ export const drawBackground = (ctx, width, height, state) => {
         // center (по умолчанию)
         drawY = (height - drawHeight) / 2;
       }
+
+      // Смещение фона вручную.
+      drawX += bgOffsetX;
+      drawY += bgOffsetY;
       
       // Рисуем изображение один раз с учетом размера и позиции
       ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
@@ -227,4 +241,3 @@ function drawGradient(ctx, width, height, gradient) {
   ctx.fillStyle = canvasGradient;
   ctx.fillRect(0, 0, width, height);
 }
-

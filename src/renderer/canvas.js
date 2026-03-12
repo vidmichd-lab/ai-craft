@@ -119,6 +119,7 @@ class CanvasManager {
         console.error('Состояние не получено');
         return;
       }
+      const isRsyaMode = state.projectMode === 'rsya';
 
       const categorized = categorizeSizes(sizes);
       console.log('Категоризированные размеры:', {
@@ -132,24 +133,46 @@ class CanvasManager {
       console.warn('Все категории размеров пустые, но есть размеры:', sizes);
     }
 
-    // Функция для получения размера с fallback - всегда возвращает валидный размер
+    // Функция для получения размера внутри категории.
+    // Не подставляем размеры из других категорий — иначе канвас категории
+    // может рендериться в неверном формате (например, wide <- narrow).
     const getSizeForCategory = (categorySizes, index) => {
-      if (categorySizes.length > 0) {
-        // Используем сохраненный индекс, если он валиден
-        // Важно: проверяем, что index не undefined и не null
-        if (index !== undefined && index !== null && index >= 0 && index < categorySizes.length) {
-          return categorySizes[index];
-        }
-        // Если индекс невалиден, используем 0
-        return categorySizes[0];
+      if (!categorySizes.length) return null;
+      // Используем сохраненный индекс, если он валиден
+      if (index !== undefined && index !== null && index >= 0 && index < categorySizes.length) {
+        return categorySizes[index];
       }
-      // Если в категории нет размеров, используем первый доступный размер из любых других категорий
-      if (categorized.narrow.length > 0) return categorized.narrow[0];
-      if (categorized.square.length > 0) return categorized.square[0];
-      if (categorized.wide.length > 0) return categorized.wide[0];
-      // В крайнем случае используем первый размер из всех
-      return sizes[0];
+      // Если индекс невалиден, используем первый размер этой же категории
+      return categorySizes[0];
     };
+
+    const clearCanvas = (canvas) => {
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    // В режиме РСЯ рендерим только один главный canvas 1600x1200
+    if (isRsyaMode) {
+      const rsyaSize = sizes.find((s) => s.width === 1600 && s.height === 1200) || sizes[0];
+      if (this.previewCanvasNarrow) clearCanvas(this.previewCanvasNarrow);
+      if (this.previewCanvasSquare) clearCanvas(this.previewCanvasSquare);
+
+      if (this.previewCanvasWide && rsyaSize) {
+        const renderState = { ...state, platform: rsyaSize.platform || 'РСЯ' };
+        this.lastRenderMeta = this.renderToCanvasFn(this.previewCanvasWide, rsyaSize.width, rsyaSize.height, renderState);
+        if (typeof setKey === 'function') {
+          setKey('kvCanvasWidth', rsyaSize.width);
+          setKey('kvCanvasHeight', rsyaSize.height);
+        }
+      }
+      if (typeof window !== 'undefined' && typeof window.__updateRsyaCropPreviews === 'function') {
+        window.__updateRsyaCropPreviews(this.previewCanvasWide, state);
+      }
+      return;
+    }
 
     // Рендерим узкий формат
     if (this.previewCanvasNarrow) {
@@ -205,6 +228,7 @@ class CanvasManager {
         }
       } else {
         console.warn('Не найден размер для узкого формата');
+        clearCanvas(this.previewCanvasNarrow);
       }
     } else {
       console.warn('Canvas узкого формата не инициализирован');
@@ -252,6 +276,7 @@ class CanvasManager {
         }
       } else {
         console.warn('Не найден размер для широкого формата');
+        clearCanvas(this.previewCanvasWide);
       }
     } else {
       console.warn('Canvas широкого формата не инициализирован');
@@ -296,6 +321,7 @@ class CanvasManager {
         }
       } else {
         console.warn('Не найден размер для квадратного формата');
+        clearCanvas(this.previewCanvasSquare);
       }
     } else {
         console.warn('Canvas квадратного формата не инициализирован');
@@ -321,6 +347,9 @@ class CanvasManager {
           console.error('Стек ошибки:', error.stack);
         }
       }
+    }
+    if (typeof window !== 'undefined' && typeof window.__updateRsyaCropPreviews === 'function') {
+      window.__updateRsyaCropPreviews(this.previewCanvasWide, state);
     }
     } catch (error) {
       console.error('Критическая ошибка в doRender:', error);

@@ -40,11 +40,16 @@ export const calculateSizeMultipliers = (width, height, layoutType) => {
   // Функция для получения множителя (кастомный или дефолтный)
   const getMultiplier = (formatType, key, defaultValue) => {
     const value = customMultipliers?.[formatType]?.[key];
-    // Если значение undefined или null, используем дефолтное значение
+    // Если значение отсутствует/невалидно/нулевое, используем дефолт.
+    // Это защищает рендер от "схлопывания" элементов при битых данных в localStorage.
     if (value === undefined || value === null) {
       return defaultValue;
     }
-    return value;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      return defaultValue;
+    }
+    return numeric;
   };
   
   let logoSizeMultiplier = 1;
@@ -480,4 +485,3 @@ export const calculateLogoBounds = (state, width, height, paddingPx, layoutType,
     };
   }
 };
-

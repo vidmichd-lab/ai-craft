@@ -1,7 +1,8 @@
-import { PRESET_SIZES, FONT_NAME_TO_WEIGHT, FONT_WEIGHT_TO_NAME, getPRESET_SIZES } from '../constants.js';
+import { PRESET_SIZES, FONT_NAME_TO_WEIGHT, FONT_WEIGHT_TO_NAME, getPRESET_SIZES, DEFAULT_KV_PATH } from '../constants.js';
 import { getPresetSizes } from '../utils/sizesConfig.js';
 
 const TITLE_SUBTITLE_RATIO = 1 / 2;
+export const SINGLE_PAIR_MODE = true;
 
 const cloneDeep = (value) => JSON.parse(JSON.stringify(value));
 
@@ -64,6 +65,11 @@ const sanitizeLogoSizeMultipliers = (value) => {
   return result;
 };
 
+const normalizeKVPath = (value) => {
+  if (!value || typeof value !== 'string') return value;
+  return value.replace(/(^|\/)assets\/pro\/assets\/0+(\d+)\.(webp|png|jpg|jpeg)$/i, '$1assets/pro/assets/$2.$3');
+};
+
 const createTitleSubtitlePair = (index = 0, baseState = null) => {
   const brandName = (baseState && baseState.brandName) || 'Практикума';
 
@@ -79,10 +85,10 @@ const createTitleSubtitlePair = (index = 0, baseState = null) => {
   // Контент: для первой пары — из сохранённых или встроенные дефолты, для новых пар — пусто
   let defaultTitle = `Курс «Frontend-разработчик» от ${brandName}`;
   let defaultSubtitle = 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев';
-  let defaultKV = 'assets/3d/logos/02.webp';
+  let defaultKV = DEFAULT_KV_PATH;
   if (savedDefaults.title !== undefined) defaultTitle = savedDefaults.title;
   if (savedDefaults.subtitle !== undefined) defaultSubtitle = savedDefaults.subtitle;
-  if (savedDefaults.kvSelected !== undefined) defaultKV = savedDefaults.kvSelected;
+  if (savedDefaults.kvSelected) defaultKV = normalizeKVPath(savedDefaults.kvSelected);
 
   // Визуальные свойства новой пары — всегда из admin defaults (savedDefaults)
   const bgColor = savedDefaults.bgColor !== undefined ? savedDefaults.bgColor : '#1e1e1e';
@@ -94,7 +100,7 @@ const createTitleSubtitlePair = (index = 0, baseState = null) => {
     const activeIdx = baseState.activePairIndex ?? 0;
     const currentPair = baseState.titleSubtitlePairs[activeIdx];
     if (currentPair) {
-      kvSelected = currentPair.kvSelected || baseState.kvSelected || defaultKV;
+      kvSelected = normalizeKVPath(currentPair.kvSelected || baseState.kvSelected || defaultKV);
       const getBgPath = (value) => {
         if (!value) return null;
         if (typeof value === 'string') return value;
@@ -262,10 +268,23 @@ const createInitialState = () => {
     logoOffsetBottomPx: d('logoOffsetBottomPx', 0),
     logoLanguage: d('logoLanguage', 'ru'), // ru или kz
     proMode: d('proMode', false), // PRO режим
+    projectMode: d('projectMode', 'rsya'), // layouts | rsya
+    variantMode: d('variantMode', d('proMode', false) ? 'pro' : (d('logoLanguage', 'ru') === 'kz' ? 'kz' : 'reskill')), // reskill | pro | kz
+    rsyaLayout: d('rsyaLayout', 'center'), // center | left
+    rsyaVisualCount: dn('rsyaVisualCount', 1, { min: 1, max: 3 }),
+    rsyaKVScale: dn('rsyaKVScale', 150, { min: 40, max: 300 }),
+    rsyaKVGap: dn('rsyaKVGap', 8, { min: -200, max: 300 }),
+    rsyaKVOffsetX: dn('rsyaKVOffsetX', 0, { min: -500, max: 500 }),
+    rsyaKVOffsetY: dn('rsyaKVOffsetY', 0, { min: -500, max: 500 }),
+    rsyaCropGridVisible: d('rsyaCropGridVisible', false),
     partnerLogo: null,
     partnerLogoFile: d('partnerLogoFile', null),
     kv: null,
-    kvSelected: d('kvSelected', 'assets/3d/logos/02.webp'),
+    kvSelected: normalizeKVPath(d('kvSelected', DEFAULT_KV_PATH) || DEFAULT_KV_PATH),
+    rsyaKV2: null,
+    rsyaKV2Selected: d('rsyaKV2Selected', ''),
+    rsyaKV3: null,
+    rsyaKV3Selected: d('rsyaKV3Selected', ''),
     kvBorderRadius: d('kvBorderRadius', 0),
     kvPosition: d('kvPosition', 'center'), // 'left', 'center', 'right' - позиция KV
     bgColor: d('bgColor', '#1e1e1e'),
@@ -276,6 +295,8 @@ const createInitialState = () => {
     bgPosition: d('bgPosition', 'center'),
     bgVPosition: d('bgVPosition', 'center'), // 'top', 'center', 'bottom' - вертикальная позиция фона
     bgImageSize: dn('bgImageSize', 100, { min: 10, max: 500 }), // Размер изображения в процентах (10-500)
+    bgOffsetX: dn('bgOffsetX', 0, { min: -1000, max: 1000 }),
+    bgOffsetY: dn('bgOffsetY', 0, { min: -1000, max: 1000 }),
     textGradientOpacity: dn('textGradientOpacity', 100, { min: 0, max: 100 }), // Прозрачность градиентной подложки под текстом (0-100)
     centerTextOverlayOpacity: 20, // Прозрачность подложки для центрированного текста (0-100)
     logoPos: d('logoPos', 'left'),
@@ -301,7 +322,7 @@ const createInitialState = () => {
     layoutMode: d('layoutMode', 'auto'),
     // Настройки веса файла при экспорте
     maxFileSizeUnit: d('maxFileSizeUnit', 'KB'), // 'KB' или 'MB'
-    maxFileSizeValue: dn('maxFileSizeValue', 150, { min: 1, max: 100000 }), // Значение (например, 1 для 1MB или 150 для 150KB)
+    maxFileSizeValue: dn('maxFileSizeValue', 200, { min: 1, max: 100000 }), // Значение в KB
     // Настройки рамки для Хабра
     habrBorderEnabled: d('habrBorderEnabled', false), // Включена ли рамка для Хабра
     habrBorderColor: d('habrBorderColor', '#D5DDDF'), // Цвет рамки для Хабра
@@ -372,6 +393,26 @@ class Store {
 const applyDerivedState = (state, delta) => {
   if (!delta) return state;
   const next = { ...state };
+  if (SINGLE_PAIR_MODE) {
+    const currentPair = (Array.isArray(next.titleSubtitlePairs) && next.titleSubtitlePairs[0])
+      ? { ...next.titleSubtitlePairs[0] }
+      : createTitleSubtitlePair(0, next);
+    currentPair.title = next.title ?? currentPair.title ?? '';
+    currentPair.subtitle = next.subtitle ?? currentPair.subtitle ?? '';
+    currentPair.kvSelected = normalizeKVPath(
+      next.kvSelected !== undefined ? next.kvSelected : (currentPair.kvSelected || DEFAULT_KV_PATH)
+    );
+    if (next.bgImageSelected !== undefined) {
+      currentPair.bgImageSelected = next.bgImageSelected || null;
+    } else if (next.bgImage !== undefined) {
+      currentPair.bgImageSelected = next.bgImage || null;
+    } else {
+      currentPair.bgImageSelected = currentPair.bgImageSelected ?? null;
+    }
+    currentPair.bgColor = currentPair.bgColor || next.bgColor || '#1e1e1e';
+    next.titleSubtitlePairs = [currentPair];
+    next.activePairIndex = 0;
+  }
 
   // Определяем ключи изменений
   const deltaKeys = delta && typeof delta === 'object' ? delta : {};
@@ -440,7 +481,7 @@ const applyDerivedState = (state, delta) => {
   }
 
   // Синхронизируем активную пару с полями title/subtitle/kvSelected/bgImageSelected для обратной совместимости
-  if (next.titleSubtitlePairs && next.titleSubtitlePairs.length > 0) {
+  if (!SINGLE_PAIR_MODE && next.titleSubtitlePairs && next.titleSubtitlePairs.length > 0) {
     const activeIndex = next.activePairIndex || 0;
     const activePair = next.titleSubtitlePairs[activeIndex];
     if (activePair) {
@@ -448,7 +489,7 @@ const applyDerivedState = (state, delta) => {
       next.subtitle = activePair.subtitle || '';
       // Синхронизируем KV из активной пары
       if (activePair.kvSelected !== undefined) {
-        next.kvSelected = activePair.kvSelected || '';
+        next.kvSelected = normalizeKVPath(activePair.kvSelected || '');
       }
       // Синхронизируем фоновое изображение из активной пары
       if (activePair.bgImageSelected !== undefined) {
@@ -499,7 +540,7 @@ const applyDerivedState = (state, delta) => {
 
   // Обратная синхронизация: если bgColor или bgImage изменены через основной UI,
   // сохраняем их в активную пару
-  if (next.titleSubtitlePairs && next.titleSubtitlePairs.length > 0) {
+  if (!SINGLE_PAIR_MODE && next.titleSubtitlePairs && next.titleSubtitlePairs.length > 0) {
     const activeIndex = next.activePairIndex || 0;
     const activePair = next.titleSubtitlePairs[activeIndex];
     if (activePair) {
@@ -594,6 +635,8 @@ export const getDefaultValues = () => {
           bgImageSize: savedDefaults.bgImageSize,
           bgPosition: savedDefaults.bgPosition,
           bgVPosition: savedDefaults.bgVPosition,
+          bgOffsetX: savedDefaults.bgOffsetX,
+          bgOffsetY: savedDefaults.bgOffsetY,
           textGradientOpacity: savedDefaults.textGradientOpacity,
           paddingPercent: savedDefaults.paddingPercent,
           layoutMode: savedDefaults.layoutMode,
@@ -657,6 +700,8 @@ export const getDefaultValues = () => {
     bgImageSize: initialState.bgImageSize,
     bgPosition: initialState.bgPosition,
     bgVPosition: initialState.bgVPosition,
+    bgOffsetX: initialState.bgOffsetX,
+    bgOffsetY: initialState.bgOffsetY,
     textGradientOpacity: initialState.textGradientOpacity,
     paddingPercent: initialState.paddingPercent,
     layoutMode: initialState.layoutMode,
@@ -697,6 +742,7 @@ export const updatePresetSizesFromConfig = () => {
 
 // Функции для управления парами заголовок/подзаголовок
 export const addTitleSubtitlePair = () => {
+  if (SINGLE_PAIR_MODE) return;
   const state = getState();
   const newPair = createTitleSubtitlePair(state.titleSubtitlePairs.length, { ...state, brandName: state.brandName || 'Практикума' });
   const newPairs = [...state.titleSubtitlePairs, newPair];
@@ -704,6 +750,7 @@ export const addTitleSubtitlePair = () => {
 };
 
 export const removeTitleSubtitlePair = (index) => {
+  if (SINGLE_PAIR_MODE) return;
   const state = getState();
   if (state.titleSubtitlePairs.length <= 1) {
     alert('Нельзя удалить последнюю пару заголовок/подзаголовок');
@@ -723,6 +770,10 @@ export const removeTitleSubtitlePair = (index) => {
 };
 
 export const setActivePairIndex = async (index) => {
+  if (SINGLE_PAIR_MODE) {
+    setKey('activePairIndex', 0);
+    return;
+  }
   const expectedIndex = index;
   const state = getState();
   if (index >= 0 && index < state.titleSubtitlePairs.length) {
@@ -807,7 +858,11 @@ export const updatePairTitle = (index, title) => {
   const newPairs = [...state.titleSubtitlePairs];
   if (newPairs[index]) {
     newPairs[index] = { ...newPairs[index], title };
-    setState({ titleSubtitlePairs: newPairs });
+    if (SINGLE_PAIR_MODE) {
+      setState({ titleSubtitlePairs: newPairs, title });
+    } else {
+      setState({ titleSubtitlePairs: newPairs });
+    }
   }
 };
 
@@ -816,7 +871,11 @@ export const updatePairSubtitle = (index, subtitle) => {
   const newPairs = [...state.titleSubtitlePairs];
   if (newPairs[index]) {
     newPairs[index] = { ...newPairs[index], subtitle };
-    setState({ titleSubtitlePairs: newPairs });
+    if (SINGLE_PAIR_MODE) {
+      setState({ titleSubtitlePairs: newPairs, subtitle });
+    } else {
+      setState({ titleSubtitlePairs: newPairs });
+    }
   }
 };
 
@@ -824,8 +883,13 @@ export const updatePairKV = (index, kvSelected) => {
   const state = getState();
   const newPairs = [...state.titleSubtitlePairs];
   if (newPairs[index]) {
-    newPairs[index] = { ...newPairs[index], kvSelected: kvSelected || '' };
-    setState({ titleSubtitlePairs: newPairs });
+    const normalizedKV = normalizeKVPath(kvSelected || '');
+    newPairs[index] = { ...newPairs[index], kvSelected: normalizedKV };
+    if (SINGLE_PAIR_MODE) {
+      setState({ titleSubtitlePairs: newPairs, kvSelected: normalizedKV });
+    } else {
+      setState({ titleSubtitlePairs: newPairs });
+    }
   }
 };
 
@@ -833,8 +897,17 @@ export const updatePairBgImage = (index, bgImage) => {
   const state = getState();
   const newPairs = [...state.titleSubtitlePairs];
   if (newPairs[index]) {
-    newPairs[index] = { ...newPairs[index], bgImageSelected: bgImage || null };
-    setState({ titleSubtitlePairs: newPairs });
+    const nextBg = bgImage || null;
+    newPairs[index] = { ...newPairs[index], bgImageSelected: nextBg };
+    if (SINGLE_PAIR_MODE) {
+      setState({
+        titleSubtitlePairs: newPairs,
+        bgImage: nextBg,
+        bgImageSelected: nextBg
+      });
+    } else {
+      setState({ titleSubtitlePairs: newPairs });
+    }
   }
 };
 
@@ -842,13 +915,21 @@ export const updatePairBgColor = (index, bgColor) => {
   const state = getState();
   const newPairs = [...state.titleSubtitlePairs];
   if (newPairs[index]) {
-    newPairs[index] = { ...newPairs[index], bgColor: bgColor || '#1e1e1e' };
-    setState({ titleSubtitlePairs: newPairs });
+    const nextBgColor = bgColor || '#1e1e1e';
+    newPairs[index] = { ...newPairs[index], bgColor: nextBgColor };
+    if (SINGLE_PAIR_MODE) {
+      setState({ titleSubtitlePairs: newPairs, bgColor: nextBgColor });
+    } else {
+      setState({ titleSubtitlePairs: newPairs });
+    }
   }
 };
 
 export const getCheckedSizes = () => {
-  const { presetSizes, customSizes } = store.getState();
+  const { presetSizes, customSizes, projectMode } = store.getState();
+  if (projectMode === 'rsya') {
+    return [{ width: 1600, height: 1200, platform: 'РСЯ' }];
+  }
   const sizes = [];
   Object.keys(presetSizes).forEach((platform) => {
     presetSizes[platform].forEach((size) => {
@@ -931,6 +1012,8 @@ export const saveSettingsSnapshot = () => {
   const snapshot = createStateSnapshot();
   delete snapshot.logo;
   delete snapshot.kv;
+  delete snapshot.rsyaKV2;
+  delete snapshot.rsyaKV3;
   delete snapshot.bgImage;
   delete snapshot.customFont;
   delete snapshot.partnerLogo;
@@ -1000,10 +1083,17 @@ export const applySavedSettings = (snapshot) => {
     ['ageSize', current.ageSize, { min: 0.1, max: 100 }],
     ['logoSize', current.logoSize, { min: 0.1, max: 100 }],
     ['bgImageSize', current.bgImageSize, { min: 10, max: 500 }],
+    ['bgOffsetX', current.bgOffsetX || 0, { min: -1000, max: 1000 }],
+    ['bgOffsetY', current.bgOffsetY || 0, { min: -1000, max: 1000 }],
     ['textGradientOpacity', current.textGradientOpacity, { min: 0, max: 100 }],
     ['legalOpacity', current.legalOpacity, { min: 0, max: 100 }],
     ['ageGapPercent', current.ageGapPercent, { min: 0, max: 50 }],
-    ['maxFileSizeValue', current.maxFileSizeValue, { min: 1, max: 100000 }]
+    ['maxFileSizeValue', current.maxFileSizeValue, { min: 1, max: 100000 }],
+    ['rsyaVisualCount', current.rsyaVisualCount || 1, { min: 1, max: 3 }],
+    ['rsyaKVScale', current.rsyaKVScale || 150, { min: 40, max: 300 }],
+    ['rsyaKVGap', current.rsyaKVGap || 8, { min: -200, max: 300 }],
+    ['rsyaKVOffsetX', current.rsyaKVOffsetX || 0, { min: -500, max: 500 }],
+    ['rsyaKVOffsetY', current.rsyaKVOffsetY || 0, { min: -500, max: 500 }]
   ];
 
   for (const [key, fallback, options] of numericFieldsToSanitize) {
@@ -1017,6 +1107,24 @@ export const applySavedSettings = (snapshot) => {
   }
   if (nextSnapshot.logoSizeMultipliers !== undefined) {
     nextSnapshot.logoSizeMultipliers = sanitizeLogoSizeMultipliers(nextSnapshot.logoSizeMultipliers);
+  }
+  if (nextSnapshot.kvSelected !== undefined) {
+    nextSnapshot.kvSelected = normalizeKVPath(nextSnapshot.kvSelected) || DEFAULT_KV_PATH;
+  }
+  if (nextSnapshot.projectMode !== undefined && !['layouts', 'rsya'].includes(nextSnapshot.projectMode)) {
+    nextSnapshot.projectMode = current.projectMode || 'rsya';
+  }
+  if (nextSnapshot.variantMode !== undefined && !['reskill', 'pro', 'kz'].includes(nextSnapshot.variantMode)) {
+    nextSnapshot.variantMode = current.variantMode || 'reskill';
+  }
+  if (nextSnapshot.rsyaLayout !== undefined && !['center', 'left'].includes(nextSnapshot.rsyaLayout)) {
+    nextSnapshot.rsyaLayout = current.rsyaLayout || 'center';
+  }
+  if (Array.isArray(nextSnapshot.titleSubtitlePairs)) {
+    nextSnapshot.titleSubtitlePairs = nextSnapshot.titleSubtitlePairs.map((pair) => ({
+      ...pair,
+      kvSelected: normalizeKVPath(pair?.kvSelected || '')
+    }));
   }
 
   store.setState({ ...current, ...nextSnapshot });

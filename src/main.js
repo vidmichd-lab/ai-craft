@@ -17,6 +17,8 @@ import {
   updateKVBorderRadius,
   selectKVPosition,
   updateTextGradientOpacity,
+  updateBgOffsetX,
+  updateBgOffsetY,
   selectPreloadedLogo,
   selectFontFamily,
   selectTitleFontFamily,
@@ -33,6 +35,8 @@ import {
   toggleLogoLanguage,
   toggleProMode,
   selectProMode,
+  selectProjectMode,
+  selectVariantMode,
   selectLayoutMode,
   updateColorFromPicker,
   updateColorFromHex,
@@ -46,11 +50,17 @@ import {
   handleLogoUpload,
   handlePartnerLogoUpload,
   handleKVUpload,
+  handleRsyaKV2Upload,
+  handleRsyaKV3Upload,
   handleBgUpload,
   clearLogo,
   clearPartnerLogo,
   showPartnerLogoSection,
   clearKV,
+  clearRsyaKV2,
+  clearRsyaKV3,
+  swapRsyaKV12,
+  swapRsyaKV23,
   clearBg,
   showSection,
   toggleSection,
@@ -125,6 +135,8 @@ import {
     initializeTitleTransformToggle,
     initializeSubtitleTransformToggle,
     initializeLegalTransformToggle,
+    updateRsyaCropPreviews,
+    initializeRsyaCanvasDrag,
   initializeBackgroundUI,
   initializeSizeManager
 } from './ui/ui.js';
@@ -133,7 +145,7 @@ import { clearTextMeasurementCache } from './renderer/text.js';
 import { setKey, getState, ensurePresetSelection, getCheckedSizes, updatePresetSizesFromConfig } from './state/store.js';
 import { exportPNG, exportJPG } from './exporter.js';
 import { scanFonts } from './utils/assetScanner.js';
-import { setAvailableFonts, initializePresetSizes } from './constants.js';
+import { setAvailableFonts, initializePresetSizes, DEFAULT_KV_PATH } from './constants.js';
 import { preloadImages } from './utils/imageCache.js';
 import { loadConfigFromFile } from './utils/fullConfig.js';
 import { showLogoAssetsAdmin } from './ui/components/logoAssetsAdmin.js';
@@ -349,6 +361,8 @@ const exposeGlobals = () => {
     updateLegalSize,
     updateKVBorderRadius,
     updateTextGradientOpacity,
+    updateBgOffsetX,
+    updateBgOffsetY,
     selectPreloadedLogo,
     selectPreloadedKV,
     selectPreloadedBG,
@@ -358,11 +372,17 @@ const exposeGlobals = () => {
     handleLogoUpload,
     handlePartnerLogoUpload,
     handleKVUpload,
+    handleRsyaKV2Upload,
+    handleRsyaKV3Upload,
     handleBgUpload,
     clearLogo,
     clearPartnerLogo,
     showPartnerLogoSection,
     clearKV,
+    clearRsyaKV2,
+    clearRsyaKV3,
+    swapRsyaKV12,
+    swapRsyaKV23,
     clearBg,
     selectTitleAlign,
     selectTitleVPos,
@@ -372,6 +392,8 @@ const exposeGlobals = () => {
     toggleLogoLanguage,
     toggleProMode,
     selectProMode,
+    selectProjectMode,
+    selectVariantMode,
     toggleTitleAlign,
     toggleTitleVPos,
     selectLayoutMode,
@@ -441,6 +463,7 @@ const exposeGlobals = () => {
     selectSubtitleTransform,
     selectLegalTransform
   });
+  window.__updateRsyaCropPreviews = updateRsyaCropPreviews;
   window.hardResetCache = hardResetCache;
 };
 
@@ -650,16 +673,20 @@ const initialize = async () => {
       startProgressSimulation();
     }
     
-    // Загружаем полную конфигурацию из файла config.json (если есть)
-    // Это позволяет командам использовать предустановленную конфигурацию
-    console.log('Загружаем конфигурацию...');
-    try {
-      const configLoaded = await loadConfigFromFile();
-      if (configLoaded) {
-        console.log('✓ Конфигурация загружена из config.json');
+    // Опциональная загрузка конфигурации из config.json:
+    // по умолчанию отключена, чтобы не создавать 404 в проде, где файла нет.
+    const searchParams = new URLSearchParams(window.location.search);
+    const shouldLoadConfig = window.APP_LOAD_CONFIG === true || searchParams.get('config') === '1';
+    if (shouldLoadConfig) {
+      console.log('Загружаем конфигурацию...');
+      try {
+        const configLoaded = await loadConfigFromFile();
+        if (configLoaded) {
+          console.log('✓ Конфигурация загружена из config.json');
+        }
+      } catch (error) {
+        console.warn('Ошибка загрузки config.json (продолжаем с настройками по умолчанию):', error);
       }
-    } catch (error) {
-      console.warn('Ошибка загрузки config.json (продолжаем с настройками по умолчанию):', error);
     }
     
     // Загружаем размеры из конфига перед инициализацией
@@ -814,6 +841,7 @@ const initialize = async () => {
     
     // Инициализируем менеджер размеров
     initializeSizeManager();
+    initializeRsyaCanvasDrag();
     
     // Инициализируем resizers для изменения ширины панелей
     initPanelResizers();
@@ -964,7 +992,7 @@ const initialize = async () => {
         const defaultState = getState();
         const defaultFontFamily = defaultState.titleFontFamily || defaultState.fontFamily || 'YS Text';
         const defaultLogo = defaultState.logoSelected || 'logo/white/ru/main.svg';
-        const defaultKV = defaultState.kvSelected || 'assets/3d/sign/01.webp';
+        const defaultKV = defaultState.kvSelected || DEFAULT_KV_PATH;
         
         updateProgress(10);
         
@@ -1042,7 +1070,7 @@ const initialize = async () => {
         const pairs = initialState.titleSubtitlePairs || [];
         if (pairs.length > 0) {
           const activePair = pairs[initialState.activePairIndex || 0];
-          const defaultKVValue = initialState.kvSelected || 'assets/3d/sign/01.webp';
+          const defaultKVValue = initialState.kvSelected || DEFAULT_KV_PATH;
           // Если в паре есть свой KV, загружаем его (если он отличается от дефолтного)
           if (activePair && activePair.kvSelected && activePair.kvSelected !== defaultKVValue) {
             await selectPreloadedKV(activePair.kvSelected);
@@ -1232,5 +1260,3 @@ window.toggleTheme = toggleTheme;
 
 // Инициализируем тему сразу при загрузке скрипта (до отображения страницы)
 initTheme();
-
-

@@ -23,7 +23,7 @@ import {
   removeCustomSize,
   toggleCustomSize
 } from '../state/store.js';
-import { AVAILABLE_LOGOS, AVAILABLE_FONTS, AVAILABLE_KV, PRESET_BACKGROUND_COLORS, FONT_WEIGHT_TO_NAME, FONT_NAME_TO_WEIGHT, AVAILABLE_WEIGHTS } from '../constants.js';
+import { AVAILABLE_LOGOS, AVAILABLE_FONTS, AVAILABLE_KV, PRESET_BACKGROUND_COLORS, FONT_WEIGHT_TO_NAME, FONT_NAME_TO_WEIGHT, AVAILABLE_WEIGHTS, DEFAULT_KV_PATH, DEFAULT_PRO_KV_PATH } from '../constants.js';
 import { scanLogos, scanKV } from '../utils/assetScanner.js';
 import { loadImage as loadImageCached } from '../utils/imageCache.js';
 import {
@@ -77,7 +77,8 @@ import {
   updateKVBorderRadius,
   updateKVTriggerText,
   openKVSelectModal,
-  closeKVSelectModal
+  closeKVSelectModal,
+  setKVModalTargetSlot
 } from './components/kvSelector.js';
 import {
   handleBgImageUpload,
@@ -116,6 +117,8 @@ import {
 } from './components/sizeManager.js';
 import { showSizesAdmin } from './components/sizesAdmin.js';
 let savedSettings = null;
+let activeRsyaCropKey = '1600';
+let activeRsyaVisualSlot = 0;
 
 // Переменные для работы с KV (используются в функциях для пар)
 let cachedKV = null;
@@ -129,8 +132,15 @@ let cachedLogosStructure = null;
 let selectedLogoFolder1 = null;
 let selectedLogoFolder2 = null;
 let selectedLogoFolder3 = null;
+let rsyaFitResizeBound = false;
 
 // Функции для работы со шрифтами теперь импортируются из ./components/fontSelector.js
+
+const normalizeKVAssetPath = (value) => {
+  if (!value || typeof value !== 'string') return value;
+  return value.replace(/(^|\/)assets\/pro\/assets\/0+(\d+)\.(webp|png|jpg|jpeg)$/i, '$1assets/pro/assets/$2.$3');
+};
+const SINGLE_PAIR_MODE = true;
 
 const updateChipGroup = (group, value) => {
   document.querySelectorAll(`[data-group="${group}"]`).forEach((chip) => {
@@ -451,6 +461,20 @@ export const syncFormFields = () => {
       bgImageSizeValue.textContent = `${Math.round(size)}%`;
     }
   }
+  const bgOffsetXInput = document.getElementById('bgOffsetX');
+  const bgOffsetXValue = document.getElementById('bgOffsetXValue');
+  if (bgOffsetXInput) {
+    const offsetX = Math.round(state.bgOffsetX ?? 0);
+    bgOffsetXInput.value = offsetX;
+    if (bgOffsetXValue) bgOffsetXValue.textContent = `${offsetX}px`;
+  }
+  const bgOffsetYInput = document.getElementById('bgOffsetY');
+  const bgOffsetYValue = document.getElementById('bgOffsetYValue');
+  if (bgOffsetYInput) {
+    const offsetY = Math.round(state.bgOffsetY ?? 0);
+    bgOffsetYInput.value = offsetY;
+    if (bgOffsetYValue) bgOffsetYValue.textContent = `${offsetY}px`;
+  }
   
   const textGradientOpacity = state.textGradientOpacity ?? 100;
   if (dom.textGradientOpacity) {
@@ -466,6 +490,46 @@ export const syncFormFields = () => {
   // Обновляем переключатель масштаба экспорта
   const exportScale = state.exportScale || 1;
   updateExportScaleToggle(exportScale);
+  const maxFileSizeValueInput = document.getElementById('maxFileSizeValue');
+  if (maxFileSizeValueInput) {
+    maxFileSizeValueInput.value = state.maxFileSizeValue || 200;
+  }
+  const rsyaVisualCountInput = document.getElementById('rsyaVisualCount');
+  const rsyaVisualCountValue = document.getElementById('rsyaVisualCountValue');
+  if (rsyaVisualCountInput) {
+    rsyaVisualCountInput.value = state.rsyaVisualCount || 1;
+    if (rsyaVisualCountValue) rsyaVisualCountValue.textContent = String(state.rsyaVisualCount || 1);
+  }
+  const rsyaKVScaleInput = document.getElementById('rsyaKVScale');
+  const rsyaKVScaleValue = document.getElementById('rsyaKVScaleValue');
+  if (rsyaKVScaleInput) {
+    rsyaKVScaleInput.value = state.rsyaKVScale || 150;
+    if (rsyaKVScaleValue) rsyaKVScaleValue.textContent = `${state.rsyaKVScale || 150}%`;
+  }
+  const rsyaKVGapInput = document.getElementById('rsyaKVGap');
+  const rsyaKVGapValue = document.getElementById('rsyaKVGapValue');
+  if (rsyaKVGapInput) {
+    const gap = Number.isFinite(Number(state.rsyaKVGap)) ? Number(state.rsyaKVGap) : 8;
+    rsyaKVGapInput.value = gap;
+    if (rsyaKVGapValue) rsyaKVGapValue.textContent = String(gap);
+  }
+  const rsyaKVOffsetXInput = document.getElementById('rsyaKVOffsetX');
+  const rsyaKVOffsetXValue = document.getElementById('rsyaKVOffsetXValue');
+  if (rsyaKVOffsetXInput) {
+    rsyaKVOffsetXInput.value = state.rsyaKVOffsetX || 0;
+    if (rsyaKVOffsetXValue) rsyaKVOffsetXValue.textContent = String(state.rsyaKVOffsetX || 0);
+  }
+  const rsyaKVOffsetYInput = document.getElementById('rsyaKVOffsetY');
+  const rsyaKVOffsetYValue = document.getElementById('rsyaKVOffsetYValue');
+  if (rsyaKVOffsetYInput) {
+    rsyaKVOffsetYInput.value = state.rsyaKVOffsetY || 0;
+    if (rsyaKVOffsetYValue) rsyaKVOffsetYValue.textContent = String(state.rsyaKVOffsetY || 0);
+  }
+  const rsyaCropGridVisibleToggle = document.getElementById('rsyaCropGridVisibleToggle');
+  if (rsyaCropGridVisibleToggle) {
+    rsyaCropGridVisibleToggle.checked = !!state.rsyaCropGridVisible;
+  }
+  renderRsyaVisualReorder();
 
   const fontSelect = dom.fontFamily;
   if (fontSelect) {
@@ -475,6 +539,7 @@ export const syncFormFields = () => {
   syncChips(state);
   updateChipGroup('layout-mode', state.layoutMode || 'auto');
   updateLogoToggle(state.logoLanguage || 'ru');
+  updateProjectModeUI();
 };
 
 // updatePreviewSizeSelect имеет дополнительную логику с обработчиками в ui.js
@@ -839,6 +904,708 @@ const loadImageFile = async (file, target) => {
   }
 };
 
+export const handleRsyaKV2Upload = async (event) => {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  const dataURL = await readFileAsDataURL(file);
+  const img = await loadImage(dataURL);
+  setKey('rsyaKV2', img);
+  setKey('rsyaKV2Selected', dataURL);
+  syncRsyaVisualCount();
+  renderRsyaVisualReorder();
+  renderer.render();
+};
+
+export const handleRsyaKV3Upload = async (event) => {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  const dataURL = await readFileAsDataURL(file);
+  const img = await loadImage(dataURL);
+  setKey('rsyaKV3', img);
+  setKey('rsyaKV3Selected', dataURL);
+  syncRsyaVisualCount();
+  renderRsyaVisualReorder();
+  renderer.render();
+};
+
+export const clearRsyaKV2 = () => {
+  setKey('rsyaKV2', null);
+  setKey('rsyaKV2Selected', '');
+  syncRsyaVisualCount();
+  renderRsyaVisualReorder();
+  renderer.render();
+};
+
+export const clearRsyaKV3 = () => {
+  setKey('rsyaKV3', null);
+  setKey('rsyaKV3Selected', '');
+  syncRsyaVisualCount();
+  renderRsyaVisualReorder();
+  renderer.render();
+};
+
+export const swapRsyaKV12 = () => {
+  const state = getState();
+  setState({
+    kv: state.rsyaKV2 || state.kv,
+    kvSelected: state.rsyaKV2Selected || state.kvSelected,
+    rsyaKV2: state.kv || null,
+    rsyaKV2Selected: state.kvSelected || ''
+  });
+  renderRsyaVisualReorder();
+  renderer.render();
+};
+
+export const swapRsyaKV23 = () => {
+  const state = getState();
+  setState({
+    rsyaKV2: state.rsyaKV3 || null,
+    rsyaKV2Selected: state.rsyaKV3Selected || '',
+    rsyaKV3: state.rsyaKV2 || null,
+    rsyaKV3Selected: state.rsyaKV2Selected || ''
+  });
+  renderRsyaVisualReorder();
+  renderer.render();
+};
+
+const getRsyaVisualSlots = (state) => ([
+  { image: state.kv || null, selected: state.kvSelected || '' },
+  { image: state.rsyaKV2 || null, selected: state.rsyaKV2Selected || '' },
+  { image: state.rsyaKV3 || null, selected: state.rsyaKV3Selected || '' }
+]);
+
+const syncRsyaVisualCount = () => {
+  const slots = getRsyaVisualSlots(getState());
+  const loaded = slots.filter((slot) => !!slot.image).length;
+  setKey('rsyaVisualCount', Math.max(1, Math.min(3, loaded || 1)));
+};
+
+const renderRsyaVisualReorder = () => {
+  const wrap = document.getElementById('rsyaVisualReorder');
+  if (!wrap) return;
+  const slots = getRsyaVisualSlots(getState());
+  const items = wrap.querySelectorAll('.rsya-visual-item');
+  items.forEach((item, index) => {
+    item.dataset.rsyaVisualSlot = String(index);
+    item.classList.toggle('active', index === activeRsyaVisualSlot);
+
+    const slot = slots[index];
+    const hasImage = !!slot?.image;
+    const previewSrc = slot?.selected || slot?.image?.src || '';
+    const canReorder = !!(slots[1]?.image || slots[1]?.selected);
+    item.draggable = canReorder;
+    item.classList.toggle('reorder-disabled', !canReorder);
+    item.classList.toggle('is-filled', hasImage);
+    item.style.backgroundImage = hasImage && previewSrc ? `url("${previewSrc}")` : 'none';
+
+    const plus = item.querySelector('.rsya-visual-item-plus');
+    if (plus) plus.style.display = hasImage ? 'none' : 'grid';
+
+    const libraryBtn = wrap.querySelector(`.rsya-visual-action-btn[data-rsya-action="library"][data-rsya-visual-slot="${index}"]`);
+    if (libraryBtn) libraryBtn.disabled = false;
+    const clearBtn = wrap.querySelector(`.rsya-visual-action-btn[data-rsya-action="clear"][data-rsya-visual-slot="${index}"]`);
+    if (clearBtn) clearBtn.disabled = !hasImage;
+  });
+};
+
+const reorderRsyaVisualSlots = (fromIndex, toIndex) => {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+  const state = getState();
+  const slots = getRsyaVisualSlots(state);
+  if (fromIndex >= slots.length || toIndex >= slots.length) return;
+  const next = [...slots];
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  setState({
+    kv: next[0].image,
+    kvSelected: next[0].selected,
+    rsyaKV2: next[1].image,
+    rsyaKV2Selected: next[1].selected,
+    rsyaKV3: next[2].image,
+    rsyaKV3Selected: next[2].selected
+  });
+  syncRsyaVisualCount();
+  renderRsyaVisualReorder();
+  renderer.render();
+};
+
+const initializeRsyaVisualReorder = () => {
+  const wrap = document.getElementById('rsyaVisualReorder');
+  if (!wrap || wrap.dataset.rsyaReorderInitialized) return;
+  wrap.dataset.rsyaReorderInitialized = 'true';
+  let dragFrom = -1;
+
+  const clearDragState = () => {
+    wrap.querySelectorAll('.rsya-visual-item').forEach((item) => item.classList.remove('drag-over'));
+  };
+
+  wrap.addEventListener('dragstart', (event) => {
+    const slots = getRsyaVisualSlots(getState());
+    const canReorder = !!(slots[1]?.image || slots[1]?.selected);
+    if (!canReorder) return;
+    const item = event.target.closest('.rsya-visual-item');
+    if (!item) return;
+    dragFrom = Number(item.dataset.rsyaVisualSlot);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(dragFrom));
+    }
+  });
+
+  wrap.addEventListener('dragover', (event) => {
+    const slots = getRsyaVisualSlots(getState());
+    const canReorder = !!(slots[1]?.image || slots[1]?.selected);
+    if (!canReorder) return;
+    const item = event.target.closest('.rsya-visual-item');
+    if (!item) return;
+    event.preventDefault();
+    clearDragState();
+    item.classList.add('drag-over');
+  });
+
+  wrap.addEventListener('drop', (event) => {
+    const slots = getRsyaVisualSlots(getState());
+    const canReorder = !!(slots[1]?.image || slots[1]?.selected);
+    if (!canReorder) return;
+    const item = event.target.closest('.rsya-visual-item');
+    if (!item) return;
+    event.preventDefault();
+    const dragTo = Number(item.dataset.rsyaVisualSlot);
+    reorderRsyaVisualSlots(dragFrom, dragTo);
+    dragFrom = -1;
+    clearDragState();
+  });
+
+  wrap.addEventListener('dragend', () => {
+    dragFrom = -1;
+    clearDragState();
+  });
+
+  wrap.addEventListener('click', (event) => {
+    const actionBtn = event.target.closest('.rsya-visual-action-btn');
+    if (actionBtn) {
+      const slot = Number(actionBtn.dataset.rsyaVisualSlot);
+      const action = actionBtn.dataset.rsyaAction;
+      activeRsyaVisualSlot = Math.max(0, Math.min(2, slot));
+      setKVModalTargetSlot(activeRsyaVisualSlot);
+      renderRsyaVisualReorder();
+
+      if (action === 'library') {
+        openKVSelectModal(null, 'rsya-slot');
+        return;
+      }
+
+      if (action === 'clear') {
+        if (slot === 0) {
+          setKey('kv', null);
+          setKey('kvSelected', '');
+        } else if (slot === 1) {
+          clearRsyaKV2();
+          return;
+        } else {
+          clearRsyaKV3();
+          return;
+        }
+        syncRsyaVisualCount();
+        renderRsyaVisualReorder();
+        renderer.render();
+        return;
+      }
+    }
+
+    const item = event.target.closest('.rsya-visual-item');
+    if (!item) return;
+    const slot = Number(item.dataset.rsyaVisualSlot);
+    activeRsyaVisualSlot = Math.max(0, Math.min(2, slot));
+    setKVModalTargetSlot(activeRsyaVisualSlot);
+    renderRsyaVisualReorder();
+
+    const uploadInputId = slot === 0 ? 'kvUpload' : (slot === 1 ? 'rsyaKV2Upload' : 'rsyaKV3Upload');
+    const input = document.getElementById(uploadInputId);
+    if (input) input.click();
+  });
+
+  // Публичный хук для обновления плиток из модулей выбора KV.
+  window.__refreshRsyaVisualReorder = () => {
+    syncRsyaVisualCount();
+    renderRsyaVisualReorder();
+  };
+
+  setKVModalTargetSlot(activeRsyaVisualSlot);
+  renderRsyaVisualReorder();
+};
+
+export const updateRsyaCropPreviews = (sourceCanvas, state) => {
+  const cropSection = document.getElementById('rsyaCropPreviewSection');
+  if (!cropSection || state?.projectMode !== 'rsya') return;
+  if (!sourceCanvas || !sourceCanvas.width || !sourceCanvas.height) return;
+  const activeCanvas = document.getElementById('rsyaActivePreviewCanvas');
+  const srcW = sourceCanvas.width;
+  const srcH = sourceCanvas.height;
+  const specs = [
+    { id: 'rsyaCrop1600', ratio: srcW / srcH, key: '1600' },
+    { id: 'rsyaCrop169', ratio: 16 / 9, key: '16:9' },
+    { id: 'rsyaCrop43', ratio: 4 / 3, key: '4:3' },
+    { id: 'rsyaCrop11', ratio: 1, key: '1:1' },
+    { id: 'rsyaCrop34', ratio: 3 / 4, key: '3:4' }
+  ];
+
+  specs.forEach(({ id, ratio, key }) => {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const crop = computeCenteredCropRect(sourceCanvas, key, state);
+    if (!crop) return;
+    const { sx, sy, cropW, cropH } = crop;
+    const outW = 320;
+    const outH = Math.round(outW / ratio);
+    canvas.width = outW;
+    canvas.height = outH;
+    ctx.clearRect(0, 0, outW, outH);
+    ctx.drawImage(sourceCanvas, sx, sy, cropW, cropH, 0, 0, outW, outH);
+    drawRsyaCropGuideOverlay(ctx, outW, outH, key, state);
+    const thumb = cropSection.querySelector(`[data-rsya-crop-key="${key}"]`);
+    if (thumb) {
+      thumb.classList.toggle('active', activeRsyaCropKey === key);
+    }
+  });
+
+  if (activeCanvas) {
+    const activeCtx = activeCanvas.getContext('2d');
+    if (activeCtx) {
+      const activeSpec = specs.find((s) => s.key === activeRsyaCropKey) || specs[0];
+      const crop = computeCenteredCropRect(sourceCanvas, activeSpec.key, state);
+      if (!crop) return;
+      const { sx, sy, cropW, cropH } = crop;
+      activeCanvas.width = cropW;
+      activeCanvas.height = cropH;
+      activeCtx.clearRect(0, 0, cropW, cropH);
+      activeCtx.drawImage(sourceCanvas, sx, sy, cropW, cropH, 0, 0, cropW, cropH);
+      drawRsyaCropGuideOverlay(activeCtx, cropW, cropH, activeSpec.key, state);
+      fitRsyaActiveCanvasToContainer(activeCanvas);
+    }
+  }
+
+  updateRsyaKVOverlay();
+};
+
+const getRsyaCropGuideZone = (key, state = null) => {
+  const layout = state?.rsyaLayout || 'center';
+  if (key === '3:4') {
+    return { x: 0.14, y: 0.08, w: 0.72, h: 0.84 };
+  }
+  if (key === '1:1') {
+    return { x: 0.14, y: 0.14, w: 0.72, h: 0.72 };
+  }
+  if (layout === 'left' && (key === '16:9' || key === '4:3')) {
+    return { x: 0.08, y: 0.16, w: 0.84, h: 0.68 };
+  }
+  if (key === '16:9') {
+    return { x: 0.16, y: 0.16, w: 0.68, h: 0.68 };
+  }
+  if (key === '4:3') {
+    return { x: 0.14, y: 0.14, w: 0.72, h: 0.72 };
+  }
+  return { x: 0.12, y: 0.12, w: 0.76, h: 0.76 };
+};
+
+const drawRsyaCropGuideOverlay = (ctx, width, height, key, state) => {
+  if (!ctx || !width || !height || !state?.rsyaCropGridVisible) return;
+  const zone = getRsyaCropGuideZone(key, state);
+  const cols = 8;
+  const rows = 8;
+  const zoneX = zone.x * width;
+  const zoneY = zone.y * height;
+  const zoneW = zone.w * width;
+  const zoneH = zone.h * height;
+
+  ctx.save();
+  ctx.lineWidth = Math.max(1, Math.round(Math.min(width, height) * 0.004));
+  ctx.strokeStyle = 'rgba(255, 214, 10, 0.35)';
+  ctx.beginPath();
+  for (let i = 1; i < cols; i += 1) {
+    const x = (width / cols) * i;
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+  }
+  for (let i = 1; i < rows; i += 1) {
+    const y = (height / rows) * i;
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(232, 64, 51, 0.14)';
+  ctx.fillRect(zoneX, zoneY, zoneW, zoneH);
+  ctx.strokeStyle = 'rgba(232, 64, 51, 0.9)';
+  ctx.strokeRect(zoneX, zoneY, zoneW, zoneH);
+  ctx.restore();
+};
+
+const fitRsyaActiveCanvasToContainer = (canvas) => {
+  if (!canvas || !canvas.width || !canvas.height) return;
+  const container = canvas.parentElement;
+  if (!container) return;
+  const availableW = container.clientWidth;
+  const availableH = container.clientHeight;
+  if (!availableW || !availableH) return;
+
+  const scale = Math.min(availableW / canvas.width, availableH / canvas.height);
+  if (!Number.isFinite(scale) || scale <= 0) return;
+  canvas.style.setProperty('width', `${Math.floor(canvas.width * scale)}px`, 'important');
+  canvas.style.setProperty('height', `${Math.floor(canvas.height * scale)}px`, 'important');
+};
+
+const getRsyaCropRatioByKey = (key, sourceCanvas) => {
+  if (key === '16:9') return 16 / 9;
+  if (key === '4:3') return 4 / 3;
+  if (key === '1:1') return 1;
+  if (key === '3:4') return 3 / 4;
+  return (sourceCanvas?.width && sourceCanvas?.height) ? (sourceCanvas.width / sourceCanvas.height) : (4 / 3);
+};
+
+const resolveRsyaCropAnchor = (key, state) => {
+  if (key === '1600') {
+    return { x: 'center', y: 'center' };
+  }
+  const layout = state?.rsyaLayout || 'center';
+  if (layout === 'left') {
+    if (key === '1:1') {
+      return { x: 'center', y: 'center' };
+    }
+    return { x: 'left', y: 'center' };
+  }
+  return { x: 'center', y: 'center' };
+};
+
+const computeCenteredCropRect = (sourceCanvas, key, state = null) => {
+  if (!sourceCanvas || !sourceCanvas.width || !sourceCanvas.height) return null;
+  const frame = { x: 0, y: 0, w: sourceCanvas.width, h: sourceCanvas.height };
+  const ratio = getRsyaCropRatioByKey(key, sourceCanvas);
+  let cropW = frame.w;
+  let cropH = Math.round(cropW / ratio);
+  if (cropH > frame.h) {
+    cropH = frame.h;
+    cropW = Math.round(cropH * ratio);
+  }
+  const anchor = resolveRsyaCropAnchor(key, state || getState());
+  const freeX = Math.max(0, frame.w - cropW);
+  const freeY = Math.max(0, frame.h - cropH);
+  const anchorX = anchor.x === 'left' ? 0 : (anchor.x === 'right' ? 1 : 0.5);
+  const anchorY = anchor.y === 'top' ? 0 : (anchor.y === 'bottom' ? 1 : 0.5);
+  const sx = Math.max(0, Math.floor(frame.x + freeX * anchorX));
+  const sy = Math.max(0, Math.floor(frame.y + freeY * anchorY));
+  return { sx, sy, cropW, cropH };
+};
+
+const projectMetaToActiveCrop = (meta, sourceCanvas, activeCanvas, cropKey, state = null) => {
+  if (!meta || !sourceCanvas || !activeCanvas || !sourceCanvas.width || !sourceCanvas.height || !activeCanvas.width || !activeCanvas.height) {
+    return null;
+  }
+  const crop = computeCenteredCropRect(sourceCanvas, cropKey, state);
+  if (!crop) return null;
+  const left = Math.max(meta.kvX, crop.sx);
+  const top = Math.max(meta.kvY, crop.sy);
+  const right = Math.min(meta.kvX + meta.kvW, crop.sx + crop.cropW);
+  const bottom = Math.min(meta.kvY + meta.kvH, crop.sy + crop.cropH);
+  if (right <= left || bottom <= top) return null;
+
+  const xInCrop = left - crop.sx;
+  const yInCrop = top - crop.sy;
+  const wInCrop = right - left;
+  const hInCrop = bottom - top;
+  return {
+    x: xInCrop * (activeCanvas.width / crop.cropW),
+    y: yInCrop * (activeCanvas.height / crop.cropH),
+    w: wInCrop * (activeCanvas.width / crop.cropW),
+    h: hInCrop * (activeCanvas.height / crop.cropH)
+  };
+};
+
+const updateRsyaKVOverlay = (forceVisible = false) => {
+  const overlay = document.getElementById('rsyaKVOverlay');
+  const sourceCanvas = document.getElementById('previewCanvasWide');
+  const activeCanvas = document.getElementById('rsyaActivePreviewCanvas');
+  const state = getState();
+  if (!overlay || !sourceCanvas || !activeCanvas || state.projectMode !== 'rsya') {
+    if (overlay) overlay.style.display = 'none';
+    return null;
+  }
+
+  const kvMeta = renderer.getRenderMeta()?.kvRenderMeta;
+  const projected = projectMetaToActiveCrop(kvMeta, sourceCanvas, activeCanvas, activeRsyaCropKey, state);
+  if (!projected || projected.w < 2 || projected.h < 2) {
+    overlay.style.display = 'none';
+    return null;
+  }
+
+  const activeRect = activeCanvas.getBoundingClientRect();
+  const parentRect = overlay.parentElement ? overlay.parentElement.getBoundingClientRect() : activeRect;
+  const scale = Math.min(activeRect.width / activeCanvas.width, activeRect.height / activeCanvas.height);
+  const drawW = activeCanvas.width * scale;
+  const drawH = activeCanvas.height * scale;
+  const offsetX = (activeRect.width - drawW) / 2;
+  const offsetY = (activeRect.height - drawH) / 2;
+  const canvasOffsetLeft = activeRect.left - parentRect.left;
+  const canvasOffsetTop = activeRect.top - parentRect.top;
+  const localLeft = offsetX + projected.x * scale;
+  const localTop = offsetY + projected.y * scale;
+  const localWidth = projected.w * scale;
+  const localHeight = projected.h * scale;
+
+  overlay.style.display = 'block';
+  overlay.style.left = `${canvasOffsetLeft + localLeft}px`;
+  overlay.style.top = `${canvasOffsetTop + localTop}px`;
+  overlay.style.width = `${localWidth}px`;
+  overlay.style.height = `${localHeight}px`;
+  overlay.classList.toggle('visible', !!forceVisible);
+  return {
+    left: localLeft,
+    top: localTop,
+    width: localWidth,
+    height: localHeight
+  };
+};
+
+const initializeRsyaCropSelector = () => {
+  const cropSection = document.getElementById('rsyaCropPreviewSection');
+  if (!cropSection || cropSection.dataset.rsyaCropInitialized) return;
+  cropSection.dataset.rsyaCropInitialized = 'true';
+  const gridToggle = document.getElementById('rsyaCropGridVisibleToggle');
+  if (gridToggle && !gridToggle.dataset.rsyaGridRefreshBound) {
+    gridToggle.dataset.rsyaGridRefreshBound = 'true';
+    gridToggle.addEventListener('change', () => {
+      const sourceCanvas = document.getElementById('previewCanvasWide');
+      if (!sourceCanvas || !sourceCanvas.width || !sourceCanvas.height) return;
+      requestAnimationFrame(() => {
+        updateRsyaCropPreviews(sourceCanvas, getState());
+      });
+    });
+  }
+  if (!rsyaFitResizeBound) {
+    rsyaFitResizeBound = true;
+    window.addEventListener('resize', () => {
+      const activeCanvas = document.getElementById('rsyaActivePreviewCanvas');
+      fitRsyaActiveCanvasToContainer(activeCanvas);
+      updateRsyaKVOverlay(false);
+    });
+  }
+  cropSection.addEventListener('click', (event) => {
+    const thumb = event.target.closest('[data-rsya-crop-key]');
+    if (!thumb) return;
+    const key = thumb.dataset.rsyaCropKey || '1600';
+    activeRsyaCropKey = key;
+    cropSection.querySelectorAll('[data-rsya-crop-key]').forEach((item) => {
+      item.classList.toggle('active', item === thumb);
+    });
+    const sourceCanvas = document.getElementById('previewCanvasWide');
+    if (sourceCanvas && sourceCanvas.width && sourceCanvas.height) {
+      updateRsyaCropPreviews(sourceCanvas, getState());
+    }
+  });
+};
+
+export const initializeRsyaCanvasDrag = () => {
+  const wideCanvas = document.getElementById('previewCanvasWide');
+  const activeCanvas = document.getElementById('rsyaActivePreviewCanvas');
+  const stage = document.getElementById('rsyaPreviewStage');
+  if ((!wideCanvas && !activeCanvas) || (stage && stage.dataset.rsyaDragInitialized)) return;
+  if (stage) stage.dataset.rsyaDragInitialized = 'true';
+
+  let drag = null;
+  let hoverMode = null;
+  const HANDLE_RADIUS = 14;
+  const CLICK_DISTANCE_THRESHOLD = 4;
+  const CLICK_DURATION_THRESHOLD = 260;
+  const canvases = [wideCanvas, activeCanvas].filter(Boolean);
+
+  const detectClickedRsyaVisualSlot = (event) => {
+    const state = getState();
+    const activePreviewCanvas = document.getElementById('rsyaActivePreviewCanvas');
+    if (!activePreviewCanvas) return 0;
+    const overlayRect = updateRsyaKVOverlay(true);
+    if (!overlayRect) return 0;
+
+    const activeRect = activePreviewCanvas.getBoundingClientRect();
+    const px = event.clientX - activeRect.left;
+    const py = event.clientY - activeRect.top;
+    if (px < overlayRect.left || px > overlayRect.left + overlayRect.width || py < overlayRect.top || py > overlayRect.top + overlayRect.height) {
+      return 0;
+    }
+
+    const allSlots = [state.kv, state.rsyaKV2, state.rsyaKV3];
+    const loadedSlotIndices = allSlots
+      .map((img, idx) => (img ? idx : -1))
+      .filter((idx) => idx >= 0);
+    const visibleCount = Math.max(1, Math.min(3, loadedSlotIndices.length || 1));
+    if (visibleCount === 1) return loadedSlotIndices[0] ?? 0;
+
+    const slotSize = overlayRect.height;
+    const gap = visibleCount > 1 ? Math.max(0, (overlayRect.width - visibleCount * slotSize) / (visibleCount - 1)) : 0;
+    const localX = px - overlayRect.left;
+    let nearestVisibleIndex = 0;
+    let nearestDist = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < visibleCount; i += 1) {
+      const centerX = (slotSize / 2) + i * (slotSize + gap);
+      const dist = Math.abs(localX - centerX);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestVisibleIndex = i;
+      }
+    }
+    return loadedSlotIndices[nearestVisibleIndex] ?? 0;
+  };
+
+  const updateCanvasCursor = (mode) => {
+    const cursor = mode === 'resize'
+      ? 'nwse-resize'
+      : (mode === 'move' ? 'grab' : '');
+    canvases.forEach((canvasEl) => {
+      canvasEl.style.cursor = cursor;
+    });
+  };
+
+  const setDraggingCursor = (cursor) => {
+    canvases.forEach((canvasEl) => {
+      canvasEl.style.cursor = cursor;
+    });
+  };
+
+  const detectHoverMode = (event) => {
+    const activePreviewCanvas = document.getElementById('rsyaActivePreviewCanvas');
+    const overlayRect = updateRsyaKVOverlay();
+    if (!activePreviewCanvas || !overlayRect) return null;
+    const activeRect = activePreviewCanvas.getBoundingClientRect();
+    const px = event.clientX - activeRect.left;
+    const py = event.clientY - activeRect.top;
+    const inside = px >= overlayRect.left && px <= overlayRect.left + overlayRect.width &&
+      py >= overlayRect.top && py <= overlayRect.top + overlayRect.height;
+    if (!inside) return null;
+
+    const handleCx = overlayRect.left + overlayRect.width;
+    const handleCy = overlayRect.top + overlayRect.height;
+    const dist = Math.hypot(px - handleCx, py - handleCy);
+    if (dist <= HANDLE_RADIUS) return 'resize';
+    return 'move';
+  };
+
+  const onMove = (event) => {
+    if (!drag) {
+      const mode = detectHoverMode(event);
+      hoverMode = mode;
+      updateCanvasCursor(mode);
+      updateRsyaKVOverlay(!!mode);
+      return;
+    }
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (Math.abs(dx) > CLICK_DISTANCE_THRESHOLD || Math.abs(dy) > CLICK_DISTANCE_THRESHOLD) {
+      drag.moved = true;
+    }
+    if (drag.type === 'bg') {
+      const nextX = Math.round(drag.baseX + dx);
+      const nextY = Math.round(drag.baseY + dy);
+      setKey('bgOffsetX', nextX);
+      setKey('bgOffsetY', nextY);
+      const bgOffsetXInput = document.getElementById('bgOffsetX');
+      const bgOffsetYInput = document.getElementById('bgOffsetY');
+      const bgOffsetXValue = document.getElementById('bgOffsetXValue');
+      const bgOffsetYValue = document.getElementById('bgOffsetYValue');
+      if (bgOffsetXInput) bgOffsetXInput.value = String(nextX);
+      if (bgOffsetYInput) bgOffsetYInput.value = String(nextY);
+      if (bgOffsetXValue) bgOffsetXValue.textContent = `${nextX}px`;
+      if (bgOffsetYValue) bgOffsetYValue.textContent = `${nextY}px`;
+    } else {
+      if (drag.type === 'kv-scale') {
+        const baseHeight = Math.max(1, drag.baseMetaH || 1);
+        const scaledHeight = Math.max(12, baseHeight + dy);
+        const nextScale = Math.max(40, Math.min(300, Math.round((drag.baseScale || 100) * (scaledHeight / baseHeight))));
+        setKey('rsyaKVScale', nextScale);
+        const scaleInput = document.getElementById('rsyaKVScale');
+        const scaleValue = document.getElementById('rsyaKVScaleValue');
+        if (scaleInput) scaleInput.value = String(nextScale);
+        if (scaleValue) scaleValue.textContent = `${nextScale}%`;
+      } else {
+        setKey('rsyaKVOffsetX', Math.round(drag.baseX + dx));
+        setKey('rsyaKVOffsetY', Math.round(drag.baseY + dy));
+      }
+    }
+    renderer.render();
+  };
+  const onUp = async (event) => {
+    if (drag && drag.type === 'kv' && !drag.moved && (Date.now() - drag.startedAt) <= CLICK_DURATION_THRESHOLD) {
+      const clickedSlot = detectClickedRsyaVisualSlot(event);
+      activeRsyaVisualSlot = Math.max(0, Math.min(2, clickedSlot));
+      setKVModalTargetSlot(activeRsyaVisualSlot);
+      renderRsyaVisualReorder();
+      await openKVSelectModal(null, 'preview-canvas');
+    }
+    drag = null;
+    updateCanvasCursor(hoverMode);
+    updateRsyaKVOverlay(!!hoverMode);
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  };
+
+  const onPointerDown = (event) => {
+    const state = getState();
+    if (state.projectMode !== 'rsya') return;
+    const meta = renderer.getRenderMeta()?.kvRenderMeta;
+    const mode = detectHoverMode(event);
+
+    if (mode === 'resize') {
+      drag = {
+        type: 'kv-scale',
+        startX: event.clientX,
+        startY: event.clientY,
+        baseScale: Number(state.rsyaKVScale) || 150,
+        baseMetaH: meta ? Number(meta.kvH) || 1 : 1
+      };
+      setDraggingCursor('nwse-resize');
+    } else if (mode === 'move') {
+      drag = {
+        type: 'kv',
+        moved: false,
+        startedAt: Date.now(),
+        startX: event.clientX,
+        startY: event.clientY,
+        baseX: Number(state.rsyaKVOffsetX) || 0,
+        baseY: Number(state.rsyaKVOffsetY) || 0
+      };
+      setDraggingCursor('grabbing');
+    } else if (state.bgImage) {
+      drag = {
+        type: 'bg',
+        moved: false,
+        startedAt: Date.now(),
+        startX: event.clientX,
+        startY: event.clientY,
+        baseX: Number(state.bgOffsetX) || 0,
+        baseY: Number(state.bgOffsetY) || 0
+      };
+      setDraggingCursor('grabbing');
+    } else {
+      return;
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const onPointerLeave = () => {
+    if (drag) return;
+    hoverMode = null;
+    updateCanvasCursor(null);
+    updateRsyaKVOverlay(false);
+  };
+
+  canvases.forEach((canvasEl) => {
+    canvasEl.addEventListener('pointerdown', onPointerDown);
+    canvasEl.addEventListener('pointermove', onMove);
+    canvasEl.addEventListener('pointerleave', onPointerLeave);
+  });
+};
+
 // Функция handleLogoUpload теперь импортируется из ./components/logoSelector.js
 
 // handleKVUpload, handlePairKVUpload, clearKV, selectPreloadedKV, initializeKVDropdown, 
@@ -1188,6 +1955,10 @@ export const toggleLogoLanguage = async () => {
 export const selectLogoLanguage = async (language) => {
   const state = getState();
   setKey('logoLanguage', language);
+  if (!getState().proMode) {
+    setKey('variantMode', language === 'kz' ? 'kz' : 'reskill');
+    updateVariantModeTags(language === 'kz' ? 'kz' : 'reskill');
+  }
   updateChipGroup('logo-lang', language);
   
   // Автоматически переключаем лигал в зависимости от языка логотипа
@@ -1262,25 +2033,97 @@ export const selectLayoutMode = (mode) => {
   renderer.render();
 };
 
-const updateProModeTags = (enabled) => {
-  const modeTags = document.querySelectorAll('.mode-tag');
-  if (!modeTags || modeTags.length === 0) return;
-  
-  // Обновляем активное состояние тегов
-  modeTags.forEach(tag => {
-    const mode = tag.dataset.mode;
-    if ((mode === 'on' && enabled) || (mode === 'off' && !enabled)) {
-      tag.classList.add('active');
-      tag.style.background = 'var(--accent-color, #027EF2)';
-      tag.style.color = 'white';
-      tag.style.borderColor = 'var(--accent-color, #027EF2)';
-    } else {
-      tag.classList.remove('active');
-      tag.style.background = 'var(--bg-secondary)';
-      tag.style.color = 'var(--text-primary)';
-      tag.style.borderColor = 'var(--border-color)';
-    }
+const setToggleSwitchValue = (toggleId, value) => {
+  const toggle = document.getElementById(toggleId);
+  if (!toggle) return;
+  toggle.setAttribute('data-value', value);
+  const options = Array.from(toggle.querySelectorAll('.toggle-switch-option'));
+  options.forEach((option) => {
+    option.classList.toggle('active', option.dataset.value === value);
   });
+  const slider = toggle.querySelector('.toggle-switch-slider');
+  if (slider && options.length > 1) {
+    const idx = Math.max(0, options.findIndex((option) => option.dataset.value === value));
+    const shift = idx * (100 / options.length);
+    slider.style.transform = `translateX(${shift}%)`;
+  }
+};
+
+const updateProjectModeTags = (mode) => {
+  setToggleSwitchValue('projectModeToggle', mode);
+};
+
+const updateVariantModeTags = (mode) => {
+  setToggleSwitchValue('variantModeToggle', mode);
+};
+
+const updateProModeTags = (enabled) => {
+  updateVariantModeTags(enabled ? 'pro' : 'reskill');
+};
+
+const updateProjectModeUI = () => {
+  const state = getState();
+  const isRsya = state.projectMode === 'rsya';
+  const app = document.querySelector('.app');
+  if (app) {
+    app.classList.toggle('rsya-mode', isRsya);
+  }
+  const cropSection = document.getElementById('rsyaCropPreviewSection');
+  if (cropSection) cropSection.style.display = isRsya ? 'block' : 'none';
+  const rsyaLayoutTypeGroup = document.getElementById('rsyaLayoutTypeGroup');
+  if (rsyaLayoutTypeGroup) rsyaLayoutTypeGroup.style.display = isRsya ? 'block' : 'none';
+  const rsyaCropGridControl = document.getElementById('rsyaCropGridControl');
+  if (rsyaCropGridControl) rsyaCropGridControl.style.display = isRsya ? 'block' : 'none';
+  const rsyaControls = document.getElementById('rsyaKVControls');
+  if (rsyaControls) rsyaControls.style.display = 'block';
+  const exportSizesControls = document.getElementById('exportSizesControls');
+  if (exportSizesControls) exportSizesControls.style.display = isRsya ? 'none' : 'block';
+  updateRsyaKVOverlay(false);
+};
+
+const setVariantModeState = (mode) => {
+  if (mode === 'pro') {
+    setKey('variantMode', 'pro');
+    setKey('proMode', true);
+    setKey('logoLanguage', 'ru');
+  } else if (mode === 'kz') {
+    setKey('variantMode', 'kz');
+    setKey('proMode', false);
+    setKey('logoLanguage', 'kz');
+  } else {
+    setKey('variantMode', 'reskill');
+    setKey('proMode', false);
+    setKey('logoLanguage', 'ru');
+  }
+};
+
+export const selectProjectMode = async (mode) => {
+  const targetMode = mode === 'rsya' ? 'rsya' : 'layouts';
+  setKey('projectMode', targetMode);
+  updateProjectModeTags(targetMode);
+  updateProjectModeUI();
+  if (targetMode === 'rsya') {
+    setKey('showGuides', false);
+  }
+  updatePreviewSizeSelect();
+  renderer.render();
+};
+
+export const selectVariantMode = async (mode) => {
+  const targetMode = ['reskill', 'pro', 'kz'].includes(mode) ? mode : 'reskill';
+  updateVariantModeTags(targetMode);
+  setVariantModeState(targetMode);
+  if (targetMode === 'pro') {
+    await selectProMode(true);
+  } else {
+    await selectProMode(false);
+    if (targetMode === 'kz') {
+      await selectLogoLanguage('kz');
+    } else {
+      await selectLogoLanguage('ru');
+    }
+  }
+  renderer.render();
 };
 
 const updateProModeToggle = (enabled) => {
@@ -1302,19 +2145,13 @@ export const toggleProMode = async () => {
 };
 
 export const selectProModeByTag = async (mode) => {
-  // mode может быть 'on', 'off' или другие режимы в будущем
-  if (mode === 'on' || mode === 'off') {
-    const enabled = mode === 'on';
-    await selectProMode(enabled);
-  } else {
-    // Для будущих режимов можно добавить свою логику
-    console.log('Режим не реализован:', mode);
-  }
+  await selectVariantMode(mode === 'on' ? 'pro' : 'reskill');
 };
 
 export const selectProMode = async (enabled) => {
   const state = getState();
   setKey('proMode', enabled);
+  setKey('variantMode', enabled ? 'pro' : ((state.logoLanguage || 'ru') === 'kz' ? 'kz' : 'reskill'));
   
   // Обновляем визуальное состояние тегов
   updateProModeTags(enabled);
@@ -1416,7 +2253,7 @@ export const selectProMode = async (enabled) => {
     }
     
     // 8. Визуал по умолчанию ставится pro/assets/1.webp
-    await selectPreloadedKV('assets/pro/assets/1.webp');
+    await selectPreloadedKV(DEFAULT_PRO_KV_PATH);
     setKey('showKV', true);
     const showKVCheckbox = document.getElementById('showKV');
     if (showKVCheckbox) {
@@ -1573,45 +2410,40 @@ export const selectProMode = async (enabled) => {
   
   // Обновляем тумблер
   updateProModeToggle(enabled);
+  updateVariantModeTags(enabled ? 'pro' : ((getState().logoLanguage || 'ru') === 'kz' ? 'kz' : 'reskill'));
   
   renderer.render();
 };
 
 export const initializeProModeToggle = async () => {
-  const modeTags = document.querySelectorAll('.mode-tag');
-  if (!modeTags || modeTags.length === 0) return;
-  
   const state = getState();
-  const proMode = state.proMode || false;
-  
-  // Устанавливаем начальное состояние тегов
-  updateProModeTags(proMode);
-  
-  // Если PRO режим был включен, применяем его настройки
-  if (proMode) {
+  const projectMode = state.projectMode || 'rsya';
+  const variantMode = state.variantMode || (state.proMode ? 'pro' : (state.logoLanguage === 'kz' ? 'kz' : 'reskill'));
+
+  updateProjectModeTags(projectMode);
+  updateVariantModeTags(variantMode);
+  updateProjectModeUI();
+  if (variantMode === 'pro' || state.proMode) {
     await selectProMode(true);
   }
-  
-  // Добавляем обработчики клика на теги
-  modeTags.forEach(tag => {
-    tag.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const mode = tag.dataset.mode;
-      await selectProModeByTag(mode);
+  initializeRsyaCropSelector();
+  initializeRsyaVisualReorder();
+
+  const rsyaLayoutToggle = document.getElementById('rsyaLayoutToggle');
+  if (rsyaLayoutToggle) {
+    const value = state.rsyaLayout || 'center';
+    rsyaLayoutToggle.setAttribute('data-value', value);
+    rsyaLayoutToggle.querySelectorAll('.toggle-switch-option').forEach((option) => {
+      option.classList.toggle('active', option.dataset.value === value);
+      option.addEventListener('click', () => {
+        const next = option.dataset.value;
+        setKey('rsyaLayout', next);
+        rsyaLayoutToggle.setAttribute('data-value', next);
+        rsyaLayoutToggle.querySelectorAll('.toggle-switch-option').forEach((o) => o.classList.toggle('active', o === option));
+        renderer.render();
+      });
     });
-    
-    // Добавляем hover эффект
-    tag.addEventListener('mouseenter', () => {
-      if (!tag.classList.contains('active')) {
-        tag.style.background = 'var(--bg-hover, #1a1a1a)';
-      }
-    });
-    tag.addEventListener('mouseleave', () => {
-      if (!tag.classList.contains('active')) {
-        tag.style.background = 'var(--bg-secondary)';
-      }
-    });
-  });
+  }
 };
 
 export const updatePadding = (value) => {
@@ -1725,6 +2557,22 @@ export const updateTextGradientOpacity = (value) => {
   }
   renderer.render();
 };
+
+export const updateBgOffsetX = (value) => {
+  const numeric = Math.round(Number(value) || 0);
+  setKey('bgOffsetX', numeric);
+  const valueEl = document.getElementById('bgOffsetXValue');
+  if (valueEl) valueEl.textContent = `${numeric}px`;
+  renderer.render();
+};
+
+export const updateBgOffsetY = (value) => {
+  const numeric = Math.round(Number(value) || 0);
+  setKey('bgOffsetY', numeric);
+  const valueEl = document.getElementById('bgOffsetYValue');
+  if (valueEl) valueEl.textContent = `${numeric}px`;
+  renderer.render();
+};
 export const updateLegalOpacity = (value) => {
   const numeric = parseInt(value, 10);
   if (isNaN(numeric)) {
@@ -1815,6 +2663,20 @@ export const showSection = (sectionId) => {
         if (bgImageSizeValue) {
           bgImageSizeValue.textContent = `${Math.round(size)}%`;
         }
+      }
+      const bgOffsetXInput = document.getElementById('bgOffsetX');
+      const bgOffsetXValue = document.getElementById('bgOffsetXValue');
+      if (bgOffsetXInput) {
+        const offsetX = Math.round(state.bgOffsetX ?? 0);
+        bgOffsetXInput.value = offsetX;
+        if (bgOffsetXValue) bgOffsetXValue.textContent = `${offsetX}px`;
+      }
+      const bgOffsetYInput = document.getElementById('bgOffsetY');
+      const bgOffsetYValue = document.getElementById('bgOffsetYValue');
+      if (bgOffsetYInput) {
+        const offsetY = Math.round(state.bgOffsetY ?? 0);
+        bgOffsetYInput.value = offsetY;
+        if (bgOffsetYValue) bgOffsetYValue.textContent = `${offsetY}px`;
       }
     } else if (sectionId === 'logo') {
       updateLogoPosToggle(state.logoPos || 'left');
@@ -2944,9 +3806,11 @@ export const selectPairKV = async (pairIndex, kvFile) => {
   // Если это активная пара, загружаем KV
   const state = getState();
   if (pairIndex === (state.activePairIndex || 0)) {
+    const prevKV = state.kv;
+    const prevKVSelected = state.kvSelected;
     if (!kvFile) {
-      setState({ kv: null, kvSelected: '' });
-      updateKVTriggerText('');
+      setState({ kv: prevKV || null, kvSelected: prevKVSelected || DEFAULT_KV_PATH });
+      updateKVTriggerText(prevKVSelected || DEFAULT_KV_PATH);
       updateKVUI();
       renderer.render();
       renderKVPairs(); // Обновляем кнопки
@@ -2954,17 +3818,18 @@ export const selectPairKV = async (pairIndex, kvFile) => {
     }
     
     try {
-      const img = await loadImage(kvFile);
-      setState({ kv: img, kvSelected: kvFile });
-      updateKVTriggerText(kvFile);
+      const normalizedKV = normalizeKVAssetPath(kvFile);
+      const img = await loadImage(normalizedKV);
+      setState({ kv: img, kvSelected: normalizedKV });
+      updateKVTriggerText(normalizedKV);
       updateKVUI();
       renderer.render();
       renderKVPairs(); // Обновляем кнопки
     } catch (error) {
       console.error(error);
       alert('Не удалось загрузить KV.');
-      setState({ kv: null, kvSelected: '' });
-      updateKVTriggerText('');
+      setState({ kv: prevKV || null, kvSelected: prevKVSelected || DEFAULT_KV_PATH });
+      updateKVTriggerText(prevKVSelected || DEFAULT_KV_PATH);
       updateKVUI();
       renderer.render();
       renderKVPairs(); // Обновляем кнопки
@@ -3176,9 +4041,7 @@ const renderTitleSubtitlePairs = () => {
     
     const titleLabel = document.createElement('label');
     titleLabel.className = `form-label ${isActive ? 'active' : ''}`;
-    titleLabel.textContent = isActive
-      ? t('title.label.active', { number: String(index + 1).padStart(2, '0') })
-      : t('title.label', { number: String(index + 1).padStart(2, '0') });
+    titleLabel.textContent = 'Заголовок';
     titleLabel.onclick = () => setActiveTitlePair(index);
     
     const titleButtons = document.createElement('div');
@@ -3231,9 +4094,7 @@ const renderTitleSubtitlePairs = () => {
     
     const subtitleLabel = document.createElement('label');
     subtitleLabel.className = `form-label ${isActive ? 'active' : ''}`;
-    subtitleLabel.textContent = isActive
-      ? t('subtitle.label.active', { number: String(index + 1).padStart(2, '0') })
-      : t('subtitle.label', { number: String(index + 1).padStart(2, '0') });
+    subtitleLabel.textContent = 'Подзаголовок';
     subtitleLabel.onclick = () => setActiveTitlePair(index);
     
     const subtitleButtons = document.createElement('div');
@@ -3283,6 +4144,11 @@ const renderTitleSubtitlePairs = () => {
     
     // Создаем функцию для создания дивайдера с кнопкой
     const createDivider = (includeButton) => {
+      if (!includeButton) {
+        const singleLine = document.createElement('div');
+        singleLine.style.cssText = 'height: 1px; background: #2a2d35; margin: 12px 0;';
+        return singleLine;
+      }
       const divider = document.createElement('div');
       divider.style.cssText = 'display: flex; align-items: center; gap: 8px; margin: 12px 0;';
       
@@ -3325,7 +4191,7 @@ const renderTitleSubtitlePairs = () => {
     
     // Добавляем дивайдер в оба контейнера
     // Кнопка "Добавить" только для первой пары
-    const includeButton = index === 0;
+    const includeButton = !SINGLE_PAIR_MODE && index === 0;
     titleContainer.appendChild(createDivider(includeButton));
     subtitleContainer.appendChild(createDivider(includeButton));
   });
@@ -3364,32 +4230,38 @@ const renderTitleSubtitlePairs = () => {
 };
 
 export const setActiveTitlePair = async (index) => {
-  await setActivePairIndex(index);
+  const targetIndex = SINGLE_PAIR_MODE ? 0 : index;
+  await setActivePairIndex(targetIndex);
   // Обновляем UI после переключения пары
   syncFormFields();
   renderer.render();
   
   // Загружаем KV и фоновое изображение для активной пары
   const state = getState();
+  const prevKV = state.kv;
+  const prevKVSelected = state.kvSelected;
   const pairs = state.titleSubtitlePairs || [];
-  const activePair = pairs[index];
+  const activePair = pairs[targetIndex];
   
   // Загружаем KV
   if (activePair && activePair.kvSelected) {
     try {
-      const img = await loadImage(activePair.kvSelected);
-      setState({ kv: img, kvSelected: activePair.kvSelected });
-      updateKVTriggerText(activePair.kvSelected);
+      const normalizedPairKV = normalizeKVAssetPath(activePair.kvSelected);
+      const img = await loadImage(normalizedPairKV);
+      setState({ kv: img, kvSelected: normalizedPairKV });
+      updateKVTriggerText(normalizedPairKV);
       updateKVUI();
     } catch (error) {
       console.error('Не удалось загрузить KV для активной пары:', error);
-      setState({ kv: null, kvSelected: '' });
-      updateKVTriggerText('');
+      // Не сбрасываем рабочий KV из-за ошибки загрузки пары
+      setState({ kv: prevKV || null, kvSelected: prevKVSelected || DEFAULT_KV_PATH });
+      updateKVTriggerText(prevKVSelected || DEFAULT_KV_PATH);
       updateKVUI();
     }
   } else {
-    setState({ kv: null, kvSelected: '' });
-    updateKVTriggerText('');
+    // Пустой KV у пары не должен обнулять текущий рабочий KV
+    setState({ kv: prevKV || null, kvSelected: prevKVSelected || DEFAULT_KV_PATH });
+    updateKVTriggerText(prevKVSelected || DEFAULT_KV_PATH);
     updateKVUI();
   }
   
@@ -3421,6 +4293,7 @@ export const setActiveTitlePair = async (index) => {
 };
 
 export const addTitleSubtitlePairAction = () => {
+  if (SINGLE_PAIR_MODE) return;
   const state = getState();
   const oldLength = (state.titleSubtitlePairs || []).length;
   addTitleSubtitlePair();
@@ -3442,6 +4315,7 @@ export const addTitleSubtitlePairAction = () => {
 };
 
 export const removeTitleSubtitlePairAction = (index) => {
+  if (SINGLE_PAIR_MODE) return;
   removeTitleSubtitlePair(index);
   renderTitleSubtitlePairs();
   renderKVPairs();
@@ -3486,8 +4360,10 @@ export const initializeStateSubscribers = () => {
     
     // Если изменился активный индекс, загружаем KV и фоновое изображение для новой активной пары
     // Делаем это асинхронно, чтобы не блокировать UI
-    if (currentActiveIndex !== lastActiveIndex && currentActiveIndex >= 0 && currentActiveIndex < currentPairs.length) {
+    if (!SINGLE_PAIR_MODE && currentActiveIndex !== lastActiveIndex && currentActiveIndex >= 0 && currentActiveIndex < currentPairs.length) {
       const activePair = currentPairs[currentActiveIndex];
+      const prevKV = state.kv;
+      const prevKVSelected = state.kvSelected;
       
       // Загружаем изображения асинхронно, не блокируя UI
       requestAnimationFrame(async () => {
@@ -3497,14 +4373,15 @@ export const initializeStateSubscribers = () => {
         // Загружаем KV
         if (activePair && activePair.kvSelected) {
           try {
-            const img = await loadImage(activePair.kvSelected);
+            const normalizedPairKV = normalizeKVAssetPath(activePair.kvSelected);
+            const img = await loadImage(normalizedPairKV);
             const current = getState();
             if (current.activePairIndex !== expectedPairIndex ||
                 current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
               return;
             }
-            setState({ kv: img, kvSelected: activePair.kvSelected });
-            updateKVTriggerText(activePair.kvSelected);
+            setState({ kv: img, kvSelected: normalizedPairKV });
+            updateKVTriggerText(normalizedPairKV);
           } catch (error) {
             console.error('Не удалось загрузить KV для активной пары:', error);
             const current = getState();
@@ -3512,8 +4389,9 @@ export const initializeStateSubscribers = () => {
                 current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
               return;
             }
-            setState({ kv: null, kvSelected: '' });
-            updateKVTriggerText('');
+            // Оставляем прошлый рабочий KV, если KV пары не загрузился
+            setState({ kv: prevKV || null, kvSelected: prevKVSelected || DEFAULT_KV_PATH });
+            updateKVTriggerText(prevKVSelected || DEFAULT_KV_PATH);
           }
         } else {
           const current = getState();
@@ -3521,8 +4399,9 @@ export const initializeStateSubscribers = () => {
               current.titleSubtitlePairs[current.activePairIndex]?.id !== expectedPairId) {
             return;
           }
-          setState({ kv: null, kvSelected: '' });
-          updateKVTriggerText('');
+          // Пустой KV в паре не должен стирать глобально текущий KV
+          setState({ kv: prevKV || null, kvSelected: prevKVSelected || DEFAULT_KV_PATH });
+          updateKVTriggerText(prevKVSelected || DEFAULT_KV_PATH);
         }
         
         // Устанавливаем фоновое изображение из активной пары
@@ -3667,4 +4546,3 @@ export const closeGuideModal = () => {
 
 // Экспортируем функции градиента
 export { updateBgGradientType, updateBgGradientAngle, addGradientStop, removeGradientStop };
-

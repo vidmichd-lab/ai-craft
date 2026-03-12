@@ -89,7 +89,10 @@ const sanitizeFolderName = (title) => {
 };
 
 const exportSizes = async (format) => {
-  const sizes = getCheckedSizes();
+  const state = getState();
+  const sizes = state.projectMode === 'rsya'
+    ? [{ width: 1600, height: 1200, platform: 'РСЯ' }]
+    : getCheckedSizes();
   if (!sizes.length) {
     alert('Нет выбранных размеров для экспорта!');
     return;
@@ -100,8 +103,9 @@ const exportSizes = async (format) => {
     return;
   }
 
-  const state = getState();
-  const pairs = state.titleSubtitlePairs || [];
+  const pairs = state.projectMode === 'rsya'
+    ? [(state.titleSubtitlePairs && state.titleSubtitlePairs[0]) || { title: state.title, subtitle: state.subtitle, kvSelected: state.kvSelected, bgColor: state.bgColor }]
+    : (state.titleSubtitlePairs || []);
   
   if (pairs.length === 0) {
     alert('Нет заголовков для экспорта!');
@@ -122,7 +126,11 @@ const exportSizes = async (format) => {
             : Promise.resolve(pair.bgImageSelected))
           : Promise.resolve(null)
       ]);
-      return { kv, bg };
+      const [rsyaKV2, rsyaKV3] = await Promise.all([
+        state.rsyaKV2Selected ? loadImage(state.rsyaKV2Selected).catch(() => null) : Promise.resolve(null),
+        state.rsyaKV3Selected ? loadImage(state.rsyaKV3Selected).catch(() => null) : Promise.resolve(null)
+      ]);
+      return { kv, bg, rsyaKV2, rsyaKV3 };
     })
   );
 
@@ -136,6 +144,8 @@ const exportSizes = async (format) => {
     const folderName = sanitizeFolderName(pair.title);
     const pairKV = pairAssets[pairIndex].kv;
     const pairBgImage = pairAssets[pairIndex].bg;
+    const pairRsyaKV2 = pairAssets[pairIndex].rsyaKV2;
+    const pairRsyaKV3 = pairAssets[pairIndex].rsyaKV3;
 
     const exportScale = state.exportScale || 1;
     const BATCH_SIZE = 4;
@@ -154,6 +164,8 @@ const exportSizes = async (format) => {
             kv: pairKV,
             kvSelected: pair.kvSelected || '',
             bgImage: pairBgImage,
+            rsyaKV2: pairRsyaKV2,
+            rsyaKV3: pairRsyaKV3,
             bgColor: pair.bgColor || state.bgColor,
             platform: size.platform || 'unknown'
           };
@@ -175,9 +187,8 @@ const exportSizes = async (format) => {
           }
 
           try {
-            const maxFileSizeUnit = state.maxFileSizeUnit || 'KB';
-            const maxFileSizeValue = state.maxFileSizeValue || 150;
-            const maxSizeBytes = maxFileSizeUnit === 'KB' ? maxFileSizeValue * 1024 : maxFileSizeValue * 1024 * 1024;
+            const maxFileSizeValue = state.maxFileSizeValue || 200;
+            const maxSizeBytes = maxFileSizeValue * 1024;
 
             if (blob.size <= maxSizeBytes) {
               // skip compression
@@ -348,5 +359,3 @@ export const exportJPG = async () => {
     }
   }
 };
-
-

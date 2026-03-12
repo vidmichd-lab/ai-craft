@@ -38,6 +38,18 @@ const applyTextTransform = (text, transformType) => {
   return text;
 };
 
+const drawImageCover = (ctx, img, x, y, w, h) => {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih || !w || !h) return;
+  const scale = Math.max(w / iw, h / ih);
+  const sw = w / scale;
+  const sh = h / scale;
+  const sx = Math.max(0, (iw - sw) / 2);
+  const sy = Math.max(0, (ih - sh) / 2);
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+};
+
 // Экспортируем clearTextMeasurementCache для использования в других модулях
 export { clearTextMeasurementCache };
 
@@ -75,6 +87,17 @@ const renderToCanvas = (canvas, width, height, state) => {
   canvas.width = width;
   canvas.height = height;
   ctx.clearRect(0, 0, width, height);
+
+  const isRsyaMode = state.projectMode === 'rsya';
+  const rsyaLayout = isRsyaMode ? (state.rsyaLayout || 'center') : 'center';
+  const isRsyaLeftLayout = isRsyaMode && rsyaLayout === 'left';
+  if (isRsyaMode) {
+    if (isRsyaLeftLayout) {
+      state = { ...state, titleAlign: 'left', logoPos: 'center', kvPosition: 'right' };
+    } else {
+      state = { ...state, titleAlign: 'center', logoPos: 'center', kvPosition: 'center' };
+    }
+  }
   
   // Режим constructor — обычный конструктор
 
@@ -125,6 +148,13 @@ const renderToCanvas = (canvas, width, height, state) => {
     titleAlignForSize = safeArea.titleAlign || null;
     logoPosForSize = defaultSafeArea.logoPos || null;
   }
+
+  // Для РСЯ-варианта "Слева + KV справа" не позволяем safe-area override
+  // возвращать выравнивание обратно в центр.
+  if (isRsyaLeftLayout) {
+    titleAlignForSize = 'left';
+    logoPosForSize = 'center';
+  }
   
   // Вычисляем отступы для охранной области (если она есть)
   let horizontalPadding = 0;
@@ -150,6 +180,23 @@ const renderToCanvas = (canvas, width, height, state) => {
     } else {
       // Если размеры охранной области повреждены, рендерим по полному canvas.
       useSafeArea = false;
+    }
+  }
+
+  // Защита от "схлопнутой" safe area на широких форматах:
+  // если пользовательские значения слишком малы, элементы (logo/KV/legal/18+) могут исчезать.
+  if (useSafeArea) {
+    const isWideCanvas = width >= height * LAYOUT_CONSTANTS.HORIZONTAL_THRESHOLD;
+    if (isWideCanvas) {
+      const minSafeAreaWidth = Math.max(300, width * 0.5);
+      const minSafeAreaHeight = Math.max(80, height * 0.5);
+      if (safeAreaWidth < minSafeAreaWidth || safeAreaHeight < minSafeAreaHeight) {
+        useSafeArea = false;
+        safeAreaWidth = width;
+        safeAreaHeight = height;
+        horizontalPadding = 0;
+        verticalPadding = 0;
+      }
     }
   }
   
@@ -275,6 +322,8 @@ const renderToCanvas = (canvas, width, height, state) => {
 
   // Вычисляем позицию KV и область для текста - используем модули
   let kvPlannedMeta = null;
+  let kvPlanningBranch = 'none';
+  let kvPlanningReason = '';
   let textArea;
   let maxTextWidth;
   
@@ -289,19 +338,83 @@ const renderToCanvas = (canvas, width, height, state) => {
   const kvHorizontalPadding = useSafeArea ? paddingPx : effectiveHorizontalPadding;
   
   // Используем logoBounds без смещения для расчетов
-  if (isSuperWide && state.showKV && isKVValid) {
+  if (isRsyaLeftLayout && state.showKV && isKVValid) {
+    kvPlanningBranch = 'rsya-left';
+    const kvW0 = state.kv.naturalWidth || state.kv.width;
+    const kvH0 = state.kv.naturalHeight || state.kv.height;
+    const maxKvW = Math.max(140, kvWidth * 0.38);
+    const maxKvH = Math.max(140, kvHeight * 0.72);
+    const scale = Math.min(maxKvW / kvW0, maxKvH / kvH0);
+    const kvW = kvW0 * scale;
+    const kvH = kvH0 * scale;
+    kvPlannedMeta = {
+      kvX: kvWidth - kvHorizontalPadding - kvW,
+      kvY: Math.max(kvHorizontalPadding, (kvHeight - kvH) / 2),
+      kvW,
+      kvH,
+      kvScale: scale,
+      paddingPx: kvHorizontalPadding
+    };
+  } else if (isSuperWide && state.showKV && isKVValid) {
+    kvPlanningBranch = 'superWide';
     kvPlannedMeta = calculateSuperWideKV(state, kvWidth, kvHeight, kvPadding, logoBoundsForCalculations, legalBlockHeight);
   } else if (isUltraWide && state.showKV && isKVValid) {
+    kvPlanningBranch = 'ultraWide';
     kvPlannedMeta = calculateUltraWideKV(state, kvWidth, kvHeight, kvHorizontalPadding, legalBlockHeight);
   } else if (layoutType.isHorizontalLayout && state.showKV && isKVValid) {
+    kvPlanningBranch = 'horizontal';
     const result = calculateHorizontalKV(state, kvWidth, kvHeight, kvHorizontalPadding, legalBlockHeight);
     kvPlannedMeta = result.kvMeta;
     maxTextWidth = result.textWidth;
+  } else if (!state.showKV) {
+    kvPlanningReason = 'showKV-disabled';
+  } else if (!isKVValid) {
+    kvPlanningReason = 'kv-invalid-or-not-loaded';
+  } else {
+    kvPlanningReason = 'layout-not-wide';
+  }
+
+  // Fallback для широких форматов: если основной расчет не дал KV, пробуем безопасное размещение справа.
+  if (!kvPlannedMeta && state.showKV && isKVValid && (isHorizontalLayout || isUltraWide || isSuperWide)) {
+    const kvW0 = state.kv.naturalWidth || state.kv.width;
+    const kvH0 = state.kv.naturalHeight || state.kv.height;
+    const wideLegalReserve = (state.showLegal || state.showAge) ? legalBlockHeight : 0;
+    const wideAvailableHeight = Math.max(0, kvHeight - kvHorizontalPadding * 2 - wideLegalReserve);
+    const wideAvailableWidth = Math.max(0, kvWidth - kvHorizontalPadding * 2);
+    const wideMaxKvWidth = Math.max(LAYOUT_CONSTANTS.MIN_KV_SIZE, wideAvailableWidth * LAYOUT_CONSTANTS.KV_MAX_WIDTH_RATIO);
+    const scaleByHeight = wideAvailableHeight > 0 ? wideAvailableHeight / kvH0 : 0;
+    const scaleByWidth = wideMaxKvWidth > 0 ? wideMaxKvWidth / kvW0 : 0;
+    const fallbackScale = Math.min(scaleByHeight, scaleByWidth);
+
+    if (Number.isFinite(fallbackScale) && fallbackScale > 0) {
+      const fallbackW = kvW0 * fallbackScale;
+      const fallbackH = kvH0 * fallbackScale;
+      if (fallbackW >= LAYOUT_CONSTANTS.MIN_KV_SIZE || fallbackH >= LAYOUT_CONSTANTS.MIN_KV_SIZE) {
+        const fallbackX = kvWidth - kvHorizontalPadding - fallbackW;
+        const fallbackY = Math.max(
+          kvHorizontalPadding,
+          kvHeight - kvHorizontalPadding - wideLegalReserve - fallbackH
+        );
+        kvPlannedMeta = {
+          kvX: fallbackX,
+          kvY: fallbackY,
+          kvW: fallbackW,
+          kvH: fallbackH,
+          kvScale: fallbackScale,
+          paddingPx: kvHorizontalPadding
+        };
+        kvPlanningBranch = `${kvPlanningBranch || 'wide'}-fallback`;
+        kvPlanningReason = '';
+      }
+    }
+
+    if (!kvPlannedMeta) {
+      kvPlanningReason = kvPlanningReason || 'wide-fallback-failed';
+    }
   }
   
   // Смещаем KV на отступы охранной области (если используется)
   if (useSafeArea && kvPlannedMeta) {
-    const originalKV = { kvX: kvPlannedMeta.kvX, kvY: kvPlannedMeta.kvY };
     kvPlannedMeta = {
       ...kvPlannedMeta,
       kvX: kvPlannedMeta.kvX + horizontalPadding,
@@ -327,6 +440,13 @@ const renderToCanvas = (canvas, width, height, state) => {
   if (useSafeArea) {
     textArea.left += horizontalPadding;
     textArea.right += horizontalPadding;
+  }
+  if (isRsyaLeftLayout) {
+    const canvasPadding = Math.max(24, (state.paddingPercent / 100) * Math.min(width, height));
+    const kvLeft = kvPlannedMeta ? kvPlannedMeta.kvX : (width - canvasPadding);
+    const gapToKV = Math.max(16, canvasPadding * 0.5);
+    textArea.left = canvasPadding;
+    textArea.right = Math.max(textArea.left + 140, kvLeft - gapToKV);
   }
   // Для горизонтального/широкого формата гарантируем минимальную ширину области текста, иначе клип «схлопывается» и контент не виден
   if ((isHorizontalLayout || isUltraWide || isSuperWide) && (textArea.right <= textArea.left || textArea.right - textArea.left < 50)) {
@@ -779,7 +899,7 @@ const renderToCanvas = (canvas, width, height, state) => {
   // Определяем выключку текста: сначала проверяем настройку для размера, потом глобальную
   // Для широких форматов текст всегда выравнивается слева и прибит к левому краю макета
   // Исключение: для РСЯ 1600x1200 всегда центрируем
-  const isRSYA1600x1200 = platform === 'РСЯ' && sizeKey === '1600x1200';
+  const isRSYA1600x1200 = platform === 'РСЯ' && sizeKey === '1600x1200' && !isRsyaLeftLayout;
   let effectiveTitleAlign;
   if (isRSYA1600x1200) {
     // Для РСЯ 1600x1200 всегда центрируем
@@ -1431,8 +1551,11 @@ const renderToCanvas = (canvas, width, height, state) => {
 
   let kvRenderMeta = null;
   if (kvPlannedMeta) {
-    // KV всегда должен быть немного выше legal текста
-    if (legalTextBounds || legalContentBounds || ageBoundsRect) {
+    // Для не-wide форматов держим KV выше legal.
+    // Для wide форматов не сдвигаем KV по vertical-конфликтам с legal:
+    // иначе KV может "схлопываться" или выдавливаться за пределы.
+    const shouldAdjustKVAgainstLegal = !(isHorizontalLayout || isUltraWide || isSuperWide || isRsyaMode);
+    if (shouldAdjustKVAgainstLegal && (legalTextBounds || legalContentBounds || ageBoundsRect)) {
       const kvBottom = kvPlannedMeta.kvY + kvPlannedMeta.kvH;
       const maxY = useSafeArea ? (verticalPadding + effectiveHeight) : height;
       const legalTop = legalTextBounds ? legalTextBounds.y : (legalContentBounds ? legalContentBounds.y : maxY);
@@ -1505,17 +1628,18 @@ const renderToCanvas = (canvas, width, height, state) => {
       const originalCoords = { kvX: kvPlannedMeta.kvX, kvY: kvPlannedMeta.kvY, kvW: kvPlannedMeta.kvW, kvH: kvPlannedMeta.kvH };
       let wasAdjusted = false;
       
-      if (kvPlannedMeta.kvX < 0 || kvPlannedMeta.kvY < 0 || kvRight > width || kvBottom > height) {
+      if (!isRsyaMode && (kvPlannedMeta.kvX < 0 || kvPlannedMeta.kvY < 0 || kvRight > width || kvBottom > height)) {
         // Корректируем координаты, чтобы KV был в пределах canvas
         kvPlannedMeta.kvX = Math.max(0, Math.min(kvPlannedMeta.kvX, width - kvPlannedMeta.kvW));
         kvPlannedMeta.kvY = Math.max(0, Math.min(kvPlannedMeta.kvY, height - kvPlannedMeta.kvH));
         wasAdjusted = true;
       }
       
-      // Применяем скругление углов для KV
-      if (state.kvBorderRadius > 0) {
+      // Скругление визуала отключено: превью и экспорт всегда без радиуса.
+      const kvRadiusPercent = 0;
+      if (kvRadiusPercent > 0) {
         ctx.save();
-        const borderRadius = Math.min(state.kvBorderRadius / 100 * Math.min(kvPlannedMeta.kvW, kvPlannedMeta.kvH), 
+        const borderRadius = Math.min(kvRadiusPercent / 100 * Math.min(kvPlannedMeta.kvW, kvPlannedMeta.kvH), 
                                        Math.min(kvPlannedMeta.kvW, kvPlannedMeta.kvH) / 2);
         
         // Создаем скругленный прямоугольник
@@ -1546,17 +1670,160 @@ const renderToCanvas = (canvas, width, height, state) => {
       }
       
       try {
-        ctx.drawImage(state.kv, kvPlannedMeta.kvX, kvPlannedMeta.kvY, kvPlannedMeta.kvW, kvPlannedMeta.kvH);
+        const visuals = [state.kv, state.rsyaKV2, state.rsyaKV3].filter(Boolean);
+        const visualCount = Math.max(1, Math.min(3, visuals.length || 1));
+        const useMultiKV = isRsyaMode || visualCount > 1;
+
+        if (useMultiKV) {
+          const scalePercent = Math.max(40, Math.min(300, Number(state.rsyaKVScale) || 150));
+          const gapRaw = Number.isFinite(Number(state.rsyaKVGap)) ? Number(state.rsyaKVGap) : 8;
+          const offsetX = Number(state.rsyaKVOffsetX) || 0;
+          const offsetY = Number(state.rsyaKVOffsetY) || 0;
+          const slotSize = Math.max(24, Math.min(kvPlannedMeta.kvW, kvPlannedMeta.kvH) * (scalePercent / 100));
+          const minGap = -slotSize + 4;
+          const gap = Math.max(minGap, Math.min(300, gapRaw));
+          const totalW = visualCount * slotSize + (visualCount - 1) * gap;
+          const startX = kvPlannedMeta.kvX + (kvPlannedMeta.kvW - totalW) / 2 + offsetX;
+          const startY = (isRsyaMode && !isRsyaLeftLayout)
+            ? (kvPlannedMeta.kvY + offsetY) // В РСЯ масштабируем от top-center: рост идет вниз.
+            : (kvPlannedMeta.kvY + (kvPlannedMeta.kvH - slotSize) / 2 + offsetY);
+
+          for (let i = 0; i < visualCount; i++) {
+            const img = visuals[i] || state.kv;
+            if (!img) continue;
+            const x = startX + i * (slotSize + gap);
+            const y = startY;
+            drawImageCover(ctx, img, x, y, slotSize, slotSize);
+          }
+
+          kvRenderMeta = {
+            ...kvPlannedMeta,
+            kvX: startX,
+            kvY: startY,
+            kvW: totalW,
+            kvH: slotSize
+          };
+        } else {
+          ctx.drawImage(state.kv, kvPlannedMeta.kvX, kvPlannedMeta.kvY, kvPlannedMeta.kvW, kvPlannedMeta.kvH);
+        }
       } catch (error) {
         console.error('Ошибка отрисовки KV:', error);
       }
       
-      if (state.kvBorderRadius > 0) {
+      if (kvRadiusPercent > 0) {
         ctx.restore();
       }
       
-      kvRenderMeta = kvPlannedMeta;
+      if (!kvRenderMeta) {
+        kvRenderMeta = kvPlannedMeta;
+      }
     }
+  }
+
+  // Аварийный fallback: на широких форматах KV не должен "пропадать" полностью.
+  // Если основной расчет не дал валидный блок, рисуем компактный KV справа.
+  if (!kvRenderMeta && state.showKV && isKVValid && (isHorizontalLayout || isUltraWide || isSuperWide)) {
+    const srcW = state.kv.naturalWidth || state.kv.width;
+    const srcH = state.kv.naturalHeight || state.kv.height;
+    if (srcW > 0 && srcH > 0) {
+      const basePad = useSafeArea ? paddingPx : effectiveHorizontalPadding;
+      const containerW = useSafeArea ? effectiveWidth : width;
+      const containerH = useSafeArea ? effectiveHeight : height;
+      const offsetX = useSafeArea ? horizontalPadding : 0;
+      const offsetY = useSafeArea ? verticalPadding : 0;
+      // На wide форматах KV приоритетен: не резервируем высоту под legal в аварийном режиме.
+      const legalReserve = 0;
+      const maxW = Math.max(24, containerW * 0.18);
+      const maxH = Math.max(32, containerH - basePad * 2);
+      const emergencyScale = Math.min(maxW / srcW, maxH / srcH);
+
+      if (Number.isFinite(emergencyScale) && emergencyScale > 0) {
+        const drawW = Math.max(32, srcW * emergencyScale);
+        const drawH = Math.max(32, srcH * emergencyScale);
+        const drawX = offsetX + Math.max(basePad, containerW - basePad - drawW);
+        const drawY = offsetY + Math.max(basePad, containerH - basePad - legalReserve - drawH);
+
+        try {
+          if (kvRadiusPercent > 0) {
+            ctx.save();
+            const borderRadius = Math.min(
+              (kvRadiusPercent / 100) * Math.min(drawW, drawH),
+              Math.min(drawW, drawH) / 2
+            );
+            ctx.beginPath();
+            if (ctx.roundRect) {
+              ctx.roundRect(drawX, drawY, drawW, drawH, borderRadius);
+            } else {
+              const x = drawX;
+              const y = drawY;
+              const w = drawW;
+              const h = drawH;
+              const r = borderRadius;
+              ctx.moveTo(x + r, y);
+              ctx.lineTo(x + w - r, y);
+              ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+              ctx.lineTo(x + w, y + h - r);
+              ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+              ctx.lineTo(x + r, y + h);
+              ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+              ctx.lineTo(x, y + r);
+              ctx.quadraticCurveTo(x, y, x + r, y);
+              ctx.closePath();
+            }
+            ctx.clip();
+            ctx.drawImage(state.kv, drawX, drawY, drawW, drawH);
+            ctx.restore();
+          } else {
+            ctx.drawImage(state.kv, drawX, drawY, drawW, drawH);
+          }
+          kvRenderMeta = {
+            kvX: drawX,
+            kvY: drawY,
+            kvW: drawW,
+            kvH: drawH,
+            kvScale: emergencyScale,
+            paddingPx: basePad,
+            emergency: true
+          };
+          kvPlanningBranch = `${kvPlanningBranch || 'wide'}-emergency-render`;
+          kvPlanningReason = '';
+        } catch (error) {
+          console.error('Ошибка аварийной отрисовки KV на wide:', error);
+          kvPlanningReason = kvPlanningReason || 'wide-emergency-render-error';
+        }
+      } else {
+        kvPlanningReason = kvPlanningReason || 'wide-emergency-scale-invalid';
+      }
+    } else {
+      kvPlanningReason = kvPlanningReason || 'wide-emergency-source-size-invalid';
+    }
+  }
+
+  // Точечный debug для проблемного wide-формата.
+  if (width === 2832 && height === 600 && state.showKV) {
+    console.log('[KV DEBUG][2832x600]', {
+      platform,
+      useSafeArea,
+      safeArea: useSafeArea ? { width: safeAreaWidth, height: safeAreaHeight, horizontalPadding, verticalPadding } : null,
+      layout: { isHorizontalLayout, isUltraWide, isSuperWide, branch: kvPlanningBranch },
+      kvValid: isKVValid,
+      kvPlanningReason,
+      kvPlannedMeta,
+      kvRenderMeta,
+      legalBlockHeight,
+      textArea
+    });
+  }
+  if ((isHorizontalLayout || isUltraWide || isSuperWide) && state.showKV && !kvRenderMeta) {
+    console.warn('[KV DEBUG][WIDE NO RENDER]', {
+      size: `${width}x${height}`,
+      platform,
+      branch: kvPlanningBranch,
+      reason: kvPlanningReason,
+      kvValid: isKVValid,
+      useSafeArea,
+      safeArea: useSafeArea ? { width: safeAreaWidth, height: safeAreaHeight, horizontalPadding, verticalPadding } : null
+    });
   }
 
   // Смещаем logoBounds на отступы охранной области перед отрисовкой
@@ -1725,51 +1992,8 @@ const renderToCanvas = (canvas, width, height, state) => {
     ctx.globalAlpha = 1.0;
   }
 
-  // Если KV включен, но места для него нет, автоматически выключаем
-  // Но только если размер KV уменьшился почти до 0 (меньше 10px) из-за изменения кегля текста
-  if (state.showKV && state.kv && !kvRenderMeta) {
-    // Проверяем, что места действительно недостаточно
-    // Для охранных областей используем effectiveWidth и effectiveHeight
-    const availableWidth = Math.max(0, effectiveWidth - paddingPx * 2);
-    const availableHeight = Math.max(0, effectiveHeight - paddingPx * 2);
-    const criticalMinSize = LAYOUT_CONSTANTS.CRITICAL_MIN_KV_SIZE;
-    
-    // Вычисляем максимально возможный размер KV при текущих условиях
-    const kvWidth = state.kv.naturalWidth || state.kv.width;
-    const kvHeight = state.kv.naturalHeight || state.kv.height;
-    const scaleByWidth = availableWidth > 0 ? availableWidth / kvWidth : 0;
-    const scaleByHeight = availableHeight > 0 ? availableHeight / kvHeight : 0;
-    const maxScale = Math.min(scaleByWidth, scaleByHeight);
-    const maxKvW = kvWidth * maxScale;
-    const maxKvH = kvHeight * maxScale;
-    
-    // Выключаем KV только если максимально возможный размер стал почти 0
-    // Это происходит когда текст занимает почти все место из-за увеличения кегля
-    if (maxKvW < criticalMinSize || maxKvH < criticalMinSize) {
-      const renderWidth = width;
-      const renderHeight = height;
-      const renderPlatform = platform;
-      const renderPairIndex = getState().activePairIndex;
-      // Используем setTimeout, чтобы избежать изменения состояния во время рендеринга
-      setTimeout(() => {
-        const currentState = getState();
-        if (
-          !currentState.showKV ||
-          currentState.activePairIndex !== renderPairIndex
-        ) return;
-
-        const checkedSizes = getCheckedSizes();
-        const isStillActiveSize = checkedSizes.some(
-          s => s.width === renderWidth &&
-               s.height === renderHeight &&
-               (s.platform || 'unknown') === renderPlatform
-        );
-        if (!isStillActiveSize) return;
-
-        setState({ showKV: false });
-      }, 0);
-    }
-  }
+  // Важно: рендер не должен менять showKV в state.
+  // Авто-выключение KV из рендера приводило к "залипанию" отсутствия KV на других форматах.
 
   // Рисуем рамку для Хабра, если включена настройка и фон светлый
   if (state.habrBorderEnabled) {
@@ -1803,7 +2027,7 @@ const renderToCanvas = (canvas, width, height, state) => {
   // Визуализация охранных полей (рисуем в самом конце, поверх всего, только для превью)
   // Показываем охранные поля на превью (canvas с id), но не в экспорте (canvas без id или временный)
   const isPreview = canvas && canvas.id && canvas.id.length > 0;
-  if (useSafeArea && safeArea && isPreview) {
+  if (useSafeArea && safeArea && isPreview && !isRsyaMode) {
     ctx.save();
     // Рисуем охранную область пунктирной линией
     ctx.strokeStyle = 'rgba(76, 175, 80, 0.9)'; // Зеленый цвет для охранной области
@@ -1835,8 +2059,56 @@ const renderToCanvas = (canvas, width, height, state) => {
     ctx.restore();
   }
 
+  const toRect = (value, useTotalWidth = false) => {
+    if (!value || typeof value !== 'object') return null;
+    const x = Number(value.x);
+    const y = Number(value.y);
+    const w = Number(useTotalWidth ? (value.totalWidth || value.width) : value.width);
+    const h = Number(value.height);
+    if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return null;
+    return { x, y, width: w, height: h };
+  };
+
+  const mergeRects = (rects) => {
+    const filtered = rects.filter(Boolean);
+    if (!filtered.length) return null;
+    let left = Number.POSITIVE_INFINITY;
+    let top = Number.POSITIVE_INFINITY;
+    let right = Number.NEGATIVE_INFINITY;
+    let bottom = Number.NEGATIVE_INFINITY;
+    filtered.forEach((rect) => {
+      left = Math.min(left, rect.x);
+      top = Math.min(top, rect.y);
+      right = Math.max(right, rect.x + rect.width);
+      bottom = Math.max(bottom, rect.y + rect.height);
+    });
+    if (!Number.isFinite(left) || !Number.isFinite(top) || right <= left || bottom <= top) {
+      return null;
+    }
+    return { x: left, y: top, width: right - left, height: bottom - top };
+  };
+
+  const logoRect = state.showLogo ? toRect(logoBounds, true) : null;
+  const titleRect = toRect(titleBounds);
+  const subtitleRect = state.showSubtitle ? toRect(subtitleBounds) : null;
+  const kvRect = (state.showKV && kvRenderMeta)
+    ? toRect({ x: kvRenderMeta.kvX, y: kvRenderMeta.kvY, width: kvRenderMeta.kvW, height: kvRenderMeta.kvH })
+    : null;
+  const legalRect = state.showLegal ? toRect(legalTextBounds || legalContentBounds) : null;
+  const ageRect = state.showAge ? toRect(ageBoundsRect) : null;
+  const keyElementsBounds = mergeRects([logoRect, titleRect, subtitleRect, kvRect]);
+
   return {
     kvRenderMeta,
+    keyElementsBounds,
+    elementsBounds: {
+      logo: logoRect,
+      title: titleRect,
+      subtitle: subtitleRect,
+      kv: kvRect,
+      legal: legalRect,
+      age: ageRect
+    },
     canvasWidth: width,
     canvasHeight: height
   };

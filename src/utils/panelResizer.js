@@ -5,27 +5,26 @@
 // Минимальная и максимальная ширина панелей
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = 600;
+const FIXED_RIGHT_PANEL_WIDTH = 208;
 
 /**
  * Загружает сохраненные ширины панелей из localStorage
  */
 function loadPanelWidths() {
   const leftWidth = localStorage.getItem('panel-left-width');
-  const rightWidth = localStorage.getItem('panel-right-width');
   
   if (leftWidth) {
     document.documentElement.style.setProperty('--panel-left-width', leftWidth);
   }
-  
-  if (rightWidth) {
-    document.documentElement.style.setProperty('--panel-right-width', rightWidth);
-  }
+  // Правая панель экспорта фиксированная по UX.
+  document.documentElement.style.setProperty('--panel-right-width', `${FIXED_RIGHT_PANEL_WIDTH}px`);
 }
 
 /**
  * Сохраняет ширину панели в localStorage
  */
 function savePanelWidth(panel, width) {
+  if (panel === 'right') return;
   const key = panel === 'left' ? 'panel-left-width' : 'panel-right-width';
   localStorage.setItem(key, `${width}px`);
 }
@@ -111,6 +110,5 @@ function initializeResizers() {
   
   // Инициализируем resizers
   initPanelResizer('leftPanelResizer', 'left');
-  initPanelResizer('rightPanelResizer', 'right');
+  // Правая колонка фиксированная, без ресайза.
 }
-

@@ -8,6 +8,7 @@ import { getState, setKey, getDefaultValues } from '../../state/store.js';
 import { openLogoSelectModal, closeLogoSelectModal, selectPreloadedLogo } from './logoSelector.js';
 import { openKVSelectModal, closeKVSelectModal, selectPreloadedKV } from './kvSelector.js';
 import { getPassword, checkPassword, setPassword, hasPassword } from '../../utils/passwordManager.js';
+import { DEFAULT_KV_PATH } from '../../constants.js';
 import { t } from '../../utils/i18n.js';
 
 let adminModal = null;
@@ -219,7 +220,7 @@ const updateDefaultsPreview = () => {
         kvClearBtn.style.display = 'block';
       }
     } else {
-      kvPreviewImg.src = 'assets/3d/sign/01.webp';
+      kvPreviewImg.src = DEFAULT_KV_PATH;
       kvPreviewImg.style.display = 'block';
       kvPreviewPlaceholder.style.display = 'none';
       if (kvClearBtn) {
@@ -478,7 +479,7 @@ const openLogoAssetsAdmin = async () => {
                 ${t('admin.logoAssets.defaults.kv')}
               </label>
               <div id="logoAssetsDefaultKVPreview" class="preview-container">
-                <img id="logoAssetsDefaultKVPreviewImg" src="${(state.kvSelected && state.kvSelected !== '') ? state.kvSelected : 'assets/3d/sign/01.webp'}" class="preview-img" style="display: ${state.kvSelected ? 'block' : 'none'};">
+                <img id="logoAssetsDefaultKVPreviewImg" src="${(state.kvSelected && state.kvSelected !== '') ? state.kvSelected : DEFAULT_KV_PATH}" class="preview-img" style="display: ${state.kvSelected ? 'block' : 'none'};">
                 <span id="logoAssetsDefaultKVPreviewPlaceholder" class="preview-placeholder" style="display: ${state.kvSelected ? 'none' : 'block'};">${t('common.none')}</span>
               </div>
               <div class="input-group" style="display: flex; gap: 8px; margin-top: 8px;">
@@ -1257,4 +1258,3 @@ export const showLogoAssetsAdmin = async () => {
   console.log('Показываем окно ввода пароля');
   showPasswordPrompt();
 };
-

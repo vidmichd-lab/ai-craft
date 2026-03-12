@@ -19,7 +19,7 @@ import { openLogoSelectModal, closeLogoSelectModal, selectPreloadedLogo } from '
 import { openKVSelectModal, closeKVSelectModal, selectPreloadedKV } from './kvSelector.js';
 import { handleLogoUpload, handleKVUpload, handleBgUpload, handlePartnerLogoUpload } from '../ui.js';
 import { updateBgColor, applyPresetBgColor, openBGSelectModal } from './backgroundSelector.js';
-import { PRESET_BACKGROUND_COLORS, AVAILABLE_FONTS } from '../../constants.js';
+import { PRESET_BACKGROUND_COLORS, AVAILABLE_FONTS, DEFAULT_KV_PATH } from '../../constants.js';
 import { LAYOUT_CONSTANTS } from '../../renderer/constants.js';
 import { autoSelectLogoByTextColor } from '../ui.js';
 import { getDom } from '../domCache.js';
@@ -3742,7 +3742,7 @@ const setupAdminHandlers = (initialSizes) => {
       // Значения, которые не меняются в админке - берем из сохраненных значений по умолчанию
       // или используем дефолтные, но НЕ из текущего state
       logoSelected: '', // Не сохраняем текущий логотип
-      kvSelected: 'assets/3d/sign/01.webp', // Дефолтное значение
+      kvSelected: DEFAULT_KV_PATH, // Дефолтное значение
       logoSize: defaults.logoSize,
       logoPos: defaults.logoPos,
       logoLanguage: defaults.logoLanguage,
@@ -4595,6 +4595,25 @@ const setupDefaultsHandlers = () => {
  */
 const setupMultipliersHandlers = () => {
   const state = getState();
+  const sanitizeMultipliers = (source) => {
+    if (!source || typeof source !== 'object') return source;
+    const next = JSON.parse(JSON.stringify(source));
+    Object.keys(next).forEach((formatType) => {
+      const group = next[formatType];
+      if (!group || typeof group !== 'object') return;
+      Object.keys(group).forEach((key) => {
+        const value = group[key];
+        if (value === null || value === undefined) return;
+        const numeric = Number.parseFloat(value);
+        if (!Number.isFinite(numeric) || numeric <= 0) {
+          delete group[key];
+          return;
+        }
+        group[key] = Math.min(10, Math.max(0.1, numeric));
+      });
+    });
+    return next;
+  };
   
   // Загружаем множители из localStorage, если их нет в state
   let multipliers = state.formatMultipliers;
@@ -4602,7 +4621,7 @@ const setupMultipliersHandlers = () => {
     try {
       const saved = localStorage.getItem('format-multipliers');
       if (saved) {
-        multipliers = JSON.parse(saved);
+        multipliers = sanitizeMultipliers(JSON.parse(saved));
         // Инициализируем множители в state
         setKey('formatMultipliers', JSON.parse(JSON.stringify(multipliers)));
       }
@@ -4623,6 +4642,10 @@ const setupMultipliersHandlers = () => {
   };
     // Инициализируем дефолтные множители в state
     setKey('formatMultipliers', JSON.parse(JSON.stringify(multipliers)));
+  } else {
+    const sanitized = sanitizeMultipliers(multipliers);
+    multipliers = sanitized;
+    setKey('formatMultipliers', JSON.parse(JSON.stringify(sanitized)));
   }
   
   // Функция для обновления множителя
@@ -4639,8 +4662,11 @@ const setupMultipliersHandlers = () => {
       updatedMultipliers[formatType] = {};
     }
     
-    // Обновляем значение
-    updatedMultipliers[formatType][key] = parseFloat(value) || 0;
+    // Обновляем значение только валидным числом; не записываем 0 при пустом input.
+    const numeric = Number.parseFloat(value);
+    if (!Number.isFinite(numeric)) return;
+    const normalized = Math.min(10, Math.max(0.1, numeric));
+    updatedMultipliers[formatType][key] = normalized;
     
     // Обновляем множители в state (используем setState для принудительного обновления)
     setState({ formatMultipliers: updatedMultipliers });
@@ -5186,4 +5212,3 @@ const setupTabHandlers = () => {
     console.warn('Найдены старые элементы меню, но они больше не используются');
   }
 };
-

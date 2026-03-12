@@ -43,7 +43,7 @@ export const checkFileExists = async (url) => {
  * Умная проверка файлов с параллельной проверкой и ранней остановкой
  * По умолчанию проверяем только 01–35 (endNum=35), чтобы не слать десятки HEAD по несуществующим номерам.
  */
-export const checkFilesSmart = async (basePath, startNum = 1, endNum = 35, maxConsecutiveMisses = 3) => {
+export const checkFilesSmart = async (basePath, startNum = 1, endNum = 35, maxConsecutiveMisses = 2) => {
   const candidateUrls = [];
   for (let i = startNum; i <= endNum; i++) {
     const num = String(i).padStart(2, '0');
@@ -53,7 +53,8 @@ export const checkFilesSmart = async (basePath, startNum = 1, endNum = 35, maxCo
   // Проверяем батчами по 5, останавливаемся после 3 подряд 404 — меньше шума в консоли
   const foundUrls = [];
   let consecutiveMisses = 0;
-  const batchSize = 5;
+  // Проверяем по одному, чтобы не получать "пачку" лишних 404 на хвосте.
+  const batchSize = 1;
   for (let i = 0; i < candidateUrls.length; i += batchSize) {
     const batch = candidateUrls.slice(i, i + batchSize);
     const batchFound = await checkFilesParallel(batch, 5);
@@ -286,21 +287,106 @@ export const scanLogos = async () => {
   return logoStructure;
 };
 
+let assetManifestPromise = null;
+
+const loadAssetManifest = async () => {
+  if (assetManifestPromise) return assetManifestPromise;
+  assetManifestPromise = (async () => {
+    try {
+      const manifestUrl = new URL('assets/asset-manifest.json', window.location.href).href;
+      const response = await fetch(manifestUrl, { cache: 'no-store' });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data && typeof data === 'object' ? data : null;
+    } catch {
+      return null;
+    }
+  })();
+  return assetManifestPromise;
+};
+
+const normalizeManifestEntry = (entry) => {
+  if (typeof entry !== 'string') return null;
+  const trimmed = entry.trim();
+  if (!trimmed || trimmed.startsWith('.')) return null;
+  return trimmed;
+};
+
+const buildStructureFromManifest = (manifest, knownSecondLevelFolders3d, knownSecondLevelFoldersPro) => {
+  const kvStructure = {};
+  const fallbackFolderMap = {
+    '3d': knownSecondLevelFolders3d,
+    pro: knownSecondLevelFoldersPro
+  };
+
+  const toDisplayName = (fileName, folder2) => {
+    const base = fileName.replace(/\.(webp|png|jpg|jpeg)$/i, '');
+    if (folder2 === 'bg') {
+      const parts = base.split(', ');
+      const shape = parts[0] ? parts[0].split('=')[1] || '' : '';
+      const inside = parts[1] ? parts[1].split('=')[1] || '' : '';
+      const theme = parts[2] ? parts[2].split('=')[1] || '' : '';
+      return `${shape} ${inside} ${theme}`.trim();
+    }
+    return base;
+  };
+
+  for (const folder1 of Object.keys(fallbackFolderMap)) {
+    const level1 = manifest[folder1];
+    if (!level1 || typeof level1 !== 'object') continue;
+    const allowedFolder2 = Object.keys(level1).length > 0
+      ? Object.keys(level1)
+      : fallbackFolderMap[folder1];
+
+    for (const folder2 of allowedFolder2) {
+      const files = Array.isArray(level1[folder2]) ? level1[folder2] : [];
+      const normalizedFiles = files
+        .map(normalizeManifestEntry)
+        .filter(Boolean)
+        .filter(fileName => /\.(webp|png|jpg|jpeg)$/i.test(fileName))
+        .map(fileName => ({
+          name: toDisplayName(fileName, folder2),
+          file: `assets/${folder1}/${folder2}/${fileName}`
+        }));
+
+      if (!normalizedFiles.length) continue;
+
+      if (folder2 !== 'bg') {
+        normalizedFiles.sort((a, b) => parseInt(a.name, 10) - parseInt(b.name, 10));
+      }
+
+      if (!kvStructure[folder1]) {
+        kvStructure[folder1] = {};
+      }
+      kvStructure[folder1][folder2] = normalizedFiles;
+    }
+  }
+
+  return kvStructure;
+};
+
 // Сканирование KV из папки assets/ с динамическим обнаружением структуры
 export const scanKV = async () => {
   const kvStructure = {};
   
-  // Список реальных папок первого уровня (только те, что существуют в проекте)
-  // В проекте есть assets/3d/, assets/photo/ и assets/pro/
-  const firstLevelFolders = ['3d', 'photo', 'pro'];
+  // Список реальных папок первого уровня.
+  // assets/photo в проде может отсутствовать/быть пустым и давать много 404 при сканировании.
+  const firstLevelFolders = ['3d', 'pro'];
   
   // Список известных папок второго уровня для проверки
   // Для 3d: sign, icons, logos, numbers, other, shapes, tech, yandex
   // Для photo: pro, ai_reskill, old_reskill и другие
   // Для pro: assets, bg, photo_env, photo_faces
   const knownSecondLevelFolders3d = ['logos', 'numbers', 'other'];
-  const knownSecondLevelFoldersPhoto = ['pro', 'ai_reskill', 'old_reskill'];
   const knownSecondLevelFoldersPro = ['assets', 'bg', 'photo_env', 'photo_faces'];
+
+  const manifest = await loadAssetManifest();
+  if (manifest) {
+    const manifestStructure = buildStructureFromManifest(manifest, knownSecondLevelFolders3d, knownSecondLevelFoldersPro);
+    if (Object.keys(manifestStructure).length > 0) {
+      return manifestStructure;
+    }
+  }
   
   // Расширенный список возможных имен папок для автоматического обнаружения
   // Включает все возможные варианты имен, которые могут встречаться в проекте
@@ -435,9 +521,7 @@ export const scanKV = async () => {
     
     // Выбираем список известных папок в зависимости от папки первого уровня
     let knownSecondLevelFolders;
-    if (folder1 === 'photo') {
-      knownSecondLevelFolders = knownSecondLevelFoldersPhoto;
-    } else if (folder1 === 'pro') {
+    if (folder1 === 'pro') {
       knownSecondLevelFolders = knownSecondLevelFoldersPro;
     } else {
       knownSecondLevelFolders = knownSecondLevelFolders3d;
@@ -453,9 +537,9 @@ export const scanKV = async () => {
     
     await Promise.all(checkPromises);
     
-    // Для assets/3d/, assets/photo/ и assets/pro/ не проверяем расширенный список —
+    // Для assets/3d/ и assets/pro/ не проверяем расширенный список —
     // только известные папки, чтобы не слать сотни HEAD-запросов по несуществующим путям (404 в консоли)
-    if (folder1 !== '3d' && folder1 !== 'photo' && folder1 !== 'pro') {
+    if (folder1 !== '3d' && folder1 !== 'pro') {
     const additionalCheckPromises = extendedFolderNames.map(async (folder2) => {
       if (!discoveredFolders.has(folder2) && !knownSecondLevelFolders.includes(folder2)) {
         const exists = await checkFolderExists(folder1, folder2);
@@ -580,36 +664,29 @@ export const scanFonts = async () => {
     'Yandex Serif Display'
   ];
   
-  // Известные начертания для проверки
-  const knownWeights = ['Thin', 'Light', 'Regular', 'Medium', 'Bold', 'Heavy', 'Black'];
-  const knownItalicWeights = knownWeights.map(w => w + ' Italic');
+  const fontFolderVariants = {
+    'YS Text': { weights: ['Thin', 'Light', 'Regular', 'Medium', 'Bold', 'Heavy', 'Black'], italic: true },
+    'YS Text Cond': { weights: ['Thin', 'Light', 'Regular', 'Medium', 'Bold', 'Heavy', 'Black'], italic: true },
+    'YS Text Wide': { weights: ['Thin', 'Light', 'Regular', 'Medium', 'Bold', 'Heavy', 'Black'], italic: true },
+    'YS Display': { weights: ['Thin', 'Light', 'Regular', 'Medium', 'Bold', 'Heavy', 'Black'], italic: false },
+    'YS Display Cond': { weights: ['Thin', 'Light', 'Regular', 'Medium', 'Bold', 'Heavy', 'Black'], italic: false },
+    'YS Display Wide': { weights: ['Thin', 'Light', 'Regular', 'Medium', 'Bold', 'Heavy', 'Black'], italic: false },
+    'YS Logotype': { weights: ['Regular'], italic: false },
+    'Yandex Serif Display': { weights: ['Regular', 'Black'], italic: false }
+  };
   
   // Сканируем каждую папку
   for (const folder of fontFolders) {
     const fontFamily = folder;
-    // Один пробный запрос (только woff2): если 404 — сразу пропускаем папку (меньше 404 в консоли)
-    const probePath = `font/${folder}/${fontFamily}-Regular.woff2`;
-    if (!(await checkFileExists(probePath))) {
-      const fallbackPath = `font/${folder}/${fontFamily}-Regular.ttf`;
-      if (!(await checkFileExists(fallbackPath))) {
-        continue;
-      }
-    }
-
-    // Проверяем, есть ли курсивные начертания; если нет, не сканируем их
-    let hasItalicVariants = false;
-    const italicProbeWoff2 = `font/${folder}/${fontFamily}-Regular Italic.woff2`;
-    if (await checkFileExists(italicProbeWoff2)) {
-      hasItalicVariants = true;
-    } else {
-      const italicProbeTtf = `font/${folder}/${fontFamily}-Regular Italic.ttf`;
-      if (await checkFileExists(italicProbeTtf)) {
-        hasItalicVariants = true;
-      }
-    }
+    const variantConfig = fontFolderVariants[folder] || { weights: ['Regular'], italic: false };
+    const knownWeights = variantConfig.weights;
+    const knownItalicWeights = variantConfig.italic ? knownWeights.map(w => `${w} Italic`) : [];
+    // Один пробный запрос: если даже базового regular нет, пропускаем семейство.
+    const probePath = `font/${folder}/${fontFamily}-${knownWeights[0]}.woff2`;
+    if (!(await checkFileExists(probePath))) continue;
 
     // Сканируем файлы в папке батчами; при 3 подряд 404 прекращаем (меньше запросов и 404 в консоли)
-    const weightsToScan = hasItalicVariants ? [...knownWeights, ...knownItalicWeights] : knownWeights;
+    const weightsToScan = [...knownWeights, ...knownItalicWeights];
     const candidates = [];
     for (const weightName of weightsToScan) {
       candidates.push({
@@ -619,12 +696,6 @@ export const scanFonts = async () => {
         format: 'hyphen'
       });
     }
-    candidates.push({
-      fileNameBase: `${fontFamily}`,
-      filePathBase: `font/${folder}/${fontFamily}`,
-      weightName: 'Regular',
-      format: 'name-only'
-    });
 
     const fontResults = [];
     const batchSize = 5;
@@ -640,17 +711,6 @@ export const scanFonts = async () => {
               fileName: `${c.fileNameBase}.woff2`,
               filePath: woff2Path,
               ext: 'woff2',
-              exists: true
-            };
-          }
-
-          const ttfPath = `${c.filePathBase}.ttf`;
-          if (await checkFileExists(ttfPath)) {
-            return {
-              ...c,
-              fileName: `${c.fileNameBase}.ttf`,
-              filePath: ttfPath,
-              ext: 'ttf',
               exists: true
             };
           }

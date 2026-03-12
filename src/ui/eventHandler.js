@@ -296,10 +296,11 @@ export const initEventDelegation = () => {
 
       // Стандартная обработка
       let value;
-      if (target.type === 'range') {
-        value = parseFloat(target.value) || 0;
-      } else if (target.type === 'number') {
-        value = parseFloat(target.value) || 0;
+      if (target.type === 'range' || target.type === 'number') {
+        value = parseFloat(target.value);
+        if (!Number.isFinite(value)) {
+          return;
+        }
       } else {
         value = target.value;
       }
@@ -372,6 +373,16 @@ export const initEventDelegation = () => {
         'logoLangToggle': () => {
           if (typeof window.selectLogoLanguage === 'function') {
             window.selectLogoLanguage(value);
+          }
+        },
+        'projectModeToggle': () => {
+          if (typeof window.selectProjectMode === 'function') {
+            window.selectProjectMode(value);
+          }
+        },
+        'variantModeToggle': () => {
+          if (typeof window.selectVariantMode === 'function') {
+            window.selectVariantMode(value);
           }
         },
         'logoPosToggle': () => {
@@ -701,4 +712,3 @@ export default {
   initEventDelegation,
   initCheckboxHandlers
 };
-

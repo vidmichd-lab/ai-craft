@@ -3,7 +3,7 @@
  * Содержит функции выбора цвета, загрузки изображения и управления фоном
  */
 
-import { getState, setKey, setState, updatePairBgImage, updatePairBgColor } from '../../state/store.js';
+import { getState, setKey, setState, updatePairBgImage, updatePairBgColor, updatePairKV } from '../../state/store.js';
 import { PRESET_BACKGROUND_COLORS, AVAILABLE_BG } from '../../constants.js';
 import { scanBG } from '../../utils/assetScanner.js';
 import { renderer } from '../../renderer.js';
@@ -43,6 +43,35 @@ const readFileAsDataURL = (file) =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+
+const preserveVisibilityFlags = () => {
+  const state = getState();
+  setState({
+    showLogo: state.showLogo,
+    showLegal: state.showLegal,
+    showAge: state.showAge
+  });
+};
+
+const clearKVOnBgUploadIfNeeded = () => {
+  const state = getState();
+  if (state.proMode) return;
+
+  const activePairIndex = 0;
+  updatePairKV(activePairIndex, '');
+  setState({
+    kv: null,
+    kvSelected: '',
+    showKV: false,
+    logo: state.logo,
+    logoSelected: state.logoSelected,
+    legal: state.legal,
+    age: state.age,
+    showLogo: state.showLogo,
+    showLegal: state.showLegal,
+    showAge: state.showAge
+  });
+};
 
 /**
  * Нормализует цвет в формат #RRGGBB
@@ -145,13 +174,15 @@ export const handleBgImageUpload = (event) => {
   (async () => {
     try {
       const state = getState();
-      const activePairIndex = state.activePairIndex || 0;
+      const activePairIndex = 0;
       
       const dataURL = await readFileAsDataURL(file);
       const img = await loadImage(dataURL);
       
       // Обновляем фоновое изображение для активной пары
       updatePairBgImage(activePairIndex, img);
+      clearKVOnBgUploadIfNeeded();
+      preserveVisibilityFlags();
       
       updateBgUI();
       // Синхронизируем остальные поля UI (после обновления чекбокса)
@@ -169,7 +200,7 @@ export const handleBgImageUpload = (event) => {
  */
 export const clearBgImage = () => {
   const state = getState();
-  const activePairIndex = state.activePairIndex || 0;
+  const activePairIndex = 0;
   
   // Очищаем фоновое изображение для активной пары
   updatePairBgImage(activePairIndex, null);
@@ -196,8 +227,7 @@ export const clearBgImage = () => {
 export const updateBgColor = async (color) => {
   const normalizedColor = normalizeColor(color);
   setKey('bgColor', normalizedColor);
-  const state = getState();
-  const activePairIndex = state.activePairIndex || 0;
+  const activePairIndex = 0;
   updatePairBgColor(activePairIndex, normalizedColor);
   const dom = getDom();
   if (dom.bgColor) dom.bgColor.value = normalizedColor;
@@ -809,6 +839,8 @@ export const selectPreloadedBG = async (bgFile) => {
   
   // Обновляем фоновое изображение для активной пары (сохраняем путь как строку)
   updatePairBgImage(activePairIndex, bgFile);
+  clearKVOnBgUploadIfNeeded();
+  preserveVisibilityFlags();
   
   // Если фон из папки pro/bg, убираем затемнение градиентом и устанавливаем размер 110%
   const isProBg = bgFile && (bgFile.includes('pro/bg') || bgFile.includes('assets/pro/bg'));
@@ -849,6 +881,7 @@ export const selectPreloadedBG = async (bgFile) => {
   try {
     const img = await loadImage(bgFile);
     setState({ bgImage: img });
+    preserveVisibilityFlags();
     updateBgUI();
     renderer.render();
   } catch (error) {
@@ -868,6 +901,10 @@ export const selectPairBG = async (pairIndex, bgFile) => {
   
   // Если это активная пара, обновляем глобальное фоновое изображение
   if (pairIndex === (state.activePairIndex || 0)) {
+    if (bgFile) {
+      clearKVOnBgUploadIfNeeded();
+      preserveVisibilityFlags();
+    }
     if (!bgFile) {
       setState({ bgImage: null });
       updateBgUI();
@@ -911,6 +948,7 @@ export const selectPairBG = async (pairIndex, bgFile) => {
       try {
         const img = await loadImage(bgFile);
         setState({ bgImage: img });
+        preserveVisibilityFlags();
         updateBgUI();
       } catch (error) {
         console.error(error);
@@ -1386,4 +1424,3 @@ export {
 
 // Экспортируем константы для использования в других модулях
 export { PRESET_BACKGROUND_COLORS };
-

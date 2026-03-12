@@ -70,13 +70,24 @@
     <div class="header">
       <div class="header-title-container">
         <h1 data-i18n="app.title">Practicum AI-Craft <span class="app-version">V1.0</span></h1>
-        <!-- Теги режимов - можно легко добавлять новые режимы, просто добавив новую кнопку с классом mode-tag и data-mode -->
-        <div class="mode-tags">
-          <button class="mode-tag" data-mode="off" data-i18n="logo.pro.off">Reskill</button>
-          <button class="mode-tag" data-mode="on" data-i18n="logo.pro.on">PRO</button>
-          <!-- Пример добавления нового режима:
-          <button class="mode-tag" data-mode="custom" data-i18n="logo.pro.custom">Custom</button>
-          -->
+        <div class="mode-control-surface">
+          <div class="mode-groups">
+            <div class="toggle-switch mode-toggle mode-toggle-primary" id="projectModeToggle" data-value="rsya" data-options="2">
+              <div class="toggle-switch-slider"></div>
+              <div class="toggle-switch-track">
+                <div class="toggle-switch-option" data-value="layouts">Макеты</div>
+                <div class="toggle-switch-option active" data-value="rsya">РСЯ</div>
+              </div>
+            </div>
+            <div class="toggle-switch mode-toggle mode-toggle-3 mode-toggle-secondary" id="variantModeToggle" data-value="reskill" data-options="3">
+              <div class="toggle-switch-slider"></div>
+              <div class="toggle-switch-track">
+                <div class="toggle-switch-option active" data-value="reskill">Reskill</div>
+                <div class="toggle-switch-option" data-value="pro">PRO</div>
+                <div class="toggle-switch-option" data-value="kz">KZ</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="header-actions">
@@ -146,6 +157,26 @@
                 <span>2%</span>
                 <span id="paddingValue">5%</span>
                 <span>8%</span>
+              </div>
+            </div>
+            <div class="form-group" id="rsyaLayoutTypeGroup">
+              <label>Тип верстки</label>
+              <div class="toggle-switch" id="rsyaLayoutToggle" data-value="center" data-options="2">
+                <div class="toggle-switch-slider"></div>
+                <div class="toggle-switch-track">
+                  <div class="toggle-switch-option active" data-value="center" title="По центру">
+                    <span class="material-icons" style="font-size: 18px;">view_agenda</span>
+                  </div>
+                  <div class="toggle-switch-option" data-value="left" title="Слева + KV справа">
+                    <span class="material-icons" style="font-size: 18px;">view_week</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group" id="rsyaCropGridControl">
+              <div class="checkbox-group">
+                <input type="checkbox" id="rsyaCropGridVisibleToggle" data-state-key="rsyaCropGridVisible">
+                <label for="rsyaCropGridVisibleToggle">Сетка кадрирования</label>
               </div>
             </div>
             <div class="form-group form-group-section">
@@ -270,6 +301,24 @@
               </div>
               <div class="hint" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;" data-i18n="layout.bgImage.imageSize.hint">Размер изображения в процентах от исходного размера. 100% = исходный размер</div>
             </div>
+            <div style="margin-top: 16px;">
+              <label for="bgOffsetX">Смещение фона X</label>
+              <input type="range" id="bgOffsetX" data-state-key="bgOffsetX" data-update-handler="updateBgOffsetX" value="0" min="-1000" max="1000" step="1" style="width: 100%;">
+              <div class="slider-value">
+                <span>-1000</span>
+                <span id="bgOffsetXValue">0px</span>
+                <span>1000</span>
+              </div>
+            </div>
+            <div style="margin-top: 12px;">
+              <label for="bgOffsetY">Смещение фона Y</label>
+              <input type="range" id="bgOffsetY" data-state-key="bgOffsetY" data-update-handler="updateBgOffsetY" value="0" min="-1000" max="1000" step="1" style="width: 100%;">
+              <div class="slider-value">
+                <span>-1000</span>
+                <span id="bgOffsetYValue">0px</span>
+                <span>1000</span>
+              </div>
+            </div>
             <label for="textGradientOpacity" style="margin-top: 16px;" data-i18n="layout.bgImage.textGradient">Прозрачность подложки под текстом</label>
             <input type="range" id="textGradientOpacity" value="100" min="0" max="100" step="1" data-state-key="textGradientOpacity" data-update-handler="updateTextGradientOpacity">
             <div class="slider-value">
@@ -285,15 +334,6 @@
             <div class="checkbox-group">
               <input type="checkbox" id="showLogo" checked data-state-key="showLogo">
               <label for="showLogo" data-i18n="logo.show">Показывать логотип</label>
-            </div>
-          </div>
-          <div class="form-group">
-            <div class="toggle-switch" id="logoLangToggle" data-value="ru" data-options="2">
-              <div class="toggle-switch-slider"></div>
-              <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="ru" data-i18n="logo.language.ru">RU</div>
-                <div class="toggle-switch-option" data-value="kz" data-i18n="logo.language.kz">KZ</div>
-              </div>
             </div>
           </div>
           <div class="form-group">
@@ -396,7 +436,6 @@
               </div>
             </div>
           <div class="form-group">
-            <label data-i18n="title.transform">Трансформация</label>
             <div class="toggle-switch" id="titleTransformToggleMain" data-value="none" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
@@ -407,7 +446,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label data-i18n="title.color">Цвет</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
               <label for="titleColor" class="sr-only" data-i18n="title.color">Цвет заголовка</label>
               <input type="color" id="titleColor" value="#ffffff" data-state-key="titleColor" data-update-handler="updateColorFromPicker" data-handler-param="titleColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.titleColor" title="Выберите цвет заголовка">
@@ -420,7 +458,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label data-i18n="title.align">Направление текста</label>
             <div class="toggle-switch" id="titleAlignToggle" data-value="left" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
@@ -431,7 +468,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label data-i18n="title.vPos">Вертикальное выравнивание</label>
             <div class="toggle-switch" id="titleVPosToggle" data-value="top" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
@@ -442,7 +478,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label for="titleSize" data-i18n="title.size">Размер шрифта</label>
             <input type="range" id="titleSize" value="8" min="6" max="10" step="0.1" data-state-key="titleSize" data-update-handler="updateTitleSize">
             <div class="slider-value">
               <span>6%</span>
@@ -452,7 +487,6 @@
             <div class="hint" data-i18n="title.size.hint">Подзаголовок автоматически масштабируется</div>
           </div>
           <div class="form-group">
-            <label data-i18n="title.font">Шрифт</label>
             <div style="display: flex; gap: 8px;">
               <div class="custom-select-wrapper" style="flex: 1;">
                 <div class="custom-select-button" id="titleFontFamilyBtn">
@@ -470,7 +504,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label data-i18n="title.weight">Начертание</label>
             <div class="custom-select-wrapper">
               <div class="custom-select-button" id="titleWeightBtn">
                 <span id="titleWeightText">Regular</span>
@@ -534,7 +567,6 @@
               </div>
             </div>
           <div class="form-group">
-            <label data-i18n="subtitle.transform">Трансформация</label>
             <div class="toggle-switch" id="subtitleTransformToggleMain" data-value="none" data-options="3">
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
@@ -545,7 +577,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label data-i18n="subtitle.color">Цвет</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
               <label for="subtitleColor" class="sr-only" data-i18n="subtitle.color">Цвет подзаголовка</label>
               <input type="color" id="subtitleColor" value="#e0e0e0" data-state-key="subtitleColor" data-update-handler="updateColorFromPicker" data-handler-param="subtitleColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.subtitleColor" title="Выберите цвет подзаголовка">
@@ -558,7 +589,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label for="subtitleOpacity" data-i18n="subtitle.opacity">Непрозрачность</label>
             <input type="range" id="subtitleOpacity" value="90" min="0" max="100" data-state-key="subtitleOpacity" data-update-handler="updateSubtitleOpacity">
             <div class="slider-value">
               <span>0%</span>
@@ -567,7 +597,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label for="subtitleSize" data-i18n="subtitle.size">Размер шрифта</label>
             <input type="range" id="subtitleSize" value="4" min="1" max="12" step="0.1" data-state-key="subtitleSize" data-update-handler="updateSubtitleSize">
             <div class="slider-value">
               <span>1%</span>
@@ -577,7 +606,6 @@
             
           </div>
           <div class="form-group">
-            <label data-i18n="subtitle.font">Шрифт</label>
             <div style="display: flex; gap: 8px;">
               <div class="custom-select-wrapper" style="flex: 1;">
                 <div class="custom-select-button" id="subtitleFontFamilyBtn">
@@ -595,7 +623,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label data-i18n="subtitle.weight">Начертание</label>
             <div class="custom-select-wrapper">
               <div class="custom-select-button" id="subtitleWeightBtn">
                 <span id="subtitleWeightText">Regular</span>
@@ -625,13 +652,6 @@
           <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
             <label for="subtitleGap" style="margin: 0; flex: 1;" data-i18n="subtitle.gap">Отступ от заголовка</label>
             <input type="number" id="subtitleGap" value="-1" min="-20" max="20" step="0.5" data-state-key="subtitleGap" style="width: 80px;">
-          </div>
-          <div class="form-group">
-            <label data-i18n="layout.spacing.title">Отступы заголовка по вертикали</label>
-            <div class="gap-sm mb-sm" style="display: flex; gap: 8px;">
-              <input type="number" id="titleOffsetTopPx" class="theme-input" placeholder="Сверху, px" min="0" data-state-key="titleOffsetTopPx">
-              <input type="number" id="titleOffsetBottomPx" class="theme-input" placeholder="Снизу, px" min="0" data-state-key="titleOffsetBottomPx">
-            </div>
           </div>
         </div>
         <!-- End Subtitle Section -->
@@ -691,7 +711,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label data-i18n="legal.font">Шрифт</label>
             <div style="display: flex; gap: 8px;">
               <div class="custom-select-wrapper" style="flex: 1;">
                 <div class="custom-select-button" id="legalFontFamilyBtn">
@@ -709,7 +728,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label data-i18n="legal.weight">Начертание</label>
             <div class="custom-select-wrapper">
               <div class="custom-select-button" id="legalWeightBtn">
                 <span id="legalWeightText">Regular</span>
@@ -790,12 +808,6 @@
         
         <!-- KV Section -->
         <div class="panel-section" id="panel-section-kv">
-            <div class="form-group">
-            <div class="checkbox-group">
-              <input type="checkbox" id="showKV" checked data-state-key="showKV">
-              <label for="showKV" style="margin: 0" data-i18n="kv.show">Показывать</label>
-            </div>
-          </div>
           <div class="form-group">
             <label for="kvBorderRadius" data-i18n="kv.borderRadius">Скругление углов</label>
             <input type="range" id="kvBorderRadius" value="0" min="0" max="12" step="1" data-state-key="kvBorderRadius" data-update-handler="updateKVBorderRadius">
@@ -805,25 +817,7 @@
               <span>12%</span>
             </div>
           </div>
-          <div class="form-group">
-            <label data-i18n="kv.position">Расположение</label>
-            <div class="toggle-switch" id="kvPositionToggle" data-value="center" data-options="3">
-              <div class="toggle-switch-slider"></div>
-              <div class="toggle-switch-track">
-                <div class="toggle-switch-option" data-value="left" data-i18n-title="kv.position.left"><span class="material-icons" style="font-size: 18px;">align_horizontal_left</span></div>
-                <div class="toggle-switch-option active" data-value="center" data-i18n-title="kv.position.center"><span class="material-icons" style="font-size: 18px;">align_horizontal_center</span></div>
-                <div class="toggle-switch-option" data-value="right" data-i18n-title="kv.position.right"><span class="material-icons" style="font-size: 18px;">align_horizontal_right</span></div>
-              </div>
-            </div>
-           
-          </div>
-          <div class="form-group-section">
-            <div class="form-group form-item">
-              <label id="kvActivePairLabel" class="form-label mb-sm" style="display: block;">KV 01</label>
-              <div id="kvPreviewContainer" class="preview-container">
-                <img id="kvPreviewImg" src="" class="preview-img" style="display: none;">
-                <span id="kvPreviewPlaceholder" class="preview-placeholder" data-i18n="kv.none">— Нет —</span>
-              </div>
+          <div>
               <div id="kvSelectModalOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); z-index: 10000; backdrop-filter: blur(2px);" data-action="close-modal" data-modal="kvSelectModal">
                 <div id="kvSelectPanel" class="theme-bg-secondary" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; max-width: 900px; max-height: 80vh; border: none; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); z-index: 10001;" data-action="stop-propagation">
                   <div class="modal-header">
@@ -846,17 +840,96 @@
                   </div>
                 </div>
               </div>
-              <button class="btn btn-full mb-sm" id="kvSelectTrigger"><span id="kvSelectText" data-i18n="kv.select">Выбрать</span></button>
-              <select id="kvSelect" style="display: none;" data-state-key="kvSelected" data-update-handler="selectPreloadedKV">
-                <option value="" selected data-i18n="kv.none">— Нет —</option>
-              </select>
-              <div style="display: flex; gap: 8px; width: 100%;">
-                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" style="flex: 1; min-width: 0;" id="kvUploadBtn" title="Загрузить файл" aria-label="Загрузить файл" data-i18n-title="kv.upload"><span class="material-icons">upload</span></button>
-                <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" id="kvReplaceBtn" style="display: none; flex: 1; min-width: 0;" data-i18n-title="kv.replace" data-i18n="kv.replace">Заменить</button>
-                <button class="btn btn-danger" id="kvRemoveBtn" data-function="clearKV" style="flex: 1; min-width: 0;" disabled data-i18n-title="kv.delete" data-i18n="kv.delete">Удалить</button>
-                <input type="file" id="kvUpload" accept="image/*" style="display: none;" data-handler="handleKVUpload">
+              <div id="kvPrimaryControls">
+                <label id="kvActivePairLabel" class="form-label mb-sm" style="display: block;">KV 01</label>
+                <div id="kvPreviewContainer" class="preview-container">
+                  <img id="kvPreviewImg" src="" class="preview-img" style="display: none;">
+                  <span id="kvPreviewPlaceholder" class="preview-placeholder" data-i18n="kv.none">— Нет —</span>
+                </div>
+                <button class="btn btn-full mb-sm" id="kvSelectTrigger"><span id="kvSelectText" data-i18n="kv.select">Выбрать</span></button>
+                <select id="kvSelect" style="display: none;" data-state-key="kvSelected" data-update-handler="selectPreloadedKV">
+                  <option value="" selected data-i18n="kv.none">— Нет —</option>
+                </select>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                  <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" style="flex: 1; min-width: 0;" id="kvUploadBtn" title="Загрузить файл" aria-label="Загрузить файл" data-i18n-title="kv.upload"><span class="material-icons">upload</span></button>
+                  <button class="btn" data-action="trigger-file-input" data-input-id="kvUpload" id="kvReplaceBtn" style="display: none; flex: 1; min-width: 0;" data-i18n-title="kv.replace" data-i18n="kv.replace">Заменить</button>
+                  <button class="btn btn-danger" id="kvRemoveBtn" data-function="clearKV" style="flex: 1; min-width: 0;" disabled data-i18n-title="kv.delete" data-i18n="kv.delete">Удалить</button>
+                  <input type="file" id="kvUpload" accept="image/*" style="display: none;" data-handler="handleKVUpload">
+                </div>
               </div>
-            </div>
+              <div id="rsyaKVControls" style="display: none; margin-top: 12px;">
+                <div id="rsyaVisualReorder" class="rsya-visual-reorder" style="margin-bottom: 12px;">
+                  <div class="rsya-visual-slot" data-rsya-slot-wrap="0">
+                    <button type="button" class="rsya-visual-item active" data-rsya-visual-slot="0" draggable="true" aria-label="Визуал 1">
+                      <span class="rsya-visual-item-plus" aria-hidden="true">+</span>
+                    </button>
+                    <div class="rsya-visual-actions">
+                      <button type="button" class="rsya-visual-action-btn" data-rsya-action="library" data-rsya-visual-slot="0" aria-label="Выбрать из библиотеки">
+                        <span class="material-icons">photo_library</span>
+                      </button>
+                      <button type="button" class="rsya-visual-action-btn" data-rsya-action="clear" data-rsya-visual-slot="0" aria-label="Удалить визуал">
+                        <span class="material-icons">close</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="rsya-visual-slot" data-rsya-slot-wrap="1">
+                    <button type="button" class="rsya-visual-item" data-rsya-visual-slot="1" draggable="true" aria-label="Визуал 2">
+                      <span class="rsya-visual-item-plus" aria-hidden="true">+</span>
+                    </button>
+                    <div class="rsya-visual-actions">
+                      <button type="button" class="rsya-visual-action-btn" data-rsya-action="library" data-rsya-visual-slot="1" aria-label="Выбрать из библиотеки">
+                        <span class="material-icons">photo_library</span>
+                      </button>
+                      <button type="button" class="rsya-visual-action-btn" data-rsya-action="clear" data-rsya-visual-slot="1" aria-label="Удалить визуал">
+                        <span class="material-icons">close</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="rsya-visual-slot" data-rsya-slot-wrap="2">
+                    <button type="button" class="rsya-visual-item" data-rsya-visual-slot="2" draggable="true" aria-label="Визуал 3">
+                      <span class="rsya-visual-item-plus" aria-hidden="true">+</span>
+                    </button>
+                    <div class="rsya-visual-actions">
+                      <button type="button" class="rsya-visual-action-btn" data-rsya-action="library" data-rsya-visual-slot="2" aria-label="Выбрать из библиотеки">
+                        <span class="material-icons">photo_library</span>
+                      </button>
+                      <button type="button" class="rsya-visual-action-btn" data-rsya-action="clear" data-rsya-visual-slot="2" aria-label="Удалить визуал">
+                        <span class="material-icons">close</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <input type="file" id="rsyaKV2Upload" accept="image/*" style="display:none;" data-handler="handleRsyaKV2Upload">
+                <input type="file" id="rsyaKV3Upload" accept="image/*" style="display:none;" data-handler="handleRsyaKV3Upload">
+                <label style="margin-top: 12px;">Масштаб</label>
+                <input type="range" id="rsyaKVScale" min="40" max="300" step="1" value="150" data-state-key="rsyaKVScale">
+                <div class="slider-value">
+                  <span>40%</span>
+                  <span id="rsyaKVScaleValue">150%</span>
+                  <span>300%</span>
+                </div>
+                <label style="margin-top: 12px;">Расстояние между</label>
+                <input type="range" id="rsyaKVGap" min="-200" max="300" step="1" value="8" data-state-key="rsyaKVGap">
+                <div class="slider-value">
+                  <span>-200</span>
+                  <span id="rsyaKVGapValue">8</span>
+                  <span>300</span>
+                </div>
+                <label style="margin-top: 12px;">X</label>
+                <input type="range" id="rsyaKVOffsetX" min="-500" max="500" step="1" value="0" data-state-key="rsyaKVOffsetX">
+                <div class="slider-value">
+                  <span>-500</span>
+                  <span id="rsyaKVOffsetXValue">0</span>
+                  <span>500</span>
+                </div>
+                <label style="margin-top: 12px;">Y</label>
+                <input type="range" id="rsyaKVOffsetY" min="-500" max="500" step="1" value="0" data-state-key="rsyaKVOffsetY">
+                <div class="slider-value">
+                  <span>-500</span>
+                  <span id="rsyaKVOffsetYValue">0</span>
+                  <span>500</span>
+                </div>
+              </div>
           </div>
           <div id="kvPairsContainer" class="gap-lg mt-lg" style="display: flex; flex-direction: column;">
             <!-- KV для каждой пары заголовок/подзаголовок будут добавлены динамически -->
@@ -869,7 +942,7 @@
       <!-- Center Canvas Preview -->
       <div class="canvas-area" id="canvasArea">
         <div style="max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px;">
-          <div class="theme-bg-secondary" style="padding: 8px; border-radius: 12px;">
+          <div class="theme-bg-secondary" id="previewSelectorsWrap" style="padding: 8px; border-radius: 12px;">
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
               <div>
                 <div class="custom-select-wrapper">
@@ -900,32 +973,62 @@
               </div>
             </div>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; position: relative;">
-            <!-- Индикатор загрузки - показывается поверх всех canvas -->
-            <div id="loadingIndicator" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 100; pointer-events: none; min-width: 300px;">
-              <!-- Прогрессбар -->
-              <div style="width: 100%; max-width: 400px;">
-                <div style="width: 100%; height: 8px; background: var(--bg-secondary, #2a2a2a); border-radius: 4px; overflow: hidden; position: relative;">
-                  <div id="progressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-color, #027EF2), #00a8ff); border-radius: 4px; transition: width 0.3s ease; box-shadow: 0 0 10px rgba(2, 126, 242, 0.5);"></div>
+          <div id="rsyaPreviewStage">
+            <div id="rsyaCropPreviewSection" class="theme-bg-secondary" style="display:none; padding: 12px; border-radius: 12px;">
+              <div class="rsya-crop-thumbs">
+                <button type="button" class="rsya-crop-thumb active" data-rsya-crop-key="1600" aria-label="1600x1200">
+                  <span class="rsya-crop-thumb-label">1600×1200</span>
+                  <canvas id="rsyaCrop1600" style="width:100%; border-radius:6px;"></canvas>
+                </button>
+                <button type="button" class="rsya-crop-thumb" data-rsya-crop-key="16:9" aria-label="16:9">
+                  <span class="rsya-crop-thumb-label">16:9</span>
+                  <canvas id="rsyaCrop169" style="width:100%; border-radius:6px;"></canvas>
+                </button>
+                <button type="button" class="rsya-crop-thumb" data-rsya-crop-key="4:3" aria-label="4:3">
+                  <span class="rsya-crop-thumb-label">4:3</span>
+                  <canvas id="rsyaCrop43" style="width:100%; border-radius:6px;"></canvas>
+                </button>
+                <button type="button" class="rsya-crop-thumb" data-rsya-crop-key="1:1" aria-label="1:1">
+                  <span class="rsya-crop-thumb-label">1:1</span>
+                  <canvas id="rsyaCrop11" style="width:100%; border-radius:6px;"></canvas>
+                </button>
+                <button type="button" class="rsya-crop-thumb" data-rsya-crop-key="3:4" aria-label="3:4">
+                  <span class="rsya-crop-thumb-label">3:4</span>
+                  <canvas id="rsyaCrop34" style="width:100%; border-radius:6px;"></canvas>
+                </button>
+              </div>
+            </div>
+            <div id="previewCanvasesWrap" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; position: relative;">
+              <!-- Индикатор загрузки - показывается поверх всех canvas -->
+              <div id="loadingIndicator" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 100; pointer-events: none; min-width: 300px;">
+                <!-- Прогрессбар -->
+                <div style="width: 100%; max-width: 400px;">
+                  <div style="width: 100%; height: 8px; background: var(--bg-secondary, #2a2a2a); border-radius: 4px; overflow: hidden; position: relative;">
+                    <div id="progressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-color, #027EF2), #00a8ff); border-radius: 4px; transition: width 0.3s ease; box-shadow: 0 0 10px rgba(2, 126, 242, 0.5);"></div>
+                  </div>
+                </div>
+                
+                <!-- Сменяющийся текст -->
+                <div id="loadingMessage" style="display: none;"></div>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
+                <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
+                  <canvas id="previewCanvasNarrow" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
                 </div>
               </div>
-              
-              <!-- Сменяющийся текст -->
-              <div id="loadingMessage" style="display: none;"></div>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
-              <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
-                <canvas id="previewCanvasNarrow" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
+                <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
+                  <canvas id="previewCanvasSquare" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
+                </div>
               </div>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
-              <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
-                <canvas id="previewCanvasSquare" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
-              </div>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
-              <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
-                <canvas id="previewCanvasWide" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
+                <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
+                  <canvas id="previewCanvasWide" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
+                  <canvas id="rsyaActivePreviewCanvas" style="width: 100%; height: auto; display: none; opacity: 1;"></canvas>
+                  <div id="rsyaKVOverlay" class="rsya-kv-overlay" style="display: none;">
+                    <div class="rsya-kv-overlay-handle"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -949,12 +1052,16 @@
               <div class="toggle-switch-option" data-value="2" data-i18n="export.scale.2x">×2</div>
             </div>
           </div>
-          <div style="display: flex; gap: 8px; margin-top: 12px;">
-            <button class="btn primary" data-function="exportAllPNG" style="flex: 1;" data-i18n="export.png">Экспорт PNG</button>
-            <button class="btn" data-function="exportAllJPG" style="flex: 1;" data-i18n="export.jpg">Экспорт JPG</button>
+          <div class="export-max-size-row" style="margin-top: 12px;">
+            <label for="maxFileSizeValue" style="margin: 0; font-size: 13px;">Макс. размер, кб</label>
+            <input type="number" id="maxFileSizeValue" min="1" value="200" data-state-key="maxFileSizeValue" placeholder="200">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+            <button class="btn primary" data-function="exportAllPNG" style="width: 100%;" data-i18n="export.png">Экспорт PNG</button>
+            <button class="btn" data-function="exportAllJPG" style="width: 100%;" data-i18n="export.jpg">Экспорт JPG</button>
           </div>
         </div>
-        <div class="form-group-section">
+        <div class="form-group-section" id="exportSizesControls">
           
           <div class="form-group">
             <div class="gap-sm mb-sm" style="display: flex; align-items: center;">

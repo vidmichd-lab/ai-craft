@@ -4,7 +4,7 @@
  */
 
 import { getState, setKey, setState } from '../../state/store.js';
-import { AVAILABLE_KV } from '../../constants.js';
+import { AVAILABLE_KV, DEFAULT_KV_PATH } from '../../constants.js';
 import { scanKV } from '../../utils/assetScanner.js';
 import { renderer } from '../../renderer.js';
 import { getDom } from '../domCache.js';
@@ -37,24 +37,42 @@ let selectedFolder2 = null;
 
 // Глобальная переменная для хранения индекса пары, для которой открывается модальное окно
 let currentKVModalPairIndex = null;
+let currentKVModalSlotIndex = 0;
+
+export const setKVModalTargetSlot = (slotIndex = 0) => {
+  const normalized = Number.isFinite(Number(slotIndex)) ? Number(slotIndex) : 0;
+  currentKVModalSlotIndex = Math.max(0, Math.min(2, normalized));
+};
+
+export const getKVModalTargetSlot = () => currentKVModalSlotIndex;
+
+/**
+ * Нормализует устаревшие пути ассетов к каноническому виду.
+ */
+const normalizeKVAssetPath = (src) => {
+  if (!src || typeof src !== 'string') return src;
+  // Пример миграции: assets/pro/assets/01.webp -> assets/pro/assets/1.webp
+  return src.replace(/(^|\/)assets\/pro\/assets\/0+(\d+)\.(webp|png|jpg|jpeg)$/i, '$1assets/pro/assets/$2.$3');
+};
 
 /**
  * Загружает изображение из файла или URL (без кеширования для модальных окон)
  */
 const loadImage = async (src) => {
+  const normalizedSrc = normalizeKVAssetPath(src);
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = (error) => {
-      console.error(`Failed to load image: ${src}`, error);
-      reject(new Error(`Failed to load image: ${src}`));
+      console.error(`Failed to load image: ${normalizedSrc}`, error);
+      reject(new Error(`Failed to load image: ${normalizedSrc}`));
     };
     // Используем абсолютный URL для относительных путей
-    if (src && !src.startsWith('http') && !src.startsWith('data:')) {
-      img.src = new URL(src, window.location.origin).href;
+    if (normalizedSrc && !normalizedSrc.startsWith('http') && !normalizedSrc.startsWith('data:')) {
+      img.src = new URL(normalizedSrc, window.location.origin).href;
     } else {
-      img.src = src;
+      img.src = normalizedSrc;
     }
   });
 };
@@ -69,6 +87,20 @@ const readFileAsDataURL = (file) =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+
+const buildKVOnlyClearPatch = (state) => ({
+  kv: null,
+  kvSelected: '',
+  showKV: false,
+  // Очистка визуала не должна менять другие элементы макета.
+  logo: state.logo,
+  logoSelected: state.logoSelected,
+  legal: state.legal,
+  age: state.age,
+  showLogo: state.showLogo,
+  showLegal: state.showLegal,
+  showAge: state.showAge
+});
 
 /**
  * Обновляет UI для KV
@@ -157,7 +189,7 @@ export const handleKVUpload = (event) => {
       const dataURL = await readFileAsDataURL(file);
       const img = await loadImage(dataURL);
       const state = getState();
-      const activeIndex = state.activePairIndex || 0;
+      const activeIndex = 0;
       
       // Обновляем KV для активной пары
       updatePairKV(activeIndex, dataURL);
@@ -209,14 +241,22 @@ export const handlePairKVUpload = async (pairIndex, file) => {
  */
 export const clearKV = () => {
   const state = getState();
-  const activeIndex = state.activePairIndex || 0;
+  const activeIndex = 0;
+  const visibilityFlags = {
+    showLogo: state.showLogo,
+    showLegal: state.showLegal,
+    showAge: state.showAge
+  };
   
   // Очищаем KV для активной пары
   updatePairKV(activeIndex, '');
   
-  setState({ kv: null, kvSelected: '', showKV: false });
+  setState({ ...buildKVOnlyClearPatch(state), ...visibilityFlags });
   const dom = getDom();
   if (dom.showKV) dom.showKV.checked = false;
+  if (dom.showLogo) dom.showLogo.checked = visibilityFlags.showLogo !== false;
+  if (dom.showLegal) dom.showLegal.checked = !!visibilityFlags.showLegal;
+  if (dom.showAge) dom.showAge.checked = !!visibilityFlags.showAge;
   updateKVTriggerText('');
   updateKVUI();
   renderer.render();
@@ -228,6 +268,13 @@ export const clearKV = () => {
 export const selectPreloadedKV = async (kvFile) => {
   const dom = getDom();
   const state = getState();
+  const prevKV = state.kv;
+  const prevKVSelected = state.kvSelected;
+  const prevKV2 = state.rsyaKV2;
+  const prevKV2Selected = state.rsyaKV2Selected;
+  const prevKV3 = state.rsyaKV3;
+  const prevKV3Selected = state.rsyaKV3Selected;
+  const normalizedKVFile = normalizeKVAssetPath(kvFile);
   
   // Закрываем модальное окно выбора
   closeKVSelectModal();
@@ -237,15 +284,59 @@ export const selectPreloadedKV = async (kvFile) => {
     await selectPairKV(currentKVModalPairIndex, kvFile || '');
     return;
   }
-  
-  if (!kvFile) {
-    // Очищаем KV для активной пары
-    const activeIndex = state.activePairIndex || 0;
-    const pairs = state.titleSubtitlePairs || [];
-    if (pairs[activeIndex]) {
-      updatePairKV(activeIndex, '');
+
+  // Выбор из библиотеки для дополнительных слотов мульти-KV (слоты 2 и 3)
+  if (currentKVModalSlotIndex === 1 || currentKVModalSlotIndex === 2) {
+    const targetImageKey = currentKVModalSlotIndex === 1 ? 'rsyaKV2' : 'rsyaKV3';
+    const targetPathKey = currentKVModalSlotIndex === 1 ? 'rsyaKV2Selected' : 'rsyaKV3Selected';
+
+    if (!normalizedKVFile) {
+      setKey(targetImageKey, null);
+      setKey(targetPathKey, '');
+      if (typeof window.__refreshRsyaVisualReorder === 'function') {
+        window.__refreshRsyaVisualReorder();
+      }
+      renderer.render();
+      return;
     }
-    setState({ kv: null, kvSelected: '', showKV: false });
+
+    try {
+      const img = await loadImage(normalizedKVFile);
+      if (!img.complete || (img.naturalWidth || img.width) <= 0 || (img.naturalHeight || img.height) <= 0) {
+        throw new Error(`Изображение не загружено: ${normalizedKVFile}`);
+      }
+      setState({
+        [targetImageKey]: img,
+        [targetPathKey]: normalizedKVFile,
+        showKV: true
+      });
+      if (dom.showKV) dom.showKV.checked = true;
+      if (typeof window.__refreshRsyaVisualReorder === 'function') {
+        window.__refreshRsyaVisualReorder();
+      }
+      renderer.render();
+      return;
+    } catch (error) {
+      console.error('Ошибка загрузки KV в дополнительный слот:', error, 'Путь:', normalizedKVFile);
+      setState({
+        rsyaKV2: prevKV2,
+        rsyaKV2Selected: prevKV2Selected,
+        rsyaKV3: prevKV3,
+        rsyaKV3Selected: prevKV3Selected
+      });
+      if (typeof window.__refreshRsyaVisualReorder === 'function') {
+        window.__refreshRsyaVisualReorder();
+      }
+      renderer.render();
+      return;
+    }
+  }
+  
+  if (!normalizedKVFile) {
+    // Очищаем KV для активной пары
+    const activeIndex = 0;
+    updatePairKV(activeIndex, '');
+    setState(buildKVOnlyClearPatch(state));
     if (dom.showKV) dom.showKV.checked = false;
     updateKVTriggerText('');
     updateKVUI();
@@ -254,32 +345,46 @@ export const selectPreloadedKV = async (kvFile) => {
   }
   
   // Иначе обновляем KV для активной пары (обычное поведение)
-  const activeIndex = state.activePairIndex || 0;
-  const pairs = state.titleSubtitlePairs || [];
-  if (pairs[activeIndex]) {
-    updatePairKV(activeIndex, kvFile);
-  }
+  const activeIndex = 0;
+  updatePairKV(activeIndex, normalizedKVFile);
   
   // Сначала устанавливаем kvSelected, чтобы UI обновился
-  setState({ kvSelected: kvFile, showKV: true });
+  setState({ kvSelected: normalizedKVFile, showKV: true });
   if (dom.showKV) dom.showKV.checked = true;
-  updateKVTriggerText(kvFile);
+  updateKVTriggerText(normalizedKVFile);
 
   try {
-    const img = await loadImage(kvFile);
+    const img = await loadImage(normalizedKVFile);
     // Проверяем, что изображение действительно загрузилось
     if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
-      throw new Error(`Изображение не загружено: ${kvFile}`);
+      throw new Error(`Изображение не загружено: ${normalizedKVFile}`);
     }
     // Обновляем оба поля: kv и kvSelected, и включаем показ KV
-    setState({ kv: img, kvSelected: kvFile, showKV: true });
-    if (dom.kvSelect) dom.kvSelect.value = kvFile;
+    setState({ kv: img, kvSelected: normalizedKVFile, showKV: true });
+    if (dom.kvSelect) dom.kvSelect.value = normalizedKVFile;
     if (dom.showKV) dom.showKV.checked = true;
     updateKVUI();
     renderer.render();
   } catch (error) {
-    console.error('Ошибка загрузки KV:', error, 'Путь:', kvFile);
-    setState({ kv: null, kvSelected: '' });
+    console.error('Ошибка загрузки KV:', error, 'Путь:', normalizedKVFile);
+    // Не теряем текущий рабочий KV из-за битого/недоступного пути.
+    // Если рабочего KV ещё нет, пробуем загрузить дефолтный.
+    let fallbackKV = prevKV || null;
+    let fallbackPath = prevKVSelected || DEFAULT_KV_PATH;
+    if (!fallbackKV && fallbackPath) {
+      try {
+        fallbackKV = await loadImage(fallbackPath);
+      } catch (fallbackError) {
+        console.warn('Не удалось загрузить fallback KV:', fallbackPath, fallbackError);
+        fallbackKV = null;
+      }
+    }
+    setState({
+      kv: fallbackKV,
+      kvSelected: fallbackPath,
+      showKV: true
+    });
+    if (dom.showKV) dom.showKV.checked = true;
     updateKVUI();
     renderer.render();
   }
@@ -291,24 +396,42 @@ export const selectPreloadedKV = async (kvFile) => {
 export const selectPairKV = async (pairIndex, kvFile) => {
   const state = getState();
   const dom = getDom();
-  updatePairKV(pairIndex, kvFile || '');
+  const prevKV = state.kv;
+  const prevKVSelected = state.kvSelected;
+  const normalizedKVFile = normalizeKVAssetPath(kvFile || '');
+  updatePairKV(pairIndex, normalizedKVFile || '');
   
   // Если это активная пара, обновляем глобальный KV
   if (pairIndex === (state.activePairIndex || 0)) {
-    if (!kvFile) {
-      setState({ kv: null, kvSelected: '', showKV: false });
+    if (!normalizedKVFile) {
+      setState(buildKVOnlyClearPatch(state));
       if (dom.showKV) dom.showKV.checked = false;
       updateKVUI();
     } else {
       try {
-        const img = await loadImage(kvFile);
-        setState({ kv: img, kvSelected: kvFile, showKV: true });
+        const img = await loadImage(normalizedKVFile);
+        setState({ kv: img, kvSelected: normalizedKVFile, showKV: true });
         if (dom.showKV) dom.showKV.checked = true;
         updateKVUI();
       } catch (error) {
         console.error(error);
-        setState({ kv: null, kvSelected: '', showKV: false });
-        if (dom.showKV) dom.showKV.checked = false;
+        // Если KV для пары не загрузился, сохраняем предыдущий рабочий KV.
+        let fallbackKV = prevKV || null;
+        let fallbackPath = prevKVSelected || DEFAULT_KV_PATH;
+        if (!fallbackKV && fallbackPath) {
+          try {
+            fallbackKV = await loadImage(fallbackPath);
+          } catch (fallbackError) {
+            console.warn('Не удалось загрузить fallback KV для пары:', fallbackPath, fallbackError);
+            fallbackKV = null;
+          }
+        }
+        setState({
+          kv: fallbackKV,
+          kvSelected: fallbackPath,
+          showKV: true
+        });
+        if (dom.showKV) dom.showKV.checked = true;
         updateKVUI();
       }
     }
@@ -776,7 +899,11 @@ export const refreshKVColumns = async () => {
 /**
  * Открывает модальное окно выбора KV
  */
-const openKVSelectModal = async (pairIndex = null) => {
+const openKVSelectModal = async (pairIndex = null, source = 'default') => {
+  const state = getState();
+  if (state.projectMode === 'rsya' && source !== 'preview-canvas' && source !== 'rsya-slot') {
+    return;
+  }
   const overlay = document.getElementById('kvSelectModalOverlay');
   if (!overlay) return;
   
@@ -876,7 +1003,7 @@ export const initializeKVDropdown = async () => {
 export const loadDefaultKV = async () => {
   const dom = getDom();
   const state = getState();
-  const defaultKV = state.kvSelected || 'assets/3d/sign/01.webp';
+  const defaultKV = state.kvSelected || DEFAULT_KV_PATH;
   
   if (!defaultKV) return;
   
@@ -925,4 +1052,3 @@ export {
   openKVSelectModal,
   closeKVSelectModal
 };
-
