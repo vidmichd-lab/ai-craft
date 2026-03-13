@@ -177,6 +177,57 @@
   --shadow-focus: 0 0 0 3px rgba(13, 13, 13, 0.18);
 }
 
+[data-theme="light"] .service-logo {
+  filter: brightness(0) saturate(100%);
+}
+
+[data-theme="light"] .header,
+[data-theme="light"] .tabs-panel,
+[data-theme="light"] .panel,
+[data-theme="light"] #previewSelectorsWrap,
+[data-theme="light"] #rsyaCropPreviewSection {
+  background: var(--bg-secondary) !important;
+}
+
+[data-theme="light"] .toggle-switch {
+  background: var(--bg-primary);
+}
+
+[data-theme="light"] .toggle-switch-slider,
+[data-theme="light"] .mode-toggle .toggle-switch-slider {
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .toggle-switch-option {
+  color: var(--text-muted);
+}
+
+[data-theme="light"] .toggle-switch-option.active,
+[data-theme="light"] .mode-toggle .toggle-switch-option.active,
+[data-theme="light"] #rsyaLayoutToggle .toggle-switch-option.active {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] input[type="checkbox"] {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  box-shadow: none;
+}
+
+[data-theme="light"] input[type="checkbox"]::after {
+  background: var(--text-primary);
+}
+
+[data-theme="light"] input[type="checkbox"]:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+}
+
+[data-theme="light"] input[type="checkbox"]:checked {
+  background: #ffffff;
+  border-color: var(--border-color);
+}
 
 body {
   font-family: var(--font-family-base);
