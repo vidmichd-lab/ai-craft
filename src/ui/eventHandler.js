@@ -160,14 +160,14 @@ export const initEventDelegation = () => {
   document.addEventListener('change', (e) => {
     try {
       const target = e.target;
-      // Пропускаем события от элементов без data-state-key (например, чекбоксы размеров с onchange)
-      if (!target || !target.hasAttribute('data-state-key')) return;
+      const updateHandler = target?.getAttribute?.('data-update-handler');
+      // Пропускаем события только если у элемента нет ни data-state-key, ни data-update-handler
+      if (!target || (!target.hasAttribute('data-state-key') && !updateHandler)) return;
 
       const key = target.getAttribute('data-state-key');
-      if (!key) return;
+      if (!key && !updateHandler) return;
 
       // Проверяем наличие специального обработчика ПЕРЕД стандартным
-      const updateHandler = target.getAttribute('data-update-handler');
       if (updateHandler && typeof window[updateHandler] === 'function') {
         const handlerParam = target.getAttribute('data-handler-param') || key;
         let value;
@@ -204,6 +204,7 @@ export const initEventDelegation = () => {
       }
 
       // Стандартная обработка для элементов без специального обработчика
+      if (!key) return;
       // Для чекбоксов проверяем, не обрабатывается ли он уже через click
       if (target.type === 'checkbox' && checkboxProcessing.has(target)) {
         // Пропускаем обработку, так как она уже выполняется через click
@@ -241,13 +242,13 @@ export const initEventDelegation = () => {
   document.addEventListener('input', (e) => {
     try {
       const target = e.target;
-      if (!target || !target.hasAttribute('data-state-key')) return;
+      const updateHandler = target?.getAttribute?.('data-update-handler');
+      if (!target || (!target.hasAttribute('data-state-key') && !updateHandler)) return;
 
       const key = target.getAttribute('data-state-key');
-      if (!key) return;
+      if (!key && !updateHandler) return;
 
       // Проверяем наличие специального обработчика ПЕРЕД стандартным
-      const updateHandler = target.getAttribute('data-update-handler');
       if (updateHandler && typeof window[updateHandler] === 'function') {
         let value;
 
@@ -295,6 +296,7 @@ export const initEventDelegation = () => {
       }
 
       // Стандартная обработка
+      if (!key) return;
       let value;
       if (target.type === 'range' || target.type === 'number') {
         value = parseFloat(target.value);
@@ -383,6 +385,11 @@ export const initEventDelegation = () => {
         'variantModeToggle': () => {
           if (typeof window.selectVariantMode === 'function') {
             window.selectVariantMode(value);
+          }
+        },
+        'rsyaLayoutToggle': () => {
+          if (typeof window.selectRsyaLayout === 'function') {
+            window.selectRsyaLayout(value);
           }
         },
         'logoPosToggle': () => {

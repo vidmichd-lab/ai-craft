@@ -67,7 +67,19 @@ const sanitizeLogoSizeMultipliers = (value) => {
 
 const normalizeKVPath = (value) => {
   if (!value || typeof value !== 'string') return value;
-  return value.replace(/(^|\/)assets\/pro\/assets\/0+(\d+)\.(webp|png|jpg|jpeg)$/i, '$1assets/pro/assets/$2.$3');
+  const normalized = value.replace(/(^|\/)assets\/pro\/assets\/0+(\d+)\.(webp|png|jpg|jpeg)$/i, '$1assets/pro/assets/$2.$3');
+  if (normalized === 'assets/3d/logos/02.webp') {
+    return DEFAULT_KV_PATH;
+  }
+  return normalized;
+};
+
+const withAllPresetSizesChecked = (presets) => {
+  const next = cloneDeep(presets || {});
+  Object.values(next).forEach((sizes) => sizes.forEach((size) => {
+    size.checked = true;
+  }));
+  return next;
 };
 
 const createTitleSubtitlePair = (index = 0, baseState = null) => {
@@ -139,6 +151,8 @@ const createInitialState = () => {
   }
   const d = (key, fallback) => savedDefaults[key] !== undefined ? savedDefaults[key] : fallback;
   const dn = (key, fallback, options) => sanitizeFiniteNumber(d(key, fallback), fallback, options);
+  const initialProjectMode = d('projectMode', 'rsya');
+  const defaultTitleLogoGap = initialProjectMode === 'layouts' ? 0 : 4;
 
   // Получаем размеры из конфига (или дефолтные, если еще не загружены)
   const sizes = getPresetSizes();
@@ -211,7 +225,7 @@ const createInitialState = () => {
     subtitleLetterSpacing: d('subtitleLetterSpacing', 0),
     subtitleLineHeight: d('subtitleLineHeight', 1.2),
     subtitleGap: dn('subtitleGap', -1, { min: -20, max: 50 }),
-    titleLogoGap: dn('titleLogoGap', 4, { min: -20, max: 50 }),
+    titleLogoGap: dn('titleLogoGap', defaultTitleLogoGap, { min: -20, max: 50 }),
     titleSubtitleRatio: dn('titleSubtitleRatio', 0.5, { min: 0.05, max: 3 }), // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
     subtitleFontFamily: d('subtitleFontFamily', null) || d('fontFamily', 'YS Text'),
     subtitleFontFamilyFile: null,
@@ -270,7 +284,7 @@ const createInitialState = () => {
     logoOffsetBottomPx: d('logoOffsetBottomPx', 0),
     logoLanguage: d('logoLanguage', 'ru'), // ru или kz
     proMode: d('proMode', false), // PRO режим
-    projectMode: d('projectMode', 'rsya'), // layouts | rsya
+    projectMode: initialProjectMode, // layouts | rsya
     variantMode: d('variantMode', d('proMode', false) ? 'pro' : (d('logoLanguage', 'ru') === 'kz' ? 'kz' : 'reskill')), // reskill | pro | kz
     rsyaLayout: d('rsyaLayout', 'center'), // center | left
     rsyaVisualCount: dn('rsyaVisualCount', 1, { min: 1, max: 3 }),
@@ -313,9 +327,9 @@ const createInitialState = () => {
     ageFontFamilyFile: null,
     ageCustomFont: null,
     ageCustomFontName: null,
-    presetSizes: cloneDeep(sizes),
+    presetSizes: withAllPresetSizesChecked(sizes),
     customSizes: [], // Кастомные размеры: [{ width, height, checked, id }]
-    namePrefix: d('namePrefix', ''),
+    namePrefix: 'layout',
     kvCanvasWidth: null,
     kvCanvasHeight: null,
     exportScale: 1, // Масштаб экспорта: 1, 2, 3 или 4
@@ -743,7 +757,7 @@ export const resetPresetSizes = (checked) => {
 // Функция для обновления размеров из конфига
 export const updatePresetSizesFromConfig = () => {
   const sizes = getPresetSizes();
-  setKey('presetSizes', cloneDeep(sizes));
+  setKey('presetSizes', withAllPresetSizesChecked(sizes));
 };
 
 // Функции для управления парами заголовок/подзаголовок
@@ -1007,7 +1021,7 @@ export const ensurePresetSelection = () => {
   if (hasCheckedSize(presetSizes)) {
     return;
   }
-  const defaults = cloneDeep(getPresetSizes());
+  const defaults = withAllPresetSizesChecked(getPresetSizes());
   store.setKey('presetSizes', defaults);
 };
 

@@ -13,18 +13,27 @@ const downloadBlob = (blob, filename) => {
   URL.revokeObjectURL(url);
 };
 
-// Функция для сжатия изображения через canvas (fallback, если библиотека недоступна)
+const canvasToBlob = (canvas, format, quality = 0.92) =>
+  new Promise((resolve) => canvas.toBlob(resolve, `image/${format}`, quality));
+
+// Функция для сжатия изображения через canvas без изменения размеров.
 const compressCanvasImage = async (canvas, format, maxSizeBytes) => {
-  let quality = 0.9;
-  let blob = await new Promise((resolve) => canvas.toBlob(resolve, `image/${format}`, quality));
-  
-  // Итеративно снижаем качество, пока не достигнем целевого размера
-  while (blob && blob.size > maxSizeBytes && quality > 0.1) {
-    quality -= 0.1;
-    blob = await new Promise((resolve) => canvas.toBlob(resolve, `image/${format}`, quality));
+  let quality = format === 'jpeg' ? 0.92 : 0.95;
+  let blob = await canvasToBlob(canvas, format, quality);
+  let bestBlob = blob;
+
+  for (let attempt = 0; blob && blob.size > maxSizeBytes && attempt < 10; attempt += 1) {
+    quality = Math.max(0.3, quality - 0.07);
+    blob = await canvasToBlob(canvas, format, quality);
+    if (blob && (!bestBlob || blob.size < bestBlob.size)) {
+      bestBlob = blob;
+    }
+    if (quality <= 0.3) {
+      break;
+    }
   }
-  
-  return blob;
+
+  return bestBlob;
 };
 
 const getRendererInternals = () => {
@@ -90,6 +99,7 @@ const sanitizeFolderName = (title) => {
 
 const exportSizes = async (format) => {
   const state = getState();
+  const isRsyaMode = state.projectMode === 'rsya';
   const sizes = state.projectMode === 'rsya'
     ? [{ width: 1600, height: 1200, platform: 'РСЯ' }]
     : getCheckedSizes();
@@ -98,7 +108,7 @@ const exportSizes = async (format) => {
     return;
   }
 
-  if (typeof JSZip === 'undefined') {
+  if (!isRsyaMode && typeof JSZip === 'undefined') {
     alert('Библиотека JSZip не загружена. Проверьте подключение к интернету.');
     return;
   }
@@ -112,7 +122,7 @@ const exportSizes = async (format) => {
     return;
   }
 
-  const zip = new JSZip();
+  const zip = isRsyaMode ? null : new JSZip();
   const { renderToCanvas } = getRendererInternals();
 
   // Предзагрузка всех KV и BG изображений параллельно
@@ -210,10 +220,10 @@ const exportSizes = async (format) => {
                   const options = {
                     maxSizeMB: maxSizeMB,
                     maxWidthOrHeight: Math.max(scaledWidth, scaledHeight),
+                    alwaysKeepResolution: true,
                     useWebWorker: true,
                     fileType: `image/${format}`,
-                    initialQuality: 0.9,
-                    alwaysKeepResolution: true
+                    initialQuality: 0.9
                   };
                   const file = new File([blob], `temp.${format === 'jpeg' ? 'jpg' : format}`, { type: `image/${format}` });
                   try {
@@ -232,10 +242,10 @@ const exportSizes = async (format) => {
                     const options = {
                       maxSizeMB: maxSizeMB,
                       maxWidthOrHeight: Math.max(scaledWidth, scaledHeight),
+                      alwaysKeepResolution: true,
                       useWebWorker: true,
                       fileType: `image/${format}`,
-                      initialQuality: q,
-                      alwaysKeepResolution: true
+                      initialQuality: q
                     };
                     const file = new File([currentBlob], `temp.${format === 'jpeg' ? 'jpg' : format}`, { type: `image/${format}` });
                     try {
@@ -255,9 +265,13 @@ const exportSizes = async (format) => {
                   }
                   if (currentBlob.size < originalSize) blob = currentBlob;
                 }
-              } else {
+              }
+
+              if (blob.size > maxSizeBytes) {
                 const compressedBlob = await compressCanvasImage(canvas, format, maxSizeBytes);
-                if (compressedBlob) blob = compressedBlob;
+                if (compressedBlob && compressedBlob.size < blob.size) {
+                  blob = compressedBlob;
+                }
               }
             }
           } catch (compressionError) {
@@ -269,11 +283,23 @@ const exportSizes = async (format) => {
           return { path: filename, blob };
         })
       );
+      if (isRsyaMode && results[0]?.blob) {
+        const extension = format === 'jpeg' ? 'jpg' : format;
+        const filename = `${(state.namePrefix || 'export').trim() || 'export'}.${extension}`;
+        downloadBlob(results[0].blob, filename);
+        console.log(`Экспорт завершен: ${filename}`);
+        return;
+      }
+
       results.forEach((r) => zip.file(r.path, r.blob));
       completed += batch.length;
       const pct = Math.round((completed / totalSizes) * 100);
       if (typeof updateExportProgress === 'function') updateExportProgress(pct);
     }
+  }
+
+  if (isRsyaMode) {
+    return;
   }
 
   // Генерируем ZIP архив

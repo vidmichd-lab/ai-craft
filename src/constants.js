@@ -2,7 +2,7 @@
 import { getPresetSizes, loadSizesConfig } from './utils/sizesConfig.js';
 
 // Единые дефолты ассетов
-export const DEFAULT_KV_PATH = 'assets/3d/logos/02.webp';
+export const DEFAULT_KV_PATH = 'assets/3d/logos/40.webp';
 export const DEFAULT_PRO_KV_PATH = 'assets/pro/assets/1.webp';
 
 export const AVAILABLE_LOGOS = [

@@ -52,7 +52,11 @@ export const getKVModalTargetSlot = () => currentKVModalSlotIndex;
 const normalizeKVAssetPath = (src) => {
   if (!src || typeof src !== 'string') return src;
   // Пример миграции: assets/pro/assets/01.webp -> assets/pro/assets/1.webp
-  return src.replace(/(^|\/)assets\/pro\/assets\/0+(\d+)\.(webp|png|jpg|jpeg)$/i, '$1assets/pro/assets/$2.$3');
+  const normalized = src.replace(/(^|\/)assets\/pro\/assets\/0+(\d+)\.(webp|png|jpg|jpeg)$/i, '$1assets/pro/assets/$2.$3');
+  if (normalized === 'assets/3d/logos/02.webp') {
+    return DEFAULT_KV_PATH;
+  }
+  return normalized;
 };
 
 /**

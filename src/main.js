@@ -14,11 +14,11 @@ import {
   updateSubtitleSize,
   updateSubtitleGap,
   updateTitleLogoGap,
+  updateRsyaCropGridVisible,
   updateLegalSize,
   updateAgeSize,
   updateAgeGapPercent,
   updateKVBorderRadius,
-  updateRsyaCropGridVisible,
   selectKVPosition,
   updateTextGradientOpacity,
   updateBgOffsetX,
@@ -42,6 +42,7 @@ import {
   selectProjectMode,
   selectVariantMode,
   selectLayoutMode,
+  selectRsyaLayout,
   updateColorFromPicker,
   updateColorFromHex,
   selectBgPosition,
@@ -363,10 +364,10 @@ const exposeGlobals = () => {
     updateSubtitleSize,
     updateSubtitleGap,
     updateTitleLogoGap,
+    updateRsyaCropGridVisible,
     updateAgeSize,
     updateAgeGapPercent,
     updateLegalSize,
-    updateRsyaCropGridVisible,
     updateKVBorderRadius,
     updateTextGradientOpacity,
     updateBgOffsetX,
@@ -405,6 +406,7 @@ const exposeGlobals = () => {
     toggleTitleAlign,
     toggleTitleVPos,
     selectLayoutMode,
+    selectRsyaLayout,
     updateColorFromPicker,
     updateColorFromHex,
   applyPresetBgColor,
@@ -1111,7 +1113,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     // Регистрируем с задержкой, чтобы не блокировать основную загрузку
     setTimeout(() => {
-      navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(window.APP_VERSION || 'dev')}`, { updateViaCache: 'none' })
+      navigator.serviceWorker.register('/sw.js?v=1.0.4', { updateViaCache: 'none' })
         .then((registration) => {
           console.log('Service Worker зарегистрирован:', registration.scope);
           

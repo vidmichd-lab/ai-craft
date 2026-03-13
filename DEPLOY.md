@@ -1,6 +1,6 @@
-# Инструкция по деплою AI-Craft в Yandex Object Storage
+# Инструкция по деплою в Yandex Object Storage
 
-Этот документ описывает процесс размещения статического сайта в бакете `ai-craft` на Yandex Object Storage.
+Этот документ описывает процесс размещения статического сайта в бакете `practicum-banners` на Yandex Object Storage.
 
 ## Предварительные требования
 
@@ -49,10 +49,10 @@ region = ru-central1
 
 ## Создание бакета (если ещё не создан)
 
-Если бакет `ai-craft` ещё не создан, создайте его через консоль Yandex Cloud или выполните:
+Если бакет `practicum-banners` ещё не создан, создайте его через консоль Yandex Cloud или выполните:
 
 ```bash
-aws --endpoint-url=https://storage.yandexcloud.net s3 mb s3://ai-craft
+aws --endpoint-url=https://storage.yandexcloud.net s3 mb s3://practicum-banners
 ```
 
 ## Автоматический деплой
@@ -80,7 +80,7 @@ chmod +x deploy.sh
 ### 1. Загрузка файлов
 
 ```bash
-aws --endpoint-url=https://storage.yandexcloud.net s3 sync ./ s3://ai-craft/ \
+aws --endpoint-url=https://storage.yandexcloud.net s3 sync ./ s3://practicum-banners/ \
   --exclude ".DS_Store" \
   --exclude "__pycache__/*" \
   --exclude "*.pyc" \
@@ -94,7 +94,7 @@ aws --endpoint-url=https://storage.yandexcloud.net s3 sync ./ s3://ai-craft/ \
 ### 2. Настройка публичного доступа
 
 В консоли Yandex Cloud:
-1. Откройте бакет `ai-craft`
+1. Откройте бакет `practicum-banners`
 2. Перейдите в раздел "Доступ"
 3. Включите "Публичный доступ на чтение объектов" и "Публичный доступ на чтение списка объектов"
 
@@ -102,14 +102,14 @@ aws --endpoint-url=https://storage.yandexcloud.net s3 sync ./ s3://ai-craft/ \
 
 ```bash
 aws --endpoint-url=https://storage.yandexcloud.net s3api put-bucket-acl \
-  --bucket ai-craft \
+  --bucket practicum-banners \
   --acl public-read
 ```
 
 ### 3. Включение хостинга статического сайта
 
 В консоли Yandex Cloud:
-1. Откройте бакет `ai-craft`
+1. Откройте бакет `practicum-banners`
 2. Перейдите в раздел "Веб-сайт"
 3. Включите хостинг
 4. Укажите главную страницу: `index.html`
@@ -130,7 +130,7 @@ cat > website-config.json << EOF
 EOF
 
 aws --endpoint-url=https://storage.yandexcloud.net s3api put-bucket-website \
-  --bucket ai-craft \
+  --bucket practicum-banners \
   --website-configuration file://website-config.json
 
 rm website-config.json
@@ -143,19 +143,19 @@ rm website-config.json
 ```bash
 # HTML
 aws --endpoint-url=https://storage.yandexcloud.net s3 cp \
-  s3://ai-craft/index.html s3://ai-craft/index.html \
+  s3://practicum-banners/index.html s3://practicum-banners/index.html \
   --content-type "text/html; charset=utf-8" \
   --metadata-directive REPLACE
 
 # CSS
 aws --endpoint-url=https://storage.yandexcloud.net s3 cp \
-  s3://ai-craft/styles.css s3://ai-craft/styles.css \
+  s3://practicum-banners/styles.css s3://practicum-banners/styles.css \
   --content-type "text/css; charset=utf-8" \
   --metadata-directive REPLACE
 
 # JavaScript
 aws --endpoint-url=https://storage.yandexcloud.net s3 cp \
-  s3://ai-craft/src/main.js s3://ai-craft/src/main.js \
+  s3://practicum-banners/src/main.js s3://practicum-banners/src/main.js \
   --content-type "application/javascript; charset=utf-8" \
   --metadata-directive REPLACE
 ```
@@ -166,17 +166,17 @@ aws --endpoint-url=https://storage.yandexcloud.net s3 cp \
 
 **Основной URL:**
 ```
-https://ai-craft.website.yandexcloud.net
+https://practicum-banners.website.yandexcloud.net
 ```
 
 **Альтернативный URL:**
 ```
-https://ai-craft.storage.yandexcloud.net
+https://practicum-banners.storage.yandexcloud.net
 ```
 
 ## Настройка собственного домена (опционально)
 
-1. В консоли Yandex Cloud откройте бакет `ai-craft`
+1. В консоли Yandex Cloud откройте бакет `practicum-banners`
 2. Перейдите в раздел "Веб-сайт"
 3. Укажите свой домен в настройках
 4. Настройте DNS-запись CNAME, указывающую на хостинг Yandex Object Storage
@@ -228,3 +228,4 @@ https://ai-craft.storage.yandexcloud.net
 - [Документация Yandex Object Storage](https://cloud.yandex.ru/docs/storage/)
 - [Документация AWS CLI](https://docs.aws.amazon.com/cli/)
 - [Настройка хостинга статического сайта](https://cloud.yandex.ru/docs/storage/operations/hosting/setup)
+

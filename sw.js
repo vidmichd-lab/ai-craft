@@ -2,12 +2,12 @@
  * Service Worker для кеширования статических ресурсов
  */
 
-// Версия кеша берется из query-параметра service worker registration: /sw.js?v=...
-const SW_URL = new URL(self.location.href);
-const CACHE_VERSION = SW_URL.searchParams.get('v') || 'dev';
-const CACHE_NAME = `ai-craft-v${CACHE_VERSION}`;
-const STATIC_CACHE_NAME = `ai-craft-static-v${CACHE_VERSION}`;
-const IMAGE_CACHE_NAME = `ai-craft-images-v${CACHE_VERSION}`;
+// Версия кеша - обновлять при каждом деплое
+// ⚠️ MUST MATCH APP_VERSION in index.html
+const CACHE_VERSION = '1.0.4';
+const CACHE_NAME = `practicum-banners-v${CACHE_VERSION}`;
+const STATIC_CACHE_NAME = `practicum-banners-static-v${CACHE_VERSION}`;
+const IMAGE_CACHE_NAME = `practicum-banners-images-v${CACHE_VERSION}`;
 
 // Ресурсы для кеширования при установке (с версионированием)
 const STATIC_ASSETS = [
@@ -95,11 +95,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (isHtmlRequest(request)) {
-    event.respondWith(networkFirstWithCache(request, STATIC_CACHE_NAME));
-    return;
-  }
-
   // Стратегия для статических ресурсов
   if (isStaticAsset(request.url)) {
     // Для JS файлов используем Network First, чтобы всегда получать свежие версии
@@ -107,7 +102,7 @@ self.addEventListener('fetch', (event) => {
       event.respondWith(networkFirstWithCache(request, STATIC_CACHE_NAME));
       return;
     }
-    // Для CSS и JSON используем Cache First
+    // Для CSS и HTML используем Cache First
     event.respondWith(cacheFirst(request, STATIC_CACHE_NAME));
     return;
   }
@@ -151,13 +146,6 @@ function isStaticAsset(url) {
          url.includes('/src/') ||
          url.endsWith('/') ||
          url.endsWith('/index.html');
-}
-
-function isHtmlRequest(request) {
-  return request.mode === 'navigate' ||
-         request.destination === 'document' ||
-         request.url.endsWith('/') ||
-         request.url.endsWith('/index.html');
 }
 
 /**
@@ -339,14 +327,7 @@ async function networkFirstWithCache(request, cacheName) {
       const cache = await caches.open(cacheName);
       // Удаляем старую версию из кеша перед добавлением новой
       await cache.delete(request);
-      const headers = new Headers(response.headers);
-      headers.set('sw-cached-date', Date.now().toString());
-      const responseToCache = new Response(response.clone().body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers
-      });
-      cache.put(request, responseToCache);
+      cache.put(request, response.clone());
     }
     
     return response;
@@ -358,7 +339,7 @@ async function networkFirstWithCache(request, cacheName) {
       const cachedDate = cached.headers.get('sw-cached-date');
       if (cachedDate) {
         const age = Date.now() - parseInt(cachedDate);
-        // HTML стараемся быстро обновлять, но в офлайне допускаем недавний кеш
+        // Если кеш старше 5 минут, не используем его
         if (age < 5 * 60 * 1000) {
           return cached;
         }

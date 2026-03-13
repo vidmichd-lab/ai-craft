@@ -93,7 +93,7 @@ const renderToCanvas = (canvas, width, height, state) => {
   const isRsyaLeftLayout = isRsyaMode && rsyaLayout === 'left';
   if (isRsyaMode) {
     if (isRsyaLeftLayout) {
-      state = { ...state, titleAlign: 'left', logoPos: 'left', kvPosition: 'right' };
+      state = { ...state, titleAlign: 'left', titleVPos: 'center', logoPos: 'left', kvPosition: 'right' };
     } else {
       state = { ...state, titleAlign: 'center', logoPos: 'center', kvPosition: 'center' };
     }
@@ -318,7 +318,7 @@ const renderToCanvas = (canvas, width, height, state) => {
   let logoBounds = calculateLogoBounds(state, logoWidthForCalc, logoHeightForCalc, logoPaddingForCalc, layoutType, logoSizePercent, logoPosForSize);
   
   // Сохраняем logoBounds без смещения для расчетов, сместим позже перед отрисовкой
-  const logoBoundsForCalculations = logoBounds;
+  let logoBoundsForCalculations = logoBounds;
   const logoHeightValue = logoBounds ? logoBounds.height : 0;
 
   // Вычисляем позицию KV и область для текста - используем модули
@@ -449,6 +449,14 @@ const renderToCanvas = (canvas, width, height, state) => {
     const gapToKV = Math.max(16, canvasPadding * 0.5);
     textArea.left = canvasPadding;
     textArea.right = Math.max(textArea.left + 140, kvLeft - gapToKV);
+
+    if (logoBoundsForCalculations) {
+      const logoX = useSafeArea ? (textArea.left - horizontalPadding) : textArea.left;
+      logoBoundsForCalculations = {
+        ...logoBoundsForCalculations,
+        x: logoX
+      };
+    }
   }
   // Для горизонтального/широкого формата гарантируем минимальную ширину области текста, иначе клип «схлопывается» и контент не виден
   if (isWideLayout && (textArea.right <= textArea.left || textArea.right - textArea.left < 50)) {
@@ -858,8 +866,11 @@ const renderToCanvas = (canvas, width, height, state) => {
       // Учитываем логотип при вычислении доступной высоты для текста
       // Для РСЯ 1600x1200 добавляем дополнительный отступ между логотипом и заголовком
       const isRSYA1600x1200ForGap = platform === 'РСЯ' && sizeKey === '1600x1200';
-      const additionalGap = isRSYA1600x1200ForGap ? paddingPx * 0.5 : (useSafeArea ? paddingPx * 0.4 : 0);
-      const logoTitleGap = getLogoTitleGap(paddingPx + additionalGap);
+      const additionalGap = isRsyaLeftLayout
+        ? 0
+        : (isRSYA1600x1200ForGap ? paddingPx * 0.5 : (useSafeArea ? paddingPx * 0.4 : 0));
+      const baseLogoGap = isRsyaLeftLayout ? Math.max(2, paddingPx * 0.04) : paddingPx;
+      const logoTitleGap = getLogoTitleGap(baseLogoGap + additionalGap);
       const logoBottom = (state.showLogo && state.logo && logoBoundsForCalculations) 
         ? logoBoundsForCalculations.y + logoBoundsForCalculations.height 
         : paddingPx;
@@ -868,9 +879,11 @@ const renderToCanvas = (canvas, width, height, state) => {
       const bottomArea = maxY - paddingPx - legalBlockHeight;
       const availableHeight = Math.max(0, bottomArea - topArea);
       if (availableHeight > 0 && totalTextHeight > 0) {
-        const centerY = topArea + availableHeight / 2;
+        const centerY = isRsyaLeftLayout
+          ? ((useSafeArea ? verticalPadding : 0) + (useSafeArea ? effectiveHeight : height) / 2)
+          : (topArea + availableHeight / 2);
         startY = centerY - totalTextHeight / 2 + titleSize;
-        if (isRSYA1600x1200 && !isRsyaLeftLayout) {
+        if (isRSYA1600x1200ForGap && !isRsyaLeftLayout) {
           startY += effectiveHeight * 0.025;
         }
         // Убеждаемся, что startY не меньше минимального значения (после логотипа)

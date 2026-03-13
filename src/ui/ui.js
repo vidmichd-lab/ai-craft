@@ -23,7 +23,7 @@ import {
   removeCustomSize,
   toggleCustomSize
 } from '../state/store.js';
-import { AVAILABLE_LOGOS, AVAILABLE_FONTS, AVAILABLE_KV, PRESET_BACKGROUND_COLORS, FONT_WEIGHT_TO_NAME, FONT_NAME_TO_WEIGHT, AVAILABLE_WEIGHTS, DEFAULT_KV_PATH, DEFAULT_PRO_KV_PATH } from '../constants.js';
+import { AVAILABLE_LOGOS, AVAILABLE_KV, PRESET_BACKGROUND_COLORS, FONT_WEIGHT_TO_NAME, AVAILABLE_WEIGHTS, DEFAULT_KV_PATH, DEFAULT_PRO_KV_PATH } from '../constants.js';
 import { scanLogos, scanKV } from '../utils/assetScanner.js';
 import { loadImage as loadImageCached } from '../utils/imageCache.js';
 import {
@@ -138,7 +138,11 @@ let rsyaFitResizeBound = false;
 
 const normalizeKVAssetPath = (value) => {
   if (!value || typeof value !== 'string') return value;
-  return value.replace(/(^|\/)assets\/pro\/assets\/0+(\d+)\.(webp|png|jpg|jpeg)$/i, '$1assets/pro/assets/$2.$3');
+  const normalized = value.replace(/(^|\/)assets\/pro\/assets\/0+(\d+)\.(webp|png|jpg|jpeg)$/i, '$1assets/pro/assets/$2.$3');
+  if (normalized === 'assets/3d/logos/02.webp') {
+    return DEFAULT_KV_PATH;
+  }
+  return normalized;
 };
 const SINGLE_PAIR_MODE = true;
 
@@ -211,23 +215,7 @@ export const syncFormFields = () => {
   const titleWeightDropdown = document.getElementById('titleWeightDropdown');
   if (titleWeightText && titleWeightDropdown) {
     const titleFontFamily = state.titleFontFamily || state.fontFamily || 'YS Text';
-    updateCustomWeightDropdown(titleWeightDropdown, titleWeightText, titleFontFamily, titleWeight, async (value) => {
-      clearTextMeasurementCache();
-      // Загружаем шрифт с новым начертанием
-      const weightValue = FONT_NAME_TO_WEIGHT[value] || '400';
-      const fontToLoad = AVAILABLE_FONTS.find(f => 
-        f.family === titleFontFamily && 
-        f.weight === weightValue && 
-        f.style === 'normal'
-      );
-      if (fontToLoad && fontToLoad.file) {
-        // Динамически импортируем loadFonts из main.js
-        const { loadFonts } = await import('../main.js');
-        await loadFonts([fontToLoad]);
-      }
-      setKey('titleWeight', value);
-      renderer.render();
-    });
+    updateCustomWeightDropdown(titleWeightDropdown, titleWeightText, titleFontFamily, titleWeight);
   }
   
   // Обратная совместимость со старыми select элементами
@@ -278,23 +266,7 @@ export const syncFormFields = () => {
   const subtitleWeightDropdown = document.getElementById('subtitleWeightDropdown');
   if (subtitleWeightText && subtitleWeightDropdown) {
     const subtitleFontFamily = state.subtitleFontFamily || state.fontFamily || 'YS Text';
-    updateCustomWeightDropdown(subtitleWeightDropdown, subtitleWeightText, subtitleFontFamily, subtitleWeight, async (value) => {
-      clearTextMeasurementCache();
-      // Загружаем шрифт с новым начертанием
-      const weightValue = FONT_NAME_TO_WEIGHT[value] || '400';
-      const fontToLoad = AVAILABLE_FONTS.find(f => 
-        f.family === subtitleFontFamily && 
-        f.weight === weightValue && 
-        f.style === 'normal'
-      );
-      if (fontToLoad && fontToLoad.file) {
-        // Динамически импортируем loadFonts из main.js
-        const { loadFonts } = await import('../main.js');
-        await loadFonts([fontToLoad]);
-      }
-      setKey('subtitleWeight', value);
-      renderer.render();
-    });
+    updateCustomWeightDropdown(subtitleWeightDropdown, subtitleWeightText, subtitleFontFamily, subtitleWeight);
   }
   
   // Обратная совместимость со старыми select элементами
@@ -349,23 +321,7 @@ export const syncFormFields = () => {
   const legalWeightDropdown = document.getElementById('legalWeightDropdown');
   if (legalWeightText && legalWeightDropdown) {
     const legalFontFamily = state.legalFontFamily || state.fontFamily || 'YS Text';
-    updateCustomWeightDropdown(legalWeightDropdown, legalWeightText, legalFontFamily, legalWeight, async (value) => {
-      clearTextMeasurementCache();
-      // Загружаем шрифт с новым начертанием
-      const weightValue = FONT_NAME_TO_WEIGHT[value] || '400';
-      const fontToLoad = AVAILABLE_FONTS.find(f => 
-        f.family === legalFontFamily && 
-        f.weight === weightValue && 
-        f.style === 'normal'
-      );
-      if (fontToLoad && fontToLoad.file) {
-        // Динамически импортируем loadFonts из main.js
-        const { loadFonts } = await import('../main.js');
-        await loadFonts([fontToLoad]);
-      }
-      setKey('legalWeight', value);
-      renderer.render();
-    });
+    updateCustomWeightDropdown(legalWeightDropdown, legalWeightText, legalFontFamily, legalWeight);
   }
   
   // Обратная совместимость со старыми select элементами
@@ -512,10 +468,6 @@ export const syncFormFields = () => {
     rsyaKVScaleInput.value = state.rsyaKVScale || 200;
     if (rsyaKVScaleValue) rsyaKVScaleValue.textContent = `${state.rsyaKVScale || 200}%`;
   }
-  const rsyaCropGridVisibleToggle = document.getElementById('rsyaCropGridVisibleToggle');
-  if (rsyaCropGridVisibleToggle) {
-    rsyaCropGridVisibleToggle.checked = !!state.rsyaCropGridVisible;
-  }
   const rsyaKVGapInput = document.getElementById('rsyaKVGap');
   const rsyaKVGapValue = document.getElementById('rsyaKVGapValue');
   if (rsyaKVGapInput) {
@@ -534,6 +486,10 @@ export const syncFormFields = () => {
   if (rsyaKVOffsetYInput) {
     rsyaKVOffsetYInput.value = state.rsyaKVOffsetY || 0;
     if (rsyaKVOffsetYValue) rsyaKVOffsetYValue.textContent = String(state.rsyaKVOffsetY || 0);
+  }
+  const rsyaCropGridVisibleToggle = document.getElementById('rsyaCropGridVisibleToggle');
+  if (rsyaCropGridVisibleToggle) {
+    rsyaCropGridVisibleToggle.checked = !!state.rsyaCropGridVisible;
   }
   renderRsyaVisualReorder();
 
@@ -572,9 +528,11 @@ export const updatePreviewSizeSelect = () => {
       emptyOption.style.cursor = 'not-allowed';
       narrowDropdown.appendChild(emptyOption);
     } else {
+      const selectedIndex = 0;
       categorized.narrow.forEach((size, index) => {
         const option = document.createElement('div');
         option.className = 'custom-select-option';
+        if (index === selectedIndex) option.classList.add('selected');
         option.dataset.value = index;
         option.textContent = `${size.width} × ${size.height} (${size.platform})`;
         option.onclick = () => {
@@ -668,9 +626,11 @@ export const updatePreviewSizeSelect = () => {
       emptyOption.style.cursor = 'not-allowed';
       squareDropdown.appendChild(emptyOption);
     } else {
+      const selectedIndex = 0;
       categorized.square.forEach((size, index) => {
         const option = document.createElement('div');
         option.className = 'custom-select-option';
+        if (index === selectedIndex) option.classList.add('selected');
         option.dataset.value = index;
         option.textContent = `${size.width} × ${size.height} (${size.platform})`;
         option.onclick = () => {
@@ -991,6 +951,11 @@ const renderRsyaVisualReorder = () => {
   if (!wrap) return;
   const slots = getRsyaVisualSlots(getState());
   const items = wrap.querySelectorAll('.rsya-visual-item');
+  const filledCount = slots.filter((slot) => !!(slot?.image || slot?.selected)).length;
+  const canReorder = filledCount >= 2;
+
+  wrap.classList.toggle('can-reorder', canReorder);
+
   items.forEach((item, index) => {
     item.dataset.rsyaVisualSlot = String(index);
     item.classList.toggle('active', index === activeRsyaVisualSlot);
@@ -998,7 +963,6 @@ const renderRsyaVisualReorder = () => {
     const slot = slots[index];
     const hasImage = !!slot?.image;
     const previewSrc = slot?.selected || slot?.image?.src || '';
-    const canReorder = !!(slots[1]?.image || slots[1]?.selected);
     item.draggable = canReorder;
     item.classList.toggle('reorder-disabled', !canReorder);
     item.classList.toggle('is-filled', hasImage);
@@ -1147,7 +1111,7 @@ export const updateRsyaCropPreviews = (sourceCanvas, state) => {
   const specs = [
     { id: 'rsyaCrop1600', ratio: srcW / srcH, key: '1600' },
     { id: 'rsyaCrop169', ratio: 16 / 9, key: '16:9' },
-    { id: 'rsyaCrop321', ratio: 3.2, key: '3.2:1' },
+    { id: 'rsyaCrop321', ratio: 3.2 / 1, key: '3.2:1' },
     { id: 'rsyaCrop43', ratio: 4 / 3, key: '4:3' },
     { id: 'rsyaCrop11', ratio: 1, key: '1:1' },
     { id: 'rsyaCrop34', ratio: 3 / 4, key: '3:4' }
@@ -1167,7 +1131,6 @@ export const updateRsyaCropPreviews = (sourceCanvas, state) => {
     canvas.height = outH;
     ctx.clearRect(0, 0, outW, outH);
     ctx.drawImage(sourceCanvas, sx, sy, cropW, cropH, 0, 0, outW, outH);
-    drawRsyaCropGuideOverlay(ctx, outW, outH, key, state);
     const thumb = cropSection.querySelector(`[data-rsya-crop-key="${key}"]`);
     if (thumb) {
       thumb.classList.toggle('active', activeRsyaCropKey === key);
@@ -1185,7 +1148,7 @@ export const updateRsyaCropPreviews = (sourceCanvas, state) => {
       activeCanvas.height = cropH;
       activeCtx.clearRect(0, 0, cropW, cropH);
       activeCtx.drawImage(sourceCanvas, sx, sy, cropW, cropH, 0, 0, cropW, cropH);
-      drawRsyaCropGuideOverlay(activeCtx, cropW, cropH, activeSpec.key, state);
+      drawRsyaCropBoundsOverlay(activeCtx, sourceCanvas, activeSpec.key, state);
       fitRsyaActiveCanvasToContainer(activeCanvas);
     }
   }
@@ -1193,48 +1156,32 @@ export const updateRsyaCropPreviews = (sourceCanvas, state) => {
   updateRsyaKVOverlay();
 };
 
-const getRsyaCropGuideZone = (key, state = null) => {
-  const layout = state?.rsyaLayout || 'center';
-  if (key === '3.2:1') {
-    return layout === 'left'
-      ? { x: 0.06, y: 0.26, w: 0.88, h: 0.48 }
-      : { x: 0.06, y: 0.28, w: 0.88, h: 0.44 };
-  }
-  if (key === '3:4') {
-    return { x: 0.14, y: 0.08, w: 0.72, h: 0.84 };
-  }
-  if (key === '1:1') {
-    return { x: 0.14, y: 0.14, w: 0.72, h: 0.72 };
-  }
-  if (layout === 'left' && (key === '16:9' || key === '4:3')) {
-    return { x: 0.08, y: 0.16, w: 0.84, h: 0.68 };
-  }
-  if (key === '16:9') {
-    return { x: 0.16, y: 0.16, w: 0.68, h: 0.68 };
-  }
-  if (key === '4:3') {
-    return { x: 0.14, y: 0.14, w: 0.72, h: 0.72 };
-  }
-  return { x: 0.12, y: 0.12, w: 0.76, h: 0.76 };
-};
+const drawRsyaCropBoundsOverlay = (ctx, sourceCanvas, activeCropKey, state) => {
+  if (!ctx || !sourceCanvas || !state?.rsyaCropGridVisible) return;
+  const overlayKeys = ['16:9', '3.2:1', '4:3', '1:1', '3:4'];
+  const activeCrop = computeCenteredCropRect(sourceCanvas, activeCropKey, state);
+  if (!activeCrop || !activeCrop.cropW || !activeCrop.cropH) return;
+  const scaleX = ctx.canvas.width / activeCrop.cropW;
+  const scaleY = ctx.canvas.height / activeCrop.cropH;
+  const displayWidth = ctx.canvas.clientWidth || ctx.canvas.width;
+  const displayScale = ctx.canvas.width / Math.max(1, displayWidth);
+  const strokeWidth = Math.max(2, Math.round(displayScale));
 
-const drawRsyaCropGuideOverlay = (ctx, width, height, key, state) => {
-  if (!ctx || !width || !height || !state?.rsyaCropGridVisible) return;
   ctx.save();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(232, 64, 51, 0.95)';
+  ctx.lineWidth = strokeWidth;
+  ctx.strokeStyle = 'rgba(232, 64, 51, 1)';
 
-  if (key === '1600') {
-    ['16:9', '3.2:1', '4:3', '1:1', '3:4'].forEach((cropKey) => {
-      const zone = getRsyaCropGuideZone(cropKey, state);
-      ctx.strokeRect(
-        Math.round(zone.x * width) + 0.5,
-        Math.round(zone.y * height) + 0.5,
-        Math.round(zone.w * width),
-        Math.round(zone.h * height)
-      );
-    });
-  }
+  overlayKeys.forEach((key) => {
+    const crop = computeCenteredCropRect(sourceCanvas, key, state);
+    if (!crop) return;
+    const x = (crop.sx - activeCrop.sx) * scaleX;
+    const y = (crop.sy - activeCrop.sy) * scaleY;
+    const w = crop.cropW * scaleX;
+    const h = crop.cropH * scaleY;
+    const inset = strokeWidth / 2;
+    ctx.strokeRect(x + inset, y + inset, Math.max(0, w - strokeWidth), Math.max(0, h - strokeWidth));
+  });
+
   ctx.restore();
 };
 
@@ -1254,7 +1201,7 @@ const fitRsyaActiveCanvasToContainer = (canvas) => {
 
 const getRsyaCropRatioByKey = (key, sourceCanvas) => {
   if (key === '16:9') return 16 / 9;
-  if (key === '3.2:1') return 3.2;
+  if (key === '3.2:1') return 3.2 / 1;
   if (key === '4:3') return 4 / 3;
   if (key === '1:1') return 1;
   if (key === '3:4') return 3 / 4;
@@ -1361,21 +1308,28 @@ const updateRsyaKVOverlay = (forceVisible = false) => {
   };
 };
 
+const getRsyaKVCenterSnapOffsets = (state = getState()) => {
+  const sourceCanvas = document.getElementById('previewCanvasWide');
+  const activeCanvas = document.getElementById('rsyaActivePreviewCanvas');
+  const kvMeta = renderer.getRenderMeta()?.kvRenderMeta;
+  if (!sourceCanvas || !activeCanvas || !kvMeta) return null;
+
+  const crop = computeCenteredCropRect(sourceCanvas, activeRsyaCropKey, state);
+  if (!crop) return null;
+
+  const targetX = crop.sx + (crop.cropW - kvMeta.kvW) / 2;
+  const targetY = crop.sy + (crop.cropH - kvMeta.kvH) / 2;
+
+  return {
+    x: Math.round((Number(state.rsyaKVOffsetX) || 0) + (targetX - kvMeta.kvX)),
+    y: Math.round((Number(state.rsyaKVOffsetY) || 0) + (targetY - kvMeta.kvY))
+  };
+};
+
 const initializeRsyaCropSelector = () => {
   const cropSection = document.getElementById('rsyaCropPreviewSection');
   if (!cropSection || cropSection.dataset.rsyaCropInitialized) return;
   cropSection.dataset.rsyaCropInitialized = 'true';
-  const gridToggle = document.getElementById('rsyaCropGridVisibleToggle');
-  if (gridToggle && !gridToggle.dataset.rsyaGridRefreshBound) {
-    gridToggle.dataset.rsyaGridRefreshBound = 'true';
-    gridToggle.addEventListener('change', () => {
-      const sourceCanvas = document.getElementById('previewCanvasWide');
-      if (!sourceCanvas || !sourceCanvas.width || !sourceCanvas.height) return;
-      requestAnimationFrame(() => {
-        updateRsyaCropPreviews(sourceCanvas, getState());
-      });
-    });
-  }
   if (!rsyaFitResizeBound) {
     rsyaFitResizeBound = true;
     window.addEventListener('resize', () => {
@@ -1452,7 +1406,7 @@ export const initializeRsyaCanvasDrag = () => {
 
   const updateCanvasCursor = (mode) => {
     const cursor = mode === 'resize'
-      ? 'nwse-resize'
+      ? 'nesw-resize'
       : (mode === 'move' ? 'grab' : '');
     canvases.forEach((canvasEl) => {
       canvasEl.style.cursor = cursor;
@@ -1477,7 +1431,7 @@ export const initializeRsyaCanvasDrag = () => {
     if (!inside) return null;
 
     const handleCx = overlayRect.left + overlayRect.width;
-    const handleCy = overlayRect.top + overlayRect.height;
+    const handleCy = overlayRect.top;
     const dist = Math.hypot(px - handleCx, py - handleCy);
     if (dist <= HANDLE_RADIUS) return 'resize';
     return 'move';
@@ -1512,7 +1466,7 @@ export const initializeRsyaCanvasDrag = () => {
     } else {
       if (drag.type === 'kv-scale') {
         const baseHeight = Math.max(1, drag.baseMetaH || 1);
-        const scaledHeight = Math.max(12, baseHeight + dy);
+        const scaledHeight = Math.max(12, baseHeight - dy);
         const nextScale = Math.max(40, Math.min(300, Math.round((drag.baseScale || 100) * (scaledHeight / baseHeight))));
         setKey('rsyaKVScale', nextScale);
         const scaleInput = document.getElementById('rsyaKVScale');
@@ -1520,8 +1474,27 @@ export const initializeRsyaCanvasDrag = () => {
         if (scaleInput) scaleInput.value = String(nextScale);
         if (scaleValue) scaleValue.textContent = `${nextScale}%`;
       } else {
-        setKey('rsyaKVOffsetX', Math.round(drag.baseX + dx));
-        setKey('rsyaKVOffsetY', Math.round(drag.baseY + dy));
+        let nextOffsetX = Math.round(drag.baseX + dx);
+        let nextOffsetY = Math.round(drag.baseY + dy);
+
+        if (event.shiftKey) {
+          const snapped = getRsyaKVCenterSnapOffsets(state);
+          if (snapped) {
+            nextOffsetX = snapped.x;
+            nextOffsetY = snapped.y;
+          }
+        }
+
+        setKey('rsyaKVOffsetX', nextOffsetX);
+        setKey('rsyaKVOffsetY', nextOffsetY);
+        const offsetXInput = document.getElementById('rsyaKVOffsetX');
+        const offsetYInput = document.getElementById('rsyaKVOffsetY');
+        const offsetXValue = document.getElementById('rsyaKVOffsetXValue');
+        const offsetYValue = document.getElementById('rsyaKVOffsetYValue');
+        if (offsetXInput) offsetXInput.value = String(nextOffsetX);
+        if (offsetYInput) offsetYInput.value = String(nextOffsetY);
+        if (offsetXValue) offsetXValue.textContent = String(nextOffsetX);
+        if (offsetYValue) offsetYValue.textContent = String(nextOffsetY);
       }
     }
     renderer.render();
@@ -1552,10 +1525,10 @@ export const initializeRsyaCanvasDrag = () => {
         type: 'kv-scale',
         startX: event.clientX,
         startY: event.clientY,
-        baseScale: Number(state.rsyaKVScale) || 150,
+        baseScale: Number(state.rsyaKVScale) || 200,
         baseMetaH: meta ? Number(meta.kvH) || 1 : 1
       };
-      setDraggingCursor('nwse-resize');
+      setDraggingCursor('nesw-resize');
     } else if (mode === 'move') {
       drag = {
         type: 'kv',
@@ -2026,6 +1999,13 @@ export const selectLayoutMode = (mode) => {
   renderer.render();
 };
 
+export const selectRsyaLayout = (mode) => {
+  const next = mode === 'left' ? 'left' : 'center';
+  setKey('rsyaLayout', next);
+  setToggleSwitchValue('rsyaLayoutToggle', next);
+  renderer.render();
+};
+
 const setToggleSwitchValue = (toggleId, value) => {
   const toggle = document.getElementById(toggleId);
   if (!toggle) return;
@@ -2065,10 +2045,22 @@ const updateProjectModeUI = () => {
   if (logoPosGroup) logoPosGroup.style.display = isRsya ? 'none' : 'block';
   const hideSubtitleOnWideGroup = document.getElementById('hideSubtitleOnWideGroup');
   if (hideSubtitleOnWideGroup) hideSubtitleOnWideGroup.style.display = isRsya ? 'none' : 'block';
+  const titleAlignGroup = document.getElementById('titleAlignToggle')?.closest('.form-group');
+  if (titleAlignGroup) titleAlignGroup.style.display = isRsya ? 'none' : 'flex';
+  const titleVPosGroup = document.getElementById('titleVPosToggle')?.closest('.form-group');
+  if (titleVPosGroup) titleVPosGroup.style.display = isRsya ? 'none' : 'flex';
   const rsyaControls = document.getElementById('rsyaKVControls');
   if (rsyaControls) rsyaControls.style.display = 'block';
   const exportSizesControls = document.getElementById('exportSizesControls');
   if (exportSizesControls) exportSizesControls.style.display = isRsya ? 'none' : 'block';
+  const exportPngButton = document.querySelector('[data-function="exportAllPNG"]');
+  if (exportPngButton) {
+    exportPngButton.textContent = isRsya ? 'PNG' : t('export.png');
+  }
+  const exportJpgButton = document.querySelector('[data-function="exportAllJPG"]');
+  if (exportJpgButton) {
+    exportJpgButton.textContent = isRsya ? 'JPG' : t('export.jpg');
+  }
   updateRsyaKVOverlay(false);
 };
 
@@ -2090,18 +2082,20 @@ const setVariantModeState = (mode) => {
 
 export const selectProjectMode = async (mode) => {
   const targetMode = mode === 'rsya' ? 'rsya' : 'layouts';
-  const stateBeforeSwitch = getState();
+  const currentState = getState();
+  const currentGap = Number(currentState.titleLogoGap);
   setKey('projectMode', targetMode);
-  const currentGap = Number(stateBeforeSwitch?.titleLogoGap);
-  if (targetMode === 'rsya' && currentGap === 0) {
-    setKey('titleLogoGap', 4);
-  } else if (targetMode === 'layouts' && currentGap === 4) {
+  if (targetMode === 'layouts' && currentGap === 4) {
     setKey('titleLogoGap', 0);
+  } else if (targetMode === 'rsya' && currentGap === 0) {
+    setKey('titleLogoGap', 4);
   }
   updateProjectModeTags(targetMode);
   updateProjectModeUI();
   if (targetMode === 'rsya') {
     setKey('showGuides', false);
+  } else {
+    selectAllSizesAction();
   }
   updatePreviewSizeSelect();
   renderer.render();
@@ -2430,14 +2424,6 @@ export const initializeProModeToggle = async () => {
   const rsyaLayoutToggle = document.getElementById('rsyaLayoutToggle');
   if (rsyaLayoutToggle) {
     setToggleSwitchValue('rsyaLayoutToggle', state.rsyaLayout || 'center');
-    rsyaLayoutToggle.querySelectorAll('.toggle-switch-option').forEach((option) => {
-      option.addEventListener('click', () => {
-        const next = option.dataset.value;
-        setKey('rsyaLayout', next);
-        setToggleSwitchValue('rsyaLayoutToggle', next);
-        renderer.render();
-      });
-    });
   }
 };
 
@@ -2535,6 +2521,12 @@ export const updateTitleLogoGap = (value) => {
   renderer.render();
 };
 
+export const updateRsyaCropGridVisible = (value) => {
+  const nextValue = !!value;
+  setKey('rsyaCropGridVisible', nextValue);
+  renderer.render();
+};
+
 export const updateAgeGapPercent = (value) => {
   const numeric = parseFloat(value);
   if (isNaN(numeric)) {
@@ -2561,19 +2553,6 @@ export const updateAgeSize = (value) => {
     dom.ageSizeValue.textContent = `${numeric}%`;
   }
   renderer.render();
-};
-
-export const updateRsyaCropGridVisible = (value) => {
-  const checked = Boolean(value);
-  setKey('rsyaCropGridVisible', checked);
-  const sourceCanvas = document.getElementById('previewCanvasWide');
-  if (sourceCanvas && sourceCanvas.width && sourceCanvas.height) {
-    requestAnimationFrame(() => {
-      updateRsyaCropPreviews(sourceCanvas, getState());
-    });
-  } else {
-    renderer.render();
-  }
 };
 
 // updateKVBorderRadius теперь импортируется из ./components/kvSelector.js
@@ -3071,7 +3050,7 @@ export const loadSettings = () => {
   if (state.brandName) {
     localStorage.setItem('brandName', state.brandName);
     
-    document.title = 'Multi-Artboard Layout Generator';
+    document.title = 'AI-Craft';
   }
 
   syncFormFields();
@@ -3971,11 +3950,11 @@ const renderKVPairs = () => {
             kvDisplayText = foundName;
           } else {
             // Используем имя файла без расширения
-            kvDisplayText = pair.kvSelected.split('/').pop().replace(/\.(png|jpg|jpeg)$/i, '');
+            kvDisplayText = pair.kvSelected.split('/').pop().replace(/\.(png|jpg|jpeg|webp)$/i, '');
           }
         } else {
           // Используем имя файла без расширения
-          kvDisplayText = pair.kvSelected.split('/').pop().replace(/\.(png|jpg|jpeg)$/i, '');
+          kvDisplayText = pair.kvSelected.split('/').pop().replace(/\.(png|jpg|jpeg|webp)$/i, '');
         }
       }
     }
@@ -4077,36 +4056,6 @@ const renderTitleSubtitlePairs = () => {
   pairs.forEach((pair, index) => {
     const isActive = index === activeIndex;
     
-    // Создаем header с label и кнопкой для заголовка
-    const titleHeader = document.createElement('div');
-    titleHeader.className = 'form-header';
-    if (isActive) titleHeader.classList.add('active');
-    
-    const titleLabel = document.createElement('label');
-    titleLabel.className = `form-label ${isActive ? 'active' : ''}`;
-    titleLabel.textContent = 'Заголовок';
-    titleLabel.onclick = () => setActiveTitlePair(index);
-    
-    const titleButtons = document.createElement('div');
-    titleButtons.className = 'gap-sm';
-    titleButtons.style.cssText = 'display: flex; align-items: center;';
-    
-    if (pairs.length > 1) {
-      const removeBtn = document.createElement('button');
-      removeBtn.className = 'btn btn-small btn-danger';
-      removeBtn.style.cssText = 'min-width: 32px;';
-      removeBtn.title = 'Удалить';
-      removeBtn.innerHTML = '<span class="material-icons" style="font-size: 18px;">remove</span>';
-      removeBtn.onclick = (e) => {
-        e.stopPropagation();
-        removeTitleSubtitlePairAction(index);
-      };
-      titleButtons.appendChild(removeBtn);
-    }
-    
-    titleHeader.appendChild(titleLabel);
-    titleHeader.appendChild(titleButtons);
-    
     // Создаем textarea для заголовка
     const titleTextarea = document.createElement('textarea');
     titleTextarea.id = `title-${index}`;
@@ -4126,25 +4075,15 @@ const renderTitleSubtitlePairs = () => {
       }
     };
     
-    // Добавляем заголовок напрямую в контейнер
-    titleContainer.appendChild(titleHeader);
-    titleContainer.appendChild(titleTextarea);
-    
-    // Создаем header с label и кнопкой для подзаголовка
-    const subtitleHeader = document.createElement('div');
-    subtitleHeader.className = 'form-header';
-    if (isActive) subtitleHeader.classList.add('active');
-    
-    const subtitleLabel = document.createElement('label');
-    subtitleLabel.className = `form-label ${isActive ? 'active' : ''}`;
-    subtitleLabel.textContent = 'Подзаголовок';
-    subtitleLabel.onclick = () => setActiveTitlePair(index);
-    
-    const subtitleButtons = document.createElement('div');
-    subtitleButtons.className = 'gap-sm';
-    subtitleButtons.style.cssText = 'display: flex;';
-    
     if (pairs.length > 1) {
+      const titleHeader = document.createElement('div');
+      titleHeader.className = 'form-header';
+      if (isActive) titleHeader.classList.add('active');
+
+      const titleButtons = document.createElement('div');
+      titleButtons.className = 'gap-sm';
+      titleButtons.style.cssText = 'display: flex; align-items: center; margin-left: auto;';
+
       const removeBtn = document.createElement('button');
       removeBtn.className = 'btn btn-small btn-danger';
       removeBtn.style.cssText = 'min-width: 32px;';
@@ -4154,13 +4093,12 @@ const renderTitleSubtitlePairs = () => {
         e.stopPropagation();
         removeTitleSubtitlePairAction(index);
       };
-      subtitleButtons.appendChild(removeBtn);
+      titleButtons.appendChild(removeBtn);
+      titleHeader.appendChild(titleButtons);
+      titleContainer.appendChild(titleHeader);
     }
-    
-    subtitleHeader.appendChild(subtitleLabel);
-    if (pairs.length > 1) {
-      subtitleHeader.appendChild(subtitleButtons);
-    }
+
+    titleContainer.appendChild(titleTextarea);
     
     // Создаем textarea для подзаголовка
     const subtitleTextarea = document.createElement('textarea');
@@ -4182,7 +4120,29 @@ const renderTitleSubtitlePairs = () => {
     };
     
     // Добавляем подзаголовок напрямую в контейнер
-    subtitleContainer.appendChild(subtitleHeader);
+    if (pairs.length > 1) {
+      const subtitleHeader = document.createElement('div');
+      subtitleHeader.className = 'form-header';
+      if (isActive) subtitleHeader.classList.add('active');
+
+      const subtitleButtons = document.createElement('div');
+      subtitleButtons.className = 'gap-sm';
+      subtitleButtons.style.cssText = 'display: flex; margin-left: auto;';
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn btn-small btn-danger';
+      removeBtn.style.cssText = 'min-width: 32px;';
+      removeBtn.title = 'Удалить';
+      removeBtn.innerHTML = '<span class="material-icons" style="font-size: 18px;">remove</span>';
+      removeBtn.onclick = (e) => {
+        e.stopPropagation();
+        removeTitleSubtitlePairAction(index);
+      };
+      subtitleButtons.appendChild(removeBtn);
+      subtitleHeader.appendChild(subtitleButtons);
+      subtitleContainer.appendChild(subtitleHeader);
+    }
+
     subtitleContainer.appendChild(subtitleTextarea);
     
     // Создаем функцию для создания дивайдера с кнопкой
@@ -4385,7 +4345,7 @@ export const initializeStateSubscribers = () => {
       localStorage.setItem('brandName', state.brandName);
       lastBrandName = state.brandName;
       
-      document.title = 'Multi-Artboard Layout Generator';
+      document.title = 'AI-Craft';
     }
     
     // Перерисовываем только если изменилась структура (количество/ID) пар или активный индекс

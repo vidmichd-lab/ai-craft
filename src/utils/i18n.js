@@ -481,7 +481,7 @@ const translations = {
   },
   tr: {
     // Header
-    'app.title': 'Practicum Düzen Oluşturucu',
+    'app.title': 'AI-Craft',
     'theme.toggle': 'Temayı değiştir',
     
     // Tabs
@@ -678,7 +678,7 @@ const translations = {
     
     // Guide Modal
     'guide.title': 'Nasıl çalışır?',
-    'guide.welcome': 'Practicum Düzen Oluşturucu\'ya hoş geldiniz!',
+    'guide.welcome': 'AI-Craft\'a hos geldiniz!',
     'guide.intro': 'Bu araç, çeşitli formatlar ve boyutlar için reklam düzenleri oluşturmanıza yardımcı olacaktır.',
     'guide.layout.title': 'Düzen',
     'guide.layout.desc': 'Temel düzen parametrelerini yapılandırın:',
@@ -956,7 +956,7 @@ const translations = {
   },
   en: {
     // Header
-    'app.title': 'Practicum Layout Generator',
+    'app.title': 'AI-Craft',
     'theme.toggle': 'Toggle theme',
     
     // Tabs
@@ -1154,7 +1154,7 @@ const translations = {
     
     // Guide Modal
     'guide.title': 'How does it work?',
-    'guide.welcome': 'Welcome to Practicum Layout Generator!',
+    'guide.welcome': 'Welcome to AI-Craft!',
     'guide.intro': 'This tool will help you quickly create advertising layouts for various formats and sizes.',
     'guide.layout.title': 'Layout',
     'guide.layout.desc': 'Configure basic layout parameters:',

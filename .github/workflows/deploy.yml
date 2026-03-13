@@ -1,43 +1,47 @@
-name: Deploy AI-Craft to Yandex Cloud
+name: Deploy to Yandex Cloud
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ru-central1
-      YC_BUCKET_NAME: ${{ secrets.YC_BUCKET_NAME }}
-      YC_ENDPOINT_URL: https://storage.yandexcloud.net
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
-      - name: Validate required secrets
-        run: |
-          test -n "${AWS_ACCESS_KEY_ID}"
-          test -n "${AWS_SECRET_ACCESS_KEY}"
-          test -n "${YC_BUCKET_NAME}"
+      - name: Install s3cmd
+        run: pip install s3cmd
 
-      - name: Install AWS CLI
+      - name: Get changed files
+        id: changed
         run: |
-          python -m pip install --upgrade pip
-          pip install awscli
+          git diff --name-only HEAD~1 HEAD > changed_files.txt
+          cat changed_files.txt
 
-      - name: Show deployment target
+      - name: Deploy changed files to Yandex Cloud S3
         run: |
-          echo "Bucket: ${YC_BUCKET_NAME}"
-          aws --endpoint-url="${YC_ENDPOINT_URL}" s3 ls "s3://${YC_BUCKET_NAME}"
-
-      - name: Deploy
-        run: |
-          chmod +x deploy.sh
-          ./deploy.sh
+          while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              echo "Uploading: $file"
+              s3cmd put "$file" "s3://${{ secrets.YC_BUCKET_NAME }}/$file" \
+                --host=storage.yandexcloud.net \
+                --host-bucket="%(bucket)s.storage.yandexcloud.net" \
+                --access_key=${{ secrets.YC_ACCESS_KEY_ID }} \
+                --secret_key=${{ secrets.YC_SECRET_ACCESS_KEY }} \
+                --acl-public \
+                --guess-mime-type \
+                --no-mime-magic
+            else
+              echo "Deleted: $file — removing from bucket"
+              s3cmd del "s3://${{ secrets.YC_BUCKET_NAME }}/$file" \
+                --host=storage.yandexcloud.net \
+                --host-bucket="%(bucket)s.storage.yandexcloud.net" \
+                --access_key=${{ secrets.YC_ACCESS_KEY_ID }} \
+                --secret_key=${{ secrets.YC_SECRET_ACCESS_KEY }}
+            fi
+          done < changed_files.txt

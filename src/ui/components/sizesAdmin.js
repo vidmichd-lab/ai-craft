@@ -2502,7 +2502,7 @@ const openSizesAdmin = async () => {
               <div style="padding: 12px; background: rgba(33, 150, 243, 0.1); border-left: 3px solid #2196F3; border-radius: 4px;">
                 <div style="font-size: 12px; color: ${textSecondary}; margin-bottom: 4px;">Пример использования:</div>
                 <div style="font-size: 14px; color: ${textPrimary}; font-weight: 500;" id="brandNamePreview">
-                  Practicum AI-Craft — ${getState().brandName || 'Практикума'}
+                  AI-Craft — ${getState().brandName || 'Практикума'}
                 </div>
               </div>
             </div>
@@ -3225,7 +3225,7 @@ const setupAdminHandlers = (initialSizes) => {
       const brandName = e.target.value.trim() || 'Практикума';
       const preview = document.getElementById('brandNamePreview');
       if (preview) {
-        preview.textContent = `Practicum AI-Craft — ${brandName}`;
+        preview.textContent = `AI-Craft — ${brandName}`;
       }
     });
   }
@@ -3770,7 +3770,7 @@ const setupAdminHandlers = (initialSizes) => {
       const brandName = brandNameInput.value.trim() || 'Практикума';
       setKey('brandName', brandName);
       
-      document.title = 'Multi-Artboard Layout Generator';
+      document.title = 'AI-Craft';
       
       // Обновляем заголовки в парах, если они содержат старое название
       state = getState(); // Обновляем state после изменения brandName
@@ -3941,7 +3941,7 @@ const setupAdminHandlers = (initialSizes) => {
       // Обновляем название бренда, если оно было импортировано
       if (imported.brandName) {
         setKey('brandName', imported.brandName);
-        document.title = 'Multi-Artboard Layout Generator';
+        document.title = 'AI-Craft';
       }
       
       // Перезагружаем страницу для применения всех изменений

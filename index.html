@@ -27,34 +27,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="dns-prefetch" href="https://fonts.googleapis.com">
   
-  <!-- Единый источник версии приложения -->
+  <!-- Версия приложения для обхода кеша -->
+  <!-- ⚠️ ALSO UPDATE CACHE_VERSION in sw.js -->
   <script>
-    window.APP_VERSION = '1.0.6';
+    window.APP_VERSION = '1.0.4';
     window.APP_BUILD_TIME = new Date().toISOString();
-
-    (function injectVersionedAssets(version) {
-      const head = document.head;
-      const makeUrl = (path) => `${path}?v=${encodeURIComponent(version)}`;
-      const appendLink = (rel, href, extra = {}) => {
-        const link = document.createElement('link');
-        link.rel = rel;
-        link.href = href;
-        Object.entries(extra).forEach(([key, value]) => {
-          link.setAttribute(key, value);
-        });
-        head.appendChild(link);
-      };
-
-      appendLink('preload', makeUrl('styles.css'), { as: 'style' });
-      appendLink('modulepreload', makeUrl('src/main.js'));
-      appendLink('modulepreload', makeUrl('src/constants.js'));
-      appendLink('modulepreload', makeUrl('src/state/store.js'));
-      appendLink('prefetch', makeUrl('sizes-config.json'), { as: 'fetch', crossorigin: '' });
-      appendLink('modulepreload', makeUrl('src/utils/assetScanner.js'));
-      appendLink('modulepreload', makeUrl('src/utils/imageCache.js'));
-      appendLink('stylesheet', makeUrl('styles.css'));
-    })(window.APP_VERSION);
   </script>
+  
+  <!-- Preload критических ресурсов -->
+  <link rel="preload" href="styles.css?v=1.0.4" as="style">
+  <link rel="modulepreload" href="src/main.js?v=1.0.4">
+  <link rel="modulepreload" href="src/constants.js?v=1.0.4">
+  <link rel="modulepreload" href="src/state/store.js?v=1.0.4">
+  <!-- Do not preload or script-load renderer.js; it must load only via import from main.js (ES module) -->
+  <link rel="prefetch" href="sizes-config.json?v=1.0.4" as="fetch" crossorigin>
+  <link rel="modulepreload" href="src/utils/assetScanner.js?v=1.0.4">
+  <link rel="modulepreload" href="src/utils/imageCache.js?v=1.0.4">
+  
+  <link rel="stylesheet" href="styles.css?v=1.0.4">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script>
     // Инициализация темы до загрузки страницы (избегаем мерцания)
@@ -187,7 +177,7 @@
             </div>
             <div class="form-group" id="rsyaCropGuidesGroup">
               <div class="checkbox-group">
-                <input type="checkbox" id="rsyaCropGridVisibleToggle" data-state-key="rsyaCropGridVisible" data-update-handler="updateRsyaCropGridVisible">
+                <input type="checkbox" id="rsyaCropGridVisibleToggle" data-update-handler="updateRsyaCropGridVisible">
                 <label for="rsyaCropGridVisibleToggle" style="margin: 0;">Линии обрезки</label>
               </div>
             </div>
@@ -701,10 +691,8 @@
               </div>
             </div>
           <div class="form-group">
-            <label for="legal" data-i18n="legal.text">Текст</label>
             <textarea id="legal" data-state-key="legal">Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/</textarea>
             <div class="form-group" style="margin-top: 12px;">
-              <label data-i18n="legal.transform">Трансформация</label>
               <div class="toggle-switch" id="legalTransformToggle" data-value="none" data-options="3">
                 <div class="toggle-switch-slider"></div>
                 <div class="toggle-switch-track">
@@ -716,7 +704,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label data-i18n="legal.color">Цвет</label>
             <div class="input-group" style="display: flex; gap: 8px; align-items: center;">
               <label for="legalColor" class="sr-only" data-i18n="legal.color">Цвет юридического текста</label>
               <input type="color" id="legalColor" value="#ffffff" data-state-key="legalColor" data-update-handler="updateColorFromPicker" data-handler-param="legalColor" style="flex: 0 0 60px;" data-i18n-aria-label="aria.legalColor" title="Выберите цвет юридического текста">
@@ -799,7 +786,6 @@
               </div>
             </div>
             <div class="form-group">
-              <label for="age" data-i18n="legal.age.text">Возраст</label>
               <input type="text" id="age" value="18+" data-state-key="age">
             </div>
             <div class="form-group">
@@ -813,7 +799,6 @@
              
             </div>
             <div class="form-group">
-              <label data-i18n="legal.age.font">Шрифт</label>
               <div style="display: flex; gap: 8px;">
                 <div class="custom-select-wrapper" style="flex: 1;">
                   <div class="custom-select-button" id="ageFontFamilyBtn">
@@ -897,6 +882,9 @@
                 <div id="rsyaVisualReorder" class="rsya-visual-reorder" style="margin-bottom: 12px;">
                   <div class="rsya-visual-slot" data-rsya-slot-wrap="0">
                     <button type="button" class="rsya-visual-item active" data-rsya-visual-slot="0" draggable="true" aria-label="Визуал 1">
+                      <span class="rsya-visual-item-handle" aria-hidden="true">
+                        <span class="material-icons">drag_indicator</span>
+                      </span>
                       <span class="rsya-visual-item-plus" aria-hidden="true">+</span>
                     </button>
                     <div class="rsya-visual-actions">
@@ -910,6 +898,9 @@
                   </div>
                   <div class="rsya-visual-slot" data-rsya-slot-wrap="1">
                     <button type="button" class="rsya-visual-item" data-rsya-visual-slot="1" draggable="true" aria-label="Визуал 2">
+                      <span class="rsya-visual-item-handle" aria-hidden="true">
+                        <span class="material-icons">drag_indicator</span>
+                      </span>
                       <span class="rsya-visual-item-plus" aria-hidden="true">+</span>
                     </button>
                     <div class="rsya-visual-actions">
@@ -923,6 +914,9 @@
                   </div>
                   <div class="rsya-visual-slot" data-rsya-slot-wrap="2">
                     <button type="button" class="rsya-visual-item" data-rsya-visual-slot="2" draggable="true" aria-label="Визуал 3">
+                      <span class="rsya-visual-item-handle" aria-hidden="true">
+                        <span class="material-icons">drag_indicator</span>
+                      </span>
                       <span class="rsya-visual-item-plus" aria-hidden="true">+</span>
                     </button>
                     <div class="rsya-visual-actions">
@@ -977,38 +971,7 @@
       
       <!-- Center Canvas Preview -->
       <div class="canvas-area" id="canvasArea">
-        <div style="max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px;">
-          <div class="theme-bg-secondary" id="previewSelectorsWrap" style="padding: 8px; border-radius: 12px;">
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-              <div>
-                <div class="custom-select-wrapper">
-                  <div class="custom-select-button" id="previewSizeSelectNarrowBtn">
-                    <span id="previewSizeSelectNarrowText" data-i18n="export.preview.select">Выберите...</span>
-                    <span class="custom-select-arrow">▼</span>
-                  </div>
-                  <div class="custom-select-dropdown" id="previewSizeSelectNarrowDropdown"></div>
-                </div>
-              </div>
-              <div>
-                <div class="custom-select-wrapper">
-                  <div class="custom-select-button" id="previewSizeSelectSquareBtn">
-                    <span id="previewSizeSelectSquareText" data-i18n="export.preview.select">Выберите...</span>
-                    <span class="custom-select-arrow">▼</span>
-                  </div>
-                  <div class="custom-select-dropdown" id="previewSizeSelectSquareDropdown"></div>
-                </div>
-              </div>
-              <div>
-                <div class="custom-select-wrapper">
-                  <div class="custom-select-button" id="previewSizeSelectWideBtn">
-                    <span id="previewSizeSelectWideText" data-i18n="export.preview.select">Выберите...</span>
-                    <span class="custom-select-arrow">▼</span>
-                  </div>
-                  <div class="custom-select-dropdown" id="previewSizeSelectWideDropdown"></div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div style="width: 100%; margin: 0; display: flex; flex-direction: column; gap: 12px;">
           <div id="rsyaPreviewStage">
             <div id="rsyaCropPreviewSection" class="theme-bg-secondary" style="display:none; padding: 12px; border-radius: 12px;">
               <div class="rsya-crop-thumbs">
@@ -1064,10 +1027,41 @@
               <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;">
                 <div style="width: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-height: 300px; position: relative;">
                   <canvas id="previewCanvasWide" style="max-width: 100%; max-height: 100%; height: auto; display: none; opacity: 0; transition: opacity 0.3s ease;"></canvas>
-                  <canvas id="rsyaActivePreviewCanvas" style="width: 100%; height: auto; display: none; opacity: 1;"></canvas>
+                  <canvas id="rsyaActivePreviewCanvas" style="width: 100%; height: auto; display: none; opacity: 1; border-radius: 8px;"></canvas>
                   <div id="rsyaKVOverlay" class="rsya-kv-overlay" style="display: none;">
                     <div class="rsya-kv-overlay-handle"></div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="theme-bg-secondary" id="previewSelectorsWrap">
+            <div class="preview-selectors-grid">
+              <div>
+                <div class="custom-select-wrapper">
+                  <div class="custom-select-button" id="previewSizeSelectNarrowBtn">
+                    <span id="previewSizeSelectNarrowText" data-i18n="export.preview.select">Выберите...</span>
+                    <span class="custom-select-arrow">▼</span>
+                  </div>
+                  <div class="custom-select-dropdown" id="previewSizeSelectNarrowDropdown"></div>
+                </div>
+              </div>
+              <div>
+                <div class="custom-select-wrapper">
+                  <div class="custom-select-button" id="previewSizeSelectSquareBtn">
+                    <span id="previewSizeSelectSquareText" data-i18n="export.preview.select">Выберите...</span>
+                    <span class="custom-select-arrow">▼</span>
+                  </div>
+                  <div class="custom-select-dropdown" id="previewSizeSelectSquareDropdown"></div>
+                </div>
+              </div>
+              <div>
+                <div class="custom-select-wrapper">
+                  <div class="custom-select-button" id="previewSizeSelectWideBtn">
+                    <span id="previewSizeSelectWideText" data-i18n="export.preview.select">Выберите...</span>
+                    <span class="custom-select-arrow">▼</span>
+                  </div>
+                  <div class="custom-select-dropdown" id="previewSizeSelectWideDropdown"></div>
                 </div>
               </div>
             </div>
@@ -1286,13 +1280,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
   <!-- Единственная точка входа приложения: только как ES module -->
-  <script>
-    (function injectEntryModule(version) {
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.src = `./src/main.js?v=${encodeURIComponent(version)}`;
-      document.body.appendChild(script);
-    })(window.APP_VERSION);
-  </script>
+  <script type="module" src="./src/main.js?v=1.0.4"></script>
 </body>
 </html>

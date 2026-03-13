@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Скрипт для деплоя статического сайта AI-Craft в Yandex Object Storage
-# Бакет по умолчанию: ai-craft
+# Скрипт для деплоя статического сайта в Yandex Object Storage
+# Бакет: practicum-banners
 #
 # Режимы: по умолчанию — только изменённые файлы (MD5 vs ETag).
 #         ./deploy.sh --full — полная синхронизация и удаление с S3.
 
 set -e
 
-BUCKET_NAME="${YC_BUCKET_NAME:-ai-craft}"
-ENDPOINT_URL="${YC_ENDPOINT_URL:-https://storage.yandexcloud.net}"
+BUCKET_NAME="practicum-banners"
+ENDPOINT_URL="https://storage.yandexcloud.net"
 LOCAL_DIR="."
 
 # Режим деплоя: 0 = только изменённые (по хешу), 1 = полная синхронизация (sync + удаление)
@@ -291,23 +291,24 @@ get_content_type() {
 }
 
 # Функция для определения Cache-Control по типу файла
-# Настройки оптимизированы для static-first деплоя через Object Storage + CDN.
-# index.html всегда должен быстро обновляться, а versioned assets могут жить долго.
+# Настройки оптимизированы для автоматического обновления без необходимости очистки кеша
 get_cache_control() {
     local file=$1
     local ext="${file##*.}"
     case "$ext" in
         html) 
-            # HTML должен проверяться при каждой загрузке, чтобы пользователь быстрее получал новый APP_VERSION
-            echo "no-cache, no-store, must-revalidate, max-age=0"
+            # HTML файлы проверяются на актуальность при каждой загрузке
+            # no-cache означает, что браузер должен проверять сервер перед использованием кеша
+            echo "no-cache, must-revalidate, max-age=0" 
             ;;
         css|js) 
-            # В проекте CSS/JS подключаются с ?v=APP_VERSION, поэтому можно кешировать агрессивно
-            echo "public, max-age=31536000, immutable"
+            # JS/CSS файлы проверяются на обновления при каждой загрузке
+            # Используем no-cache вместо max-age=0 для лучшей совместимости
+            echo "no-cache, must-revalidate" 
             ;;
         json) 
-            # Конфигурационные JSON в проекте тоже версионируются через query string
-            echo "public, max-age=31536000, immutable"
+            # JSON файлы (конфигурация) тоже должны обновляться
+            echo "no-cache, must-revalidate" 
             ;;
         png|jpg|jpeg|gif|webp|svg|ico) 
             # Изображения кешируются долго, так как они редко меняются
@@ -348,8 +349,6 @@ upload_with_content_type() {
 if [ "$FULL_DEPLOY" -eq 1 ]; then
 echo "  Проверка изменённых файлов..."
 SYNC_OUTPUT=$(aws --endpoint-url=${ENDPOINT_URL} s3 sync "${LOCAL_DIR}" "s3://${BUCKET_NAME}/" \
-    --exclude ".github/*" \
-    --exclude ".deploy-manifest" \
     --exclude ".DS_Store" \
     --exclude "__pycache__/*" \
     --exclude "*.pyc" \
@@ -496,7 +495,6 @@ else
   }
 
   ALL_FILES=$(find . -type f \
-    ! -path './.github/*' \
     ! -path './.git/*' \
     ! -path './__pycache__/*' \
     ! -path './node_modules/*' \
@@ -507,7 +505,6 @@ else
     ! -name '*.tmp' \
     ! -name '.gitignore' \
     ! -name '.gitattributes' \
-    ! -name '.deploy-manifest' \
     ! -name 'compress_images.py' \
     ! -name 'start_server.py' \
     ! -name 'deploy.sh' \
