@@ -5,9 +5,9 @@
 // Версия кеша - обновлять при каждом деплое
 // ⚠️ MUST MATCH APP_VERSION in index.html
 const CACHE_VERSION = '1.0.4';
-const CACHE_NAME = `practicum-banners-v${CACHE_VERSION}`;
-const STATIC_CACHE_NAME = `practicum-banners-static-v${CACHE_VERSION}`;
-const IMAGE_CACHE_NAME = `practicum-banners-images-v${CACHE_VERSION}`;
+const CACHE_NAME = `ai-craft-v${CACHE_VERSION}`;
+const STATIC_CACHE_NAME = `ai-craft-static-v${CACHE_VERSION}`;
+const IMAGE_CACHE_NAME = `ai-craft-images-v${CACHE_VERSION}`;
 
 // Ресурсы для кеширования при установке (с версионированием)
 const STATIC_ASSETS = [

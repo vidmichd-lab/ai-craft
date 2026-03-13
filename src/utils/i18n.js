@@ -7,7 +7,7 @@
 const translations = {
   ru: {
     // Header
-    'app.title': 'Practicum AI-Craft',
+    'app.title': 'AI-Craft',
     'theme.toggle': 'Переключить тему',
     
     // Tabs
@@ -205,7 +205,7 @@ const translations = {
     
     // Guide Modal
     'guide.title': 'Как это работает?',
-    'guide.welcome': 'Добро пожаловать в Practicum AI-Craft!',
+    'guide.welcome': 'Добро пожаловать в AI-Craft!',
     'guide.intro': 'Этот инструмент поможет вам быстро создавать рекламные макеты для различных форматов и размеров.',
     'guide.layout.title': 'Макет',
     'guide.layout.desc': 'Настройте базовые параметры макета:',

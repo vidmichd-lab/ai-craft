@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Скрипт для деплоя статического сайта в Yandex Object Storage
-# Бакет: practicum-banners
+# Скрипт для деплоя статического сайта AI-Craft в Yandex Object Storage
+# Бакет по умолчанию: ai-craft-prod
 #
 # Режимы: по умолчанию — только изменённые файлы (MD5 vs ETag).
 #         ./deploy.sh --full — полная синхронизация и удаление с S3.
 
 set -e
 
-BUCKET_NAME="practicum-banners"
-ENDPOINT_URL="https://storage.yandexcloud.net"
+BUCKET_NAME="${YC_BUCKET_NAME:-ai-craft-prod}"
+ENDPOINT_URL="${YC_ENDPOINT_URL:-https://storage.yandexcloud.net}"
 LOCAL_DIR="."
 
 # Режим деплоя: 0 = только изменённые (по хешу), 1 = полная синхронизация (sync + удаление)
@@ -291,24 +291,23 @@ get_content_type() {
 }
 
 # Функция для определения Cache-Control по типу файла
-# Настройки оптимизированы для автоматического обновления без необходимости очистки кеша
+# Настройки оптимизированы для static-first деплоя через Object Storage + CDN.
+# index.html всегда должен быстро обновляться, а versioned assets могут жить долго.
 get_cache_control() {
     local file=$1
     local ext="${file##*.}"
     case "$ext" in
         html) 
-            # HTML файлы проверяются на актуальность при каждой загрузке
-            # no-cache означает, что браузер должен проверять сервер перед использованием кеша
-            echo "no-cache, must-revalidate, max-age=0" 
+            # HTML должен проверяться при каждой загрузке, чтобы пользователь быстрее получал новый APP_VERSION
+            echo "no-cache, no-store, must-revalidate, max-age=0"
             ;;
         css|js) 
-            # JS/CSS файлы проверяются на обновления при каждой загрузке
-            # Используем no-cache вместо max-age=0 для лучшей совместимости
-            echo "no-cache, must-revalidate" 
+            # В проекте CSS/JS подключаются с ?v=APP_VERSION, поэтому можно кешировать агрессивно
+            echo "public, max-age=31536000, immutable"
             ;;
         json) 
-            # JSON файлы (конфигурация) тоже должны обновляться
-            echo "no-cache, must-revalidate" 
+            # Конфигурационные JSON в проекте тоже версионируются через query string
+            echo "public, max-age=31536000, immutable"
             ;;
         png|jpg|jpeg|gif|webp|svg|ico) 
             # Изображения кешируются долго, так как они редко меняются

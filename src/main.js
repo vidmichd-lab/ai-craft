@@ -745,12 +745,12 @@ const initialize = async () => {
       const savedBrandName = localStorage.getItem('brandName');
       if (savedBrandName) {
         setKey('brandName', savedBrandName);
-        document.title = 'Multi-Artboard Layout Generator';
+        document.title = 'AI-Craft';
       } else {
         // Используем значение из state
         const state = getState();
         if (state.brandName) {
-          document.title = 'Multi-Artboard Layout Generator';
+          document.title = 'AI-Craft';
         }
       }
     } catch (e) {
