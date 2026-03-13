@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Скрипт для деплоя статического сайта в Yandex Object Storage
-# Бакет: practicum-banners
+# Бакет: ai-craft
 #
 # Режимы: по умолчанию — только изменённые файлы (MD5 vs ETag).
 #         ./deploy.sh --full — полная синхронизация и удаление с S3.
 
 set -e
 
-BUCKET_NAME="practicum-banners"
+BUCKET_NAME="${YC_BUCKET_NAME:-ai-craft}"
 ENDPOINT_URL="https://storage.yandexcloud.net"
 LOCAL_DIR="."
 
