@@ -120,7 +120,7 @@ const translations = {
     'subtitle.gap': 'Отступ от заголовка',
     
     // Legal Section
-    'legal.show': 'Показывать юридический текст',
+    'legal.show': 'Показывать лигал',
     'legal.text': 'Текст',
     'legal.transform': 'Трансформация',
     'legal.transform.none': '—',

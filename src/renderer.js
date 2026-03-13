@@ -1688,7 +1688,7 @@ const renderToCanvas = (canvas, width, height, state) => {
         const useMultiKV = isRsyaMode || visualCount > 1;
 
         if (useMultiKV) {
-          const scalePercent = Math.max(40, Math.min(300, Number(state.rsyaKVScale) || 150));
+          const scalePercent = Math.max(40, Math.min(300, Number(state.rsyaKVScale) || 200));
           const gapRaw = Number.isFinite(Number(state.rsyaKVGap)) ? Number(state.rsyaKVGap) : 8;
           const offsetX = Number(state.rsyaKVOffsetX) || 0;
           const offsetY = Number(state.rsyaKVOffsetY) || 0;

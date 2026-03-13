@@ -86,7 +86,7 @@
               <div class="toggle-switch-slider"></div>
               <div class="toggle-switch-track">
                 <div class="toggle-switch-option active" data-value="rsya">РСЯ</div>
-                <div class="toggle-switch-option" data-value="layouts">Макеты</div>
+                <div class="toggle-switch-option" data-value="layouts">Перформанс</div>
               </div>
             </div>
           </div>
@@ -183,6 +183,12 @@
                     <span class="material-icons" style="font-size: 18px;">view_week</span>
                   </div>
                 </div>
+              </div>
+            </div>
+            <div class="form-group" id="rsyaCropGuidesGroup">
+              <div class="checkbox-group">
+                <input type="checkbox" id="rsyaCropGridVisibleToggle" data-state-key="rsyaCropGridVisible" data-update-handler="updateRsyaCropGridVisible">
+                <label for="rsyaCropGridVisibleToggle" style="margin: 0;">Линии обрезки</label>
               </div>
             </div>
             <div class="form-group form-group-section">
@@ -547,10 +553,10 @@
           </div>
           <div class="form-group">
             <label for="titleLogoGap">Отступ от логотипа</label>
-            <input type="range" id="titleLogoGap" value="0" min="-20" max="20" step="0.5" data-state-key="titleLogoGap" data-update-handler="updateTitleLogoGap">
+            <input type="range" id="titleLogoGap" value="4" min="-20" max="20" step="0.5" data-state-key="titleLogoGap" data-update-handler="updateTitleLogoGap">
             <div class="slider-value">
               <span>-20%</span>
-              <span id="titleLogoGapValue">0%</span>
+              <span id="titleLogoGapValue">4%</span>
               <span>20%</span>
             </div>
           </div>
@@ -932,10 +938,10 @@
                 <input type="file" id="rsyaKV2Upload" accept="image/*" style="display:none;" data-handler="handleRsyaKV2Upload">
                 <input type="file" id="rsyaKV3Upload" accept="image/*" style="display:none;" data-handler="handleRsyaKV3Upload">
                 <label style="margin-top: 12px;">Масштаб</label>
-                <input type="range" id="rsyaKVScale" min="40" max="300" step="1" value="150" data-state-key="rsyaKVScale">
+                <input type="range" id="rsyaKVScale" min="40" max="300" step="1" value="200" data-state-key="rsyaKVScale">
                 <div class="slider-value">
                   <span>40%</span>
-                  <span id="rsyaKVScaleValue">150%</span>
+                  <span id="rsyaKVScaleValue">200%</span>
                   <span>300%</span>
                 </div>
                 <label style="margin-top: 12px;">Расстояние между</label>
@@ -1014,6 +1020,10 @@
                   <span class="rsya-crop-thumb-label">16:9</span>
                   <canvas id="rsyaCrop169" style="width:100%; border-radius:6px;"></canvas>
                 </button>
+                <button type="button" class="rsya-crop-thumb" data-rsya-crop-key="3.2:1" aria-label="3.2:1">
+                  <span class="rsya-crop-thumb-label">3.2:1</span>
+                  <canvas id="rsyaCrop321" style="width:100%; border-radius:6px;"></canvas>
+                </button>
                 <button type="button" class="rsya-crop-thumb" data-rsya-crop-key="4:3" aria-label="4:3">
                   <span class="rsya-crop-thumb-label">4:3</span>
                   <canvas id="rsyaCrop43" style="width:100%; border-radius:6px;"></canvas>
@@ -1070,11 +1080,9 @@
       <div class="panel">
         <div class="panel-resizer" id="rightPanelResizer"></div>
         <div class="form-group">
-          <label for="namePrefix" data-i18n="export.archiveName">Название архива</label>
-          <input type="text" id="namePrefix" value="layout" data-state-key="namePrefix">
+          <input type="text" id="namePrefix" value="" placeholder="Title" data-state-key="namePrefix">
         </div>
         <div class="form-group">
-          <label data-i18n="export.scale">Масштаб</label>
           <div class="toggle-switch" id="exportScaleToggle" data-value="1" data-options="2">
             <div class="toggle-switch-slider"></div>
             <div class="toggle-switch-track">

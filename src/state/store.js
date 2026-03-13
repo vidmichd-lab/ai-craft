@@ -211,7 +211,7 @@ const createInitialState = () => {
     subtitleLetterSpacing: d('subtitleLetterSpacing', 0),
     subtitleLineHeight: d('subtitleLineHeight', 1.2),
     subtitleGap: dn('subtitleGap', -1, { min: -20, max: 50 }),
-    titleLogoGap: dn('titleLogoGap', 0, { min: -20, max: 50 }),
+    titleLogoGap: dn('titleLogoGap', 4, { min: -20, max: 50 }),
     titleSubtitleRatio: dn('titleSubtitleRatio', 0.5, { min: 0.05, max: 3 }), // Коэффициент зависимости размера подзаголовка от заголовка (0.5 = подзаголовок в 2 раза меньше)
     subtitleFontFamily: d('subtitleFontFamily', null) || d('fontFamily', 'YS Text'),
     subtitleFontFamilyFile: null,
@@ -274,7 +274,7 @@ const createInitialState = () => {
     variantMode: d('variantMode', d('proMode', false) ? 'pro' : (d('logoLanguage', 'ru') === 'kz' ? 'kz' : 'reskill')), // reskill | pro | kz
     rsyaLayout: d('rsyaLayout', 'center'), // center | left
     rsyaVisualCount: dn('rsyaVisualCount', 1, { min: 1, max: 3 }),
-    rsyaKVScale: dn('rsyaKVScale', 150, { min: 40, max: 300 }),
+    rsyaKVScale: dn('rsyaKVScale', 200, { min: 40, max: 300 }),
     rsyaKVGap: dn('rsyaKVGap', 8, { min: -200, max: 300 }),
     rsyaKVOffsetX: dn('rsyaKVOffsetX', 0, { min: -500, max: 500 }),
     rsyaKVOffsetY: dn('rsyaKVOffsetY', 0, { min: -500, max: 500 }),
@@ -315,7 +315,7 @@ const createInitialState = () => {
     ageCustomFontName: null,
     presetSizes: cloneDeep(sizes),
     customSizes: [], // Кастомные размеры: [{ width, height, checked, id }]
-    namePrefix: 'layout',
+    namePrefix: d('namePrefix', ''),
     kvCanvasWidth: null,
     kvCanvasHeight: null,
     exportScale: 1, // Масштаб экспорта: 1, 2, 3 или 4
@@ -1096,7 +1096,7 @@ export const applySavedSettings = (snapshot) => {
     ['ageGapPercent', current.ageGapPercent, { min: 0, max: 50 }],
     ['maxFileSizeValue', current.maxFileSizeValue, { min: 1, max: 100000 }],
     ['rsyaVisualCount', current.rsyaVisualCount || 1, { min: 1, max: 3 }],
-    ['rsyaKVScale', current.rsyaKVScale || 150, { min: 40, max: 300 }],
+    ['rsyaKVScale', current.rsyaKVScale || 200, { min: 40, max: 300 }],
     ['rsyaKVGap', current.rsyaKVGap || 8, { min: -200, max: 300 }],
     ['rsyaKVOffsetX', current.rsyaKVOffsetX || 0, { min: -500, max: 500 }],
     ['rsyaKVOffsetY', current.rsyaKVOffsetY || 0, { min: -500, max: 500 }]

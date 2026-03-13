@@ -509,8 +509,12 @@ export const syncFormFields = () => {
   const rsyaKVScaleInput = document.getElementById('rsyaKVScale');
   const rsyaKVScaleValue = document.getElementById('rsyaKVScaleValue');
   if (rsyaKVScaleInput) {
-    rsyaKVScaleInput.value = state.rsyaKVScale || 150;
-    if (rsyaKVScaleValue) rsyaKVScaleValue.textContent = `${state.rsyaKVScale || 150}%`;
+    rsyaKVScaleInput.value = state.rsyaKVScale || 200;
+    if (rsyaKVScaleValue) rsyaKVScaleValue.textContent = `${state.rsyaKVScale || 200}%`;
+  }
+  const rsyaCropGridVisibleToggle = document.getElementById('rsyaCropGridVisibleToggle');
+  if (rsyaCropGridVisibleToggle) {
+    rsyaCropGridVisibleToggle.checked = !!state.rsyaCropGridVisible;
   }
   const rsyaKVGapInput = document.getElementById('rsyaKVGap');
   const rsyaKVGapValue = document.getElementById('rsyaKVGapValue');
@@ -1143,6 +1147,7 @@ export const updateRsyaCropPreviews = (sourceCanvas, state) => {
   const specs = [
     { id: 'rsyaCrop1600', ratio: srcW / srcH, key: '1600' },
     { id: 'rsyaCrop169', ratio: 16 / 9, key: '16:9' },
+    { id: 'rsyaCrop321', ratio: 3.2, key: '3.2:1' },
     { id: 'rsyaCrop43', ratio: 4 / 3, key: '4:3' },
     { id: 'rsyaCrop11', ratio: 1, key: '1:1' },
     { id: 'rsyaCrop34', ratio: 3 / 4, key: '3:4' }
@@ -1190,6 +1195,11 @@ export const updateRsyaCropPreviews = (sourceCanvas, state) => {
 
 const getRsyaCropGuideZone = (key, state = null) => {
   const layout = state?.rsyaLayout || 'center';
+  if (key === '3.2:1') {
+    return layout === 'left'
+      ? { x: 0.06, y: 0.26, w: 0.88, h: 0.48 }
+      : { x: 0.06, y: 0.28, w: 0.88, h: 0.44 };
+  }
   if (key === '3:4') {
     return { x: 0.14, y: 0.08, w: 0.72, h: 0.84 };
   }
@@ -1210,34 +1220,21 @@ const getRsyaCropGuideZone = (key, state = null) => {
 
 const drawRsyaCropGuideOverlay = (ctx, width, height, key, state) => {
   if (!ctx || !width || !height || !state?.rsyaCropGridVisible) return;
-  const zone = getRsyaCropGuideZone(key, state);
-  const cols = 8;
-  const rows = 8;
-  const zoneX = zone.x * width;
-  const zoneY = zone.y * height;
-  const zoneW = zone.w * width;
-  const zoneH = zone.h * height;
-
   ctx.save();
-  ctx.lineWidth = Math.max(1, Math.round(Math.min(width, height) * 0.004));
-  ctx.strokeStyle = 'rgba(255, 214, 10, 0.35)';
-  ctx.beginPath();
-  for (let i = 1; i < cols; i += 1) {
-    const x = (width / cols) * i;
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
-  }
-  for (let i = 1; i < rows; i += 1) {
-    const y = (height / rows) * i;
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-  }
-  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(232, 64, 51, 0.95)';
 
-  ctx.fillStyle = 'rgba(232, 64, 51, 0.14)';
-  ctx.fillRect(zoneX, zoneY, zoneW, zoneH);
-  ctx.strokeStyle = 'rgba(232, 64, 51, 0.9)';
-  ctx.strokeRect(zoneX, zoneY, zoneW, zoneH);
+  if (key === '1600') {
+    ['16:9', '3.2:1', '4:3', '1:1', '3:4'].forEach((cropKey) => {
+      const zone = getRsyaCropGuideZone(cropKey, state);
+      ctx.strokeRect(
+        Math.round(zone.x * width) + 0.5,
+        Math.round(zone.y * height) + 0.5,
+        Math.round(zone.w * width),
+        Math.round(zone.h * height)
+      );
+    });
+  }
   ctx.restore();
 };
 
@@ -1257,6 +1254,7 @@ const fitRsyaActiveCanvasToContainer = (canvas) => {
 
 const getRsyaCropRatioByKey = (key, sourceCanvas) => {
   if (key === '16:9') return 16 / 9;
+  if (key === '3.2:1') return 3.2;
   if (key === '4:3') return 4 / 3;
   if (key === '1:1') return 1;
   if (key === '3:4') return 3 / 4;
@@ -2061,6 +2059,8 @@ const updateProjectModeUI = () => {
   if (cropSection) cropSection.style.display = isRsya ? 'block' : 'none';
   const rsyaLayoutTypeGroup = document.getElementById('rsyaLayoutTypeGroup');
   if (rsyaLayoutTypeGroup) rsyaLayoutTypeGroup.style.display = isRsya ? 'block' : 'none';
+  const rsyaCropGuidesGroup = document.getElementById('rsyaCropGuidesGroup');
+  if (rsyaCropGuidesGroup) rsyaCropGuidesGroup.style.display = isRsya ? 'block' : 'none';
   const logoPosGroup = document.getElementById('logoPosGroup');
   if (logoPosGroup) logoPosGroup.style.display = isRsya ? 'none' : 'block';
   const hideSubtitleOnWideGroup = document.getElementById('hideSubtitleOnWideGroup');
@@ -2090,7 +2090,14 @@ const setVariantModeState = (mode) => {
 
 export const selectProjectMode = async (mode) => {
   const targetMode = mode === 'rsya' ? 'rsya' : 'layouts';
+  const stateBeforeSwitch = getState();
   setKey('projectMode', targetMode);
+  const currentGap = Number(stateBeforeSwitch?.titleLogoGap);
+  if (targetMode === 'rsya' && currentGap === 0) {
+    setKey('titleLogoGap', 4);
+  } else if (targetMode === 'layouts' && currentGap === 4) {
+    setKey('titleLogoGap', 0);
+  }
   updateProjectModeTags(targetMode);
   updateProjectModeUI();
   if (targetMode === 'rsya') {
@@ -2554,6 +2561,19 @@ export const updateAgeSize = (value) => {
     dom.ageSizeValue.textContent = `${numeric}%`;
   }
   renderer.render();
+};
+
+export const updateRsyaCropGridVisible = (value) => {
+  const checked = Boolean(value);
+  setKey('rsyaCropGridVisible', checked);
+  const sourceCanvas = document.getElementById('previewCanvasWide');
+  if (sourceCanvas && sourceCanvas.width && sourceCanvas.height) {
+    requestAnimationFrame(() => {
+      updateRsyaCropPreviews(sourceCanvas, getState());
+    });
+  } else {
+    renderer.render();
+  }
 };
 
 // updateKVBorderRadius теперь импортируется из ./components/kvSelector.js
