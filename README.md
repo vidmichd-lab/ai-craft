@@ -36,6 +36,25 @@ python -m SimpleHTTPServer 8000
 
 Нажмите `Ctrl+C` в терминале, где запущен сервер.
 
+## Версия релиза
+
+Версия приложения хранится в `window.APP_VERSION` внутри [index.html](/Users/vidmich/Desktop/prac/index.html) и используется для versioned assets и service worker.
+
+Поднять версию можно одной командой:
+
+```bash
+node scripts/bump-version.mjs patch
+```
+
+Другие варианты:
+
+```bash
+node scripts/bump-version.mjs minor
+node scripts/bump-version.mjs major
+node scripts/bump-version.mjs 1.2.3
+node scripts/bump-version.mjs --current
+```
+
 ## Требования
 
 - Python 3.x (для запуска локального сервера)
@@ -54,4 +73,3 @@ prac/
 ├── font/              # Шрифты
 └── logo/              # Логотипы
 ```
-
