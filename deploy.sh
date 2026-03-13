@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Скрипт для деплоя статического сайта AI-Craft в Yandex Object Storage
-# Бакет по умолчанию: ai-craft-prod
+# Бакет по умолчанию: ai-craft
 #
 # Режимы: по умолчанию — только изменённые файлы (MD5 vs ETag).
 #         ./deploy.sh --full — полная синхронизация и удаление с S3.
 
 set -e
 
-BUCKET_NAME="${YC_BUCKET_NAME:-ai-craft-prod}"
+BUCKET_NAME="${YC_BUCKET_NAME:-ai-craft}"
 ENDPOINT_URL="${YC_ENDPOINT_URL:-https://storage.yandexcloud.net}"
 LOCAL_DIR="."
 
@@ -348,6 +348,8 @@ upload_with_content_type() {
 if [ "$FULL_DEPLOY" -eq 1 ]; then
 echo "  Проверка изменённых файлов..."
 SYNC_OUTPUT=$(aws --endpoint-url=${ENDPOINT_URL} s3 sync "${LOCAL_DIR}" "s3://${BUCKET_NAME}/" \
+    --exclude ".github/*" \
+    --exclude ".deploy-manifest" \
     --exclude ".DS_Store" \
     --exclude "__pycache__/*" \
     --exclude "*.pyc" \
@@ -494,6 +496,7 @@ else
   }
 
   ALL_FILES=$(find . -type f \
+    ! -path './.github/*' \
     ! -path './.git/*' \
     ! -path './__pycache__/*' \
     ! -path './node_modules/*' \
@@ -504,6 +507,7 @@ else
     ! -name '*.tmp' \
     ! -name '.gitignore' \
     ! -name '.gitattributes' \
+    ! -name '.deploy-manifest' \
     ! -name 'compress_images.py' \
     ! -name 'start_server.py' \
     ! -name 'deploy.sh' \

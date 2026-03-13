@@ -35,7 +35,7 @@
 
 1. Включить биллинг и создать отдельную папку, например `ai-craft-prod`.
 2. Создать бакет Object Storage:
-   - имя вида `ai-craft-prod`
+   - имя `ai-craft`
    - регион `ru-central1`
 3. Включить static website hosting:
    - index document: `index.html`
