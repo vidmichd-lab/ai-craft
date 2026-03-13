@@ -31,6 +31,15 @@ mark_deploy_error() {
     DEPLOY_ERRORS=$((DEPLOY_ERRORS + 1))
 }
 
+count_nonempty_lines() {
+    local value="$1"
+    if [ -z "$value" ]; then
+        echo 0
+        return
+    fi
+    printf '%s\n' "$value" | awk 'NF { count++ } END { print count + 0 }'
+}
+
 s3_cp_with_meta() {
     local local_file="$1"
     local remote_path="$2"
@@ -519,7 +528,7 @@ else
     ! -name 'YANDEX_CLOUD_SETUP.md' \
     -print 2>/dev/null | sed 's|^\./||' | grep -v '^$' || true)
 
-  TOTAL_FILES=$(echo "$ALL_FILES" | grep -c . 2>/dev/null || echo 0)
+  TOTAL_FILES=$(count_nonempty_lines "$ALL_FILES")
   TO_CHECK=""
   if [ -f "$MANIFEST_FILE" ]; then
     while IFS= read -r file; do
@@ -537,7 +546,7 @@ else
     TO_CHECK="$ALL_FILES"
   fi
 
-  TO_CHECK_COUNT=$(echo "$TO_CHECK" | grep -c . 2>/dev/null || echo 0)
+  TO_CHECK_COUNT=$(count_nonempty_lines "$TO_CHECK")
   echo "  Файлов к проверке (изменённые/новые): $TO_CHECK_COUNT из $TOTAL_FILES"
 
   UPLOAD_FILES=""
