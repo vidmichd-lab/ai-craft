@@ -353,7 +353,9 @@ SYNC_OUTPUT=$(aws --endpoint-url=${ENDPOINT_URL} s3 sync "${LOCAL_DIR}" "s3://${
     --exclude "__pycache__/*" \
     --exclude "*.pyc" \
     --exclude ".git/*" \
+    --exclude ".github/*" \
     --exclude ".gitignore" \
+    --exclude ".deploy-manifest" \
     --exclude "deploy*.sh" \
     --exclude "compress_images.py" \
     --exclude "DEPLOY.md" \
@@ -496,6 +498,7 @@ else
 
   ALL_FILES=$(find . -type f \
     ! -path './.git/*' \
+    ! -path './.github/*' \
     ! -path './__pycache__/*' \
     ! -path './node_modules/*' \
     ! -name '.DS_Store' \
@@ -505,6 +508,7 @@ else
     ! -name '*.tmp' \
     ! -name '.gitignore' \
     ! -name '.gitattributes' \
+    ! -name '.deploy-manifest' \
     ! -name 'compress_images.py' \
     ! -name 'start_server.py' \
     ! -name 'deploy.sh' \
