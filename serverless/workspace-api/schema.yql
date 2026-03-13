@@ -1,0 +1,88 @@
+-- Teams
+CREATE TABLE teams (
+  id Utf8,
+  slug Utf8,
+  name Utf8,
+  status Utf8,
+  settings_json JsonDocument,
+  created_at Timestamp,
+  updated_at Timestamp,
+  archived_at Timestamp,
+  PRIMARY KEY (id)
+);
+
+-- Users
+CREATE TABLE users (
+  id Utf8,
+  email Utf8,
+  password_hash Utf8,
+  display_name Utf8,
+  status Utf8,
+  created_at Timestamp,
+  updated_at Timestamp,
+  last_login_at Timestamp,
+  PRIMARY KEY (id)
+);
+
+-- Team memberships
+CREATE TABLE memberships (
+  team_id Utf8,
+  user_id Utf8,
+  role Utf8,
+  status Utf8,
+  created_at Timestamp,
+  updated_at Timestamp,
+  PRIMARY KEY (team_id, user_id)
+);
+
+-- Projects
+CREATE TABLE projects (
+  team_id Utf8,
+  id Utf8,
+  name Utf8,
+  status Utf8,
+  description Utf8,
+  state_json JsonDocument,
+  created_by Utf8,
+  created_at Timestamp,
+  updated_at Timestamp,
+  archived_at Timestamp,
+  PRIMARY KEY (team_id, id)
+);
+
+-- Snapshots/templates inside a project
+CREATE TABLE project_snapshots (
+  team_id Utf8,
+  project_id Utf8,
+  id Utf8,
+  name Utf8,
+  kind Utf8,
+  state_json JsonDocument,
+  created_by Utf8,
+  created_at Timestamp,
+  PRIMARY KEY (team_id, project_id, id)
+);
+
+-- Team defaults used by generator startup
+CREATE TABLE team_defaults (
+  team_id Utf8,
+  version Uint64,
+  defaults_json JsonDocument,
+  media_sources_json JsonDocument,
+  created_by Utf8,
+  created_at Timestamp,
+  updated_at Timestamp,
+  PRIMARY KEY (team_id, version)
+);
+
+-- Optional long-lived sessions / refresh tokens
+CREATE TABLE sessions (
+  user_id Utf8,
+  session_id Utf8,
+  team_id Utf8,
+  refresh_token_hash Utf8,
+  expires_at Timestamp,
+  created_at Timestamp,
+  revoked_at Timestamp,
+  PRIMARY KEY (user_id, session_id)
+);

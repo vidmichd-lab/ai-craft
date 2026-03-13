@@ -35,6 +35,36 @@ let selectedLogoFolder1 = null;
 let selectedLogoFolder2 = null;
 let selectedLogoFolder3 = null;
 
+const canUseDirectPreviewSrc = (src) => typeof src === 'string' && (
+  src.startsWith('http') || src.startsWith('data:') || src.startsWith('blob:')
+);
+
+const flattenNestedFiles = (node) => {
+  if (Array.isArray(node)) return [...node];
+  if (!node || typeof node !== 'object') return [];
+  return Object.values(node).flatMap((value) => flattenNestedFiles(value));
+};
+
+const findResolvedLogoSource = async (logoFile) => {
+  if (!logoFile || typeof logoFile !== 'string') return null;
+
+  if (!cachedLogosStructure && !logosScanning) {
+    cachedLogosStructure = await scanLogos().catch(() => null);
+  }
+
+  const allLogos = flattenNestedFiles(cachedLogosStructure);
+  if (!allLogos.length) return null;
+
+  return allLogos.find((item) => {
+    if (!item?.file) return false;
+    if (item.file === logoFile) return true;
+    if (typeof item.key === 'string' && item.key) {
+      return item.key.endsWith(logoFile);
+    }
+    return false;
+  }) || null;
+};
+
 /**
  * Загружает изображение из файла или URL (без кеширования для модальных окон)
  */
@@ -85,7 +115,7 @@ export const updateLogoUI = () => {
       logoPreviewImg.src = logo.src;
       logoPreviewImg.style.display = 'block';
       logoPreviewPlaceholder.style.display = 'none';
-    } else if (logoSelected) {
+    } else if (canUseDirectPreviewSrc(logoSelected)) {
       // Предзагруженный логотип
       logoPreviewImg.src = logoSelected;
       logoPreviewImg.style.display = 'block';
@@ -199,8 +229,6 @@ export const selectPreloadedLogo = async (logoFile) => {
     return;
   }
 
-  // Сначала устанавливаем logoSelected, чтобы UI обновился
-  setState({ logoSelected: logoFile });
   updateLogoTriggerText(logoFile);
 
   // Пробуем найти логотип в структуре или загрузить напрямую
@@ -221,10 +249,34 @@ export const selectPreloadedLogo = async (logoFile) => {
   }
 
   try {
-    const img = await loadImage(logoInfo.file);
+    const resolvedLogo = !logoInfo.file.startsWith('http')
+      ? await findResolvedLogoSource(logoFile)
+      : null;
+    let resolvedFile = resolvedLogo?.file || logoInfo.file;
+    try {
+      const img = await loadImage(resolvedFile);
+      // Проверяем, что изображение действительно загрузилось
+      if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+        throw new Error(`Изображение не загружено: ${resolvedFile}`);
+      }
+      // Обновляем оба поля: logo и logoSelected
+      setState({ logo: img, logoSelected: logoFile });
+      if (dom.logoSelect) dom.logoSelect.value = logoFile;
+      updateLogoUI();
+      renderer.render();
+      return;
+    } catch (primaryError) {
+      const fallbackLogo = await findResolvedLogoSource(logoFile);
+      if (!fallbackLogo?.file || fallbackLogo.file === resolvedFile) {
+        throw primaryError;
+      }
+      resolvedFile = fallbackLogo.file;
+    }
+
+    const img = await loadImage(resolvedFile);
     // Проверяем, что изображение действительно загрузилось
     if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
-      throw new Error(`Изображение не загружено: ${logoInfo.file}`);
+      throw new Error(`Изображение не загружено: ${resolvedFile}`);
     }
     // Обновляем оба поля: logo и logoSelected
     setState({ logo: img, logoSelected: logoFile });
@@ -1135,4 +1187,3 @@ export {
   closeLogoSelectModal,
   populateLogoColumns
 };
-

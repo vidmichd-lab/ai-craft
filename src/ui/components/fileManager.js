@@ -3,12 +3,170 @@
  */
 
 import { scanLogos, scanKV, scanBG } from '../../utils/assetScanner.js';
+import { deleteRemoteObject, isRemoteMediaEnabled, publishRemoteObject, uploadRemoteFile } from '../../utils/remoteMediaApi.js';
+
+const isRemoteFilePath = (filePath) => typeof filePath === 'string' && /^(https?:)?\/\//i.test(filePath);
+const REMOTE_ASSETS_FOLDERS_STORAGE_KEY = 'file-manager-remote-assets-folders';
+
+const parseRemoteAssetsTargetPath = (targetPath) => {
+  if (typeof targetPath !== 'string') return null;
+
+  const normalized = targetPath.trim().replace(/^\/+|\/+$/g, '');
+  if (!normalized.startsWith('assets/')) return null;
+
+  const parts = normalized.split('/');
+  if (parts.length !== 3) return null;
+
+  const [, folder1, folder2] = parts;
+  if (!folder1 || !folder2) return null;
+
+  return { folder1, folder2 };
+};
+
+const normalizeFolderSegment = (value) => {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/^\/+|\/+$/g, '');
+};
+
+const normalizeRemoteFolderRegistryEntry = (value) => {
+  const normalized = normalizeFolderSegment(value);
+  if (!normalized.startsWith('assets/')) return '';
+
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts[0] !== 'assets') return '';
+  if (parts.length === 2 && parts[1]) {
+    return `assets/${parts[1]}`;
+  }
+  if (parts.length === 3 && parts[1] && parts[2]) {
+    return `assets/${parts[1]}/${parts[2]}`;
+  }
+
+  return '';
+};
+
+const loadRemoteAssetsFolderRegistry = () => {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(REMOTE_ASSETS_FOLDERS_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return Array.from(new Set(parsed.map(normalizeRemoteFolderRegistryEntry).filter(Boolean))).sort();
+  } catch (error) {
+    console.warn('Не удалось прочитать реестр remote-папок:', error);
+    return [];
+  }
+};
+
+const saveRemoteAssetsFolderRegistry = (folders) => {
+  if (typeof window === 'undefined') return;
+
+  const normalized = Array.from(new Set((folders || []).map(normalizeRemoteFolderRegistryEntry).filter(Boolean))).sort();
+  window.localStorage.setItem(REMOTE_ASSETS_FOLDERS_STORAGE_KEY, JSON.stringify(normalized));
+};
+
+const registerRemoteAssetsFolder = (folderPath) => {
+  const normalized = normalizeRemoteFolderRegistryEntry(folderPath);
+  if (!normalized) return [];
+
+  const next = Array.from(new Set([...loadRemoteAssetsFolderRegistry(), normalized])).sort();
+  saveRemoteAssetsFolderRegistry(next);
+  return next;
+};
+
+const unregisterRemoteAssetsFolder = (folderPath) => {
+  const normalized = normalizeRemoteFolderRegistryEntry(folderPath);
+  if (!normalized) return [];
+
+  const next = loadRemoteAssetsFolderRegistry().filter((item) => item !== normalized && !item.startsWith(`${normalized}/`));
+  saveRemoteAssetsFolderRegistry(next);
+  return next;
+};
+
+const mergeRemoteAssetsFoldersIntoStructure = (structure, folders) => {
+  const target = structure && typeof structure === 'object' ? structure : {};
+
+  (folders || []).forEach((folderPath) => {
+    const normalized = normalizeRemoteFolderRegistryEntry(folderPath);
+    if (!normalized) return;
+
+    const [, folder1, folder2] = normalized.split('/');
+    if (!target[folder1] || typeof target[folder1] !== 'object' || Array.isArray(target[folder1])) {
+      target[folder1] = {};
+    }
+    if (!folder2) return;
+    if (!target[folder1][folder2] || typeof target[folder1][folder2] !== 'object' || Array.isArray(target[folder1][folder2])) {
+      target[folder1][folder2] = {};
+    }
+  });
+
+  return target;
+};
+
+const parsePathSegmentsFromUrl = (value) => {
+  if (typeof value !== 'string' || !value.trim()) return [];
+
+  const trimmed = value.trim();
+  const withoutQuery = trimmed.split('?')[0];
+
+  if (!isRemoteFilePath(trimmed)) {
+    return withoutQuery.split('/').filter(Boolean);
+  }
+
+  try {
+    const url = new URL(trimmed, window.location.origin);
+    return url.pathname.split('/').filter(Boolean);
+  } catch {
+    return withoutQuery.split('/').filter(Boolean);
+  }
+};
+
+const inferFileNameFromPath = (value) => {
+  const parts = parsePathSegmentsFromUrl(value);
+  return parts.length > 0 ? parts[parts.length - 1] : '';
+};
+
+const buildDisplayFileName = (file) => {
+  const explicitName = typeof file?.name === 'string' ? file.name.trim() : '';
+  const inferredFileName = inferFileNameFromPath(file?.file);
+
+  if (explicitName && /\.[a-z0-9]{2,5}$/i.test(explicitName)) {
+    return explicitName;
+  }
+
+  if (inferredFileName) {
+    if (explicitName && !/\.[a-z0-9]{2,5}$/i.test(explicitName)) {
+      const extMatch = inferredFileName.match(/(\.[a-z0-9]{2,5})$/i);
+      if (extMatch) {
+        return `${explicitName}${extMatch[1]}`;
+      }
+    }
+    return inferredFileName;
+  }
+
+  return explicitName || 'file';
+};
 
 /**
  * API функции для работы с файлами
  */
 const api = {
   async uploadFile(file, targetPath) {
+    const remoteEnabled = await isRemoteMediaEnabled().catch(() => false);
+    const remoteTarget = remoteEnabled ? parseRemoteAssetsTargetPath(targetPath) : null;
+
+    if (remoteTarget) {
+      return uploadRemoteFile({
+        file,
+        folder1: remoteTarget.folder1,
+        folder2: remoteTarget.folder2,
+        visibility: 'published'
+      });
+    }
+
     // Читаем файл как blob
     const fileData = await file.arrayBuffer();
     
@@ -191,6 +349,8 @@ export function renderFileManager() {
             </button>
           </div>
           
+          <div id="fileManagerHint" style="display: none; margin-bottom: 16px; padding: 10px 12px; background: rgba(33, 150, 243, 0.1); border-left: 3px solid #2196F3; border-radius: 4px; color: ${textSecondary}; font-size: 13px; line-height: 1.45;"></div>
+          
           <div id="fileManagerTree" style="max-height: 500px; overflow-y: auto; border: 1px solid ${borderColor}; border-radius: 6px; padding: 12px; background: ${bgPrimary}; min-height: 200px;">
             <!-- Дерево файлов будет отрисовано здесь -->
           </div>
@@ -207,6 +367,131 @@ export function initFileManager() {
   let currentBasePath = null;
   let currentPath = '';
   let pathHistory = []; // История путей для навигации назад
+  let latestStructure = null;
+  let pendingUploadTargetPath = '';
+
+  const getRemoteAssetsTarget = () => parseRemoteAssetsTargetPath(currentPath || currentBasePath || '');
+  const getCurrentAssetsDepth = () => (currentPath || currentBasePath || '').split('/').filter(Boolean).length;
+
+  const getRemoteAssetsSubfolders = () => {
+    if (!latestStructure || currentBasePath !== 'assets') return [];
+
+    const currentContent = getFolderContent(latestStructure, currentPath);
+    if (!currentContent || typeof currentContent !== 'object' || Array.isArray(currentContent)) {
+      return [];
+    }
+
+    return Object.entries(currentContent)
+      .filter(([, value]) => Array.isArray(value))
+      .map(([key]) => key)
+      .sort();
+  };
+
+  const getRemoteFolderKeys = (node) => {
+    if (!node) return [];
+
+    if (Array.isArray(node)) {
+      return node
+        .map((item) => (typeof item?.key === 'string' ? item.key : ''))
+        .filter(Boolean);
+    }
+
+    if (typeof node !== 'object') return [];
+
+    return Object.values(node).flatMap((value) => getRemoteFolderKeys(value));
+  };
+
+  const resolveRemoteUploadTargetPath = () => {
+    const directTarget = getRemoteAssetsTarget();
+    if (directTarget) {
+      return `assets/${directTarget.folder1}/${directTarget.folder2}`;
+    }
+
+    const pathParts = (currentPath || '').split('/').filter(Boolean);
+    if (pathParts.length !== 2 || pathParts[0] !== 'assets') {
+      return '';
+    }
+
+    const options = getRemoteAssetsSubfolders();
+    if (options.length === 0) {
+      return '';
+    }
+
+    if (options.length === 1) {
+      return `${currentPath}/${options[0]}`;
+    }
+
+    const selected = prompt(
+      `Выберите подпапку для загрузки: ${options.join(', ')}`,
+      options[0]
+    );
+
+    if (!selected) {
+      return '';
+    }
+
+    const normalized = selected.trim();
+    if (!options.includes(normalized)) {
+      alert(`Допустимые папки: ${options.join(', ')}`);
+      return '';
+    }
+
+    return `${currentPath}/${normalized}`;
+  };
+
+  const setButtonDisabled = (button, disabled) => {
+    if (!button) return;
+    button.disabled = disabled;
+    button.style.opacity = disabled ? '0.55' : '1';
+    button.style.cursor = disabled ? 'not-allowed' : 'pointer';
+  };
+
+  const updateFileManagerActions = async () => {
+    const createFolderBtn = document.getElementById('fileManagerCreateFolderBtn');
+    const uploadBtn = document.getElementById('fileManagerUploadBtn');
+    const hint = document.getElementById('fileManagerHint');
+
+    const remoteMediaEnabled = await isRemoteMediaEnabled().catch(() => false);
+    const remoteAssetsEnabled = currentBasePath === 'assets' && remoteMediaEnabled;
+    const remoteLogoMode = currentBasePath === 'logo' && remoteMediaEnabled;
+    const remoteTarget = remoteAssetsEnabled ? getRemoteAssetsTarget() : null;
+    const remoteSubfolders = remoteAssetsEnabled ? getRemoteAssetsSubfolders() : [];
+    const canChooseRemoteSubfolder = !remoteTarget && remoteSubfolders.length > 0;
+    const canCreateRemoteFolder = remoteAssetsEnabled && getCurrentAssetsDepth() <= 2;
+
+    setButtonDisabled(createFolderBtn, remoteLogoMode || (remoteAssetsEnabled ? !canCreateRemoteFolder : false));
+    setButtonDisabled(uploadBtn, remoteLogoMode || (remoteAssetsEnabled && !remoteTarget && !canChooseRemoteSubfolder));
+
+    if (!hint) return;
+
+    if (remoteLogoMode) {
+      hint.style.display = 'block';
+      hint.textContent = 'Логотипы теперь ожидаются только из remote manifest. Локальное управление папками logo через этот UI отключено.';
+      return;
+    }
+
+    if (remoteAssetsEnabled && !remoteTarget) {
+      hint.style.display = 'block';
+      if (getCurrentAssetsDepth() === 1) {
+        hint.textContent = 'В корне assets можно создавать категории. Откройте категорию, чтобы создать внутри неё папку или загрузить туда файлы.';
+        return;
+      }
+
+      hint.textContent = canChooseRemoteSubfolder
+        ? `Вы находитесь в ${currentPath}. Можно создать новую подпапку или выбрать существующую: ${remoteSubfolders.join(', ')}.`
+        : 'В этой категории пока нет подпапок. Создайте папку и после этого загружайте в неё файлы.';
+      return;
+    }
+
+    if (remoteAssetsEnabled && remoteTarget) {
+      hint.style.display = 'block';
+      hint.textContent = `Remote media активно. Загрузка пойдёт в assets/${remoteTarget.folder1}/${remoteTarget.folder2}.`;
+      return;
+    }
+
+    hint.style.display = 'none';
+    hint.textContent = '';
+  };
   
   /**
    * Обновляет отображение текущего пути
@@ -223,6 +508,8 @@ export function initFileManager() {
     if (backBtn) {
       backBtn.style.display = (pathHistory.length > 0) ? 'inline-flex' : 'none';
     }
+
+    void updateFileManagerActions();
   }
   
   /**
@@ -265,11 +552,16 @@ export function initFileManager() {
     treeElement.innerHTML = '<div style="text-align: center; padding: var(--spacing-md); color: var(--text-secondary);">Загрузка...</div>';
     
     try {
-      const structure = await getFolderStructure(currentBasePath);
+      let structure = await getFolderStructure(currentBasePath);
+      if (currentBasePath === 'assets' && await isRemoteMediaEnabled().catch(() => false)) {
+        structure = mergeRemoteAssetsFoldersIntoStructure(structure, loadRemoteAssetsFolderRegistry());
+      }
+      latestStructure = structure;
       treeElement.innerHTML = renderFileTree(structure, currentBasePath);
       
       // Добавляем обработчики событий
       attachTreeEventHandlers();
+      await updateFileManagerActions();
     } catch (error) {
       console.error('Ошибка при загрузке дерева файлов:', error);
       treeElement.innerHTML = `<div style="text-align: center; padding: var(--spacing-md); color: #f44336;">Ошибка: ${error.message}</div>`;
@@ -308,7 +600,7 @@ export function initFileManager() {
    */
   function isImageFile(filePath) {
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico'];
-    const lowerPath = filePath.toLowerCase();
+    const lowerPath = String(filePath || '').split('?')[0].toLowerCase();
     return imageExtensions.some(ext => lowerPath.endsWith(ext));
   }
   
@@ -316,14 +608,29 @@ export function initFileManager() {
    * Рендерит файл с превью (если это изображение) или без
    */
   function renderFileItem(file, isGrid = false) {
-    const fileName = file.file.split('/').pop();
+    const fileName = buildDisplayFileName(file);
     const filePath = file.file;
     const isImage = isImageFile(filePath);
+    const remoteKey = typeof file.key === 'string' ? file.key : '';
+    const visibility = typeof file.visibility === 'string' ? file.visibility : 'published';
+    const source = typeof file.source === 'string' ? file.source : (isRemoteFilePath(filePath) ? 'remote' : 'local');
+    const publishButton = source === 'remote'
+      ? `
+            <button class="btn btn-small file-manager-publish-btn" data-path="${filePath}"${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" data-visibility="${visibility}" style="
+              padding: 4px;
+              opacity: 0.7;
+              flex-shrink: 0;
+            " title="${visibility === 'draft' ? 'Опубликовать' : 'Снять с публикации'}" onclick="event.stopPropagation();">
+              <span class="material-icons" style="font-size: 16px;">${visibility === 'draft' ? 'publish' : 'visibility_off'}</span>
+            </button>
+          `
+      : '';
+    const dataAttrs = `${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" data-visibility="${visibility}"`;
     
     if (isGrid && isImage) {
       // Рендерим в виде карточки с превью
       return `
-        <div class="file-manager-item file-manager-image-item" data-type="file" data-path="${filePath}" style="
+        <div class="file-manager-item file-manager-image-item" data-type="file" data-path="${filePath}"${dataAttrs} style="
           position: relative;
           display: flex;
           flex-direction: column;
@@ -377,7 +684,8 @@ export function initFileManager() {
               text-overflow: ellipsis;
               white-space: nowrap;
             " title="${fileName}">${fileName}</span>
-            <button class="btn btn-small file-manager-delete-btn" data-path="${filePath}" data-type="file" style="
+            ${publishButton}
+            <button class="btn btn-small file-manager-delete-btn" data-path="${filePath}" data-type="file"${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" style="
               padding: 4px;
               opacity: 0.7;
               flex-shrink: 0;
@@ -390,10 +698,11 @@ export function initFileManager() {
     } else {
       // Рендерим в виде строки (для не-изображений или списка)
       return `
-        <div class="file-manager-item" data-type="file" data-path="${filePath}" style="display: flex; align-items: center; gap: var(--spacing-xs); padding: var(--spacing-xs); margin-left: 0px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s;">
+        <div class="file-manager-item" data-type="file" data-path="${filePath}"${dataAttrs} style="display: flex; align-items: center; gap: var(--spacing-xs); padding: var(--spacing-xs); margin-left: 0px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s;">
           ${isImage ? `<img src="${filePath}" alt="${fileName}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"><span class="material-icons" style="font-size: 18px; color: ${getComputedStyle(document.documentElement).getPropertyValue('--text-secondary') || '#999999'}; display: none;">insert_drive_file</span>` : `<span class="material-icons" style="font-size: 18px; color: ${getComputedStyle(document.documentElement).getPropertyValue('--text-secondary') || '#999999'};">insert_drive_file</span>`}
           <span style="flex: 1; color: ${getComputedStyle(document.documentElement).getPropertyValue('--text-primary') || '#e9e9e9'}; font-size: var(--font-size-sm);">${fileName}</span>
-          <button class="btn btn-small file-manager-delete-btn" data-path="${filePath}" data-type="file" style="padding: 4px 8px; opacity: 0.7;" title="Удалить">
+          ${publishButton}
+          <button class="btn btn-small file-manager-delete-btn" data-path="${filePath}" data-type="file"${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" style="padding: 4px 8px; opacity: 0.7;" title="Удалить">
             <span class="material-icons" style="font-size: 16px;">delete</span>
           </button>
         </div>
@@ -581,6 +890,20 @@ export function initFileManager() {
             input.focus();
             return;
           }
+
+          if (currentBasePath === 'assets' && await isRemoteMediaEnabled().catch(() => false)) {
+            alert('Переименование папок в assets отключено, пока не появится отдельный remote folder API.');
+            input.remove();
+            nameSpan.style.display = '';
+            return;
+          }
+
+          if (currentBasePath === 'logo' && await isRemoteMediaEnabled().catch(() => false)) {
+            alert('Переименование папок logo отключено: логотипы теперь берутся только из remote manifest.');
+            input.remove();
+            nameSpan.style.display = '';
+            return;
+          }
           
           try {
             await api.renameFolder(folderPath, newName);
@@ -612,11 +935,14 @@ export function initFileManager() {
     // Обработчики для файлов (замена)
     document.querySelectorAll('.file-manager-item[data-type="file"]').forEach(item => {
       item.addEventListener('click', (e) => {
-        if (e.target.closest('.file-manager-delete-btn')) return;
+        if (e.target.closest('.file-manager-delete-btn') || e.target.closest('.file-manager-publish-btn')) return;
         
         // При клике на файл предлагаем заменить его
         const filePath = item.dataset.path;
-        const fileName = filePath.split('/').pop();
+        if (isRemoteFilePath(filePath)) {
+          alert('Замена remote-файлов через UI пока не поддерживается. Для них сначала нужен отдельный replace/delete API.');
+          return;
+        }
         
         const replaceInput = document.createElement('input');
         replaceInput.type = 'file';
@@ -677,8 +1003,10 @@ export function initFileManager() {
         e.stopPropagation();
         
         const path = btn.dataset.path;
+        const remoteKey = btn.dataset.remoteKey || '';
+        const source = btn.dataset.source || '';
         const type = btn.dataset.type;
-        const name = path.split('/').pop();
+        const name = type === 'folder' ? path.split('/').pop() : buildDisplayFileName({ file: path });
         
         if (!confirm(`Вы уверены, что хотите удалить ${type === 'folder' ? 'папку' : 'файл'} "${name}"?`)) {
           return;
@@ -686,9 +1014,29 @@ export function initFileManager() {
         
         try {
           if (type === 'folder') {
-            await api.deleteFolder(path);
+            if (currentBasePath === 'logo' && await isRemoteMediaEnabled().catch(() => false)) {
+              throw new Error('Удаление папок logo через локальный API отключено: логотипы теперь remote-only.');
+            }
+            if (currentBasePath === 'assets' && await isRemoteMediaEnabled().catch(() => false)) {
+              const folderNode = getFolderContent(latestStructure, path);
+              const remoteKeys = Array.from(new Set(getRemoteFolderKeys(folderNode)));
+
+              for (const key of remoteKeys) {
+                await deleteRemoteObject({ key });
+              }
+              unregisterRemoteAssetsFolder(path);
+            } else {
+              await api.deleteFolder(path);
+            }
           } else {
-            await api.deleteFile(path);
+            if (source === 'remote' || isRemoteFilePath(path)) {
+              if (!remoteKey) {
+                throw new Error('Для remote-файла не найден object key.');
+              }
+              await deleteRemoteObject({ key: remoteKey });
+            } else {
+              await api.deleteFile(path);
+            }
           }
           await loadFileManagerTree();
           await refreshLibraries();
@@ -702,27 +1050,43 @@ export function initFileManager() {
         }
       });
     });
+
+    document.querySelectorAll('.file-manager-publish-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+
+        const remoteKey = btn.dataset.remoteKey || '';
+        const visibility = btn.dataset.visibility === 'draft' ? 'draft' : 'published';
+        const nextVisibility = visibility === 'draft' ? 'published' : 'draft';
+
+        if (!remoteKey) {
+          alert('Для remote-файла не найден object key.');
+          return;
+        }
+
+        try {
+          await publishRemoteObject({ key: remoteKey, visibility: nextVisibility });
+          await loadFileManagerTree();
+          await refreshLibraries();
+          if (typeof window.updateLogoAssetsPreview === 'function') {
+            window.updateLogoAssetsPreview();
+          }
+          alert(nextVisibility === 'published' ? 'Файл опубликован' : 'Файл снят с публикации');
+        } catch (error) {
+          alert(`Ошибка при смене статуса публикации: ${error.message}`);
+        }
+      });
+    });
   }
   
   /**
    * Обновляет библиотеки в интерфейсе
    */
   async function refreshLibraries() {
-    // Очищаем кэш сканирования
-    if (window.AVAILABLE_LOGOS) {
-      window.AVAILABLE_LOGOS = null;
-    }
-    if (window.AVAILABLE_KV) {
-      window.AVAILABLE_KV = null;
-    }
-    if (window.AVAILABLE_BG) {
-      window.AVAILABLE_BG = null;
-    }
-    
-    // Очищаем кэш проверки файлов
-    const { checkFileExists } = await import('../../utils/assetScanner.js');
-    if (checkFileExists && checkFileExists.cache) {
-      checkFileExists.cache.clear();
+    // Очищаем кэши сканирования
+    const { resetAssetScannerCaches } = await import('../../utils/assetScanner.js');
+    if (typeof resetAssetScannerCaches === 'function') {
+      resetAssetScannerCaches();
     }
     
     // Обновляем превью в админке логотипов и ассетов, если она открыта
@@ -824,6 +1188,11 @@ export function initFileManager() {
         alert('Сначала выберите папку (logo или assets)');
         return;
       }
+
+      if (currentBasePath === 'logo' && await isRemoteMediaEnabled().catch(() => false)) {
+        alert('Создание папок logo через локальный UI отключено: логотипы теперь remote-only.');
+        return;
+      }
       
       const folderName = prompt('Введите имя новой папки:');
       if (!folderName || !folderName.trim()) {
@@ -852,6 +1221,28 @@ export function initFileManager() {
         
         // Убеждаемся, что путь нормализован (без начальных/конечных слэшей)
         targetPath = targetPath.trim().replace(/^\/+|\/+$/g, '');
+
+        if (currentBasePath === 'assets' && await isRemoteMediaEnabled().catch(() => false)) {
+          const targetDepth = targetPath.split('/').filter(Boolean).length;
+          let remoteFolderPath = '';
+
+          if (targetDepth === 1) {
+            remoteFolderPath = `assets/${folderName.trim()}`;
+          } else if (targetDepth === 2) {
+            remoteFolderPath = `${targetPath}/${folderName.trim()}`;
+          } else {
+            throw new Error('Для remote assets доступны только два уровня: assets/{категория}/{папка}.');
+          }
+
+          registerRemoteAssetsFolder(remoteFolderPath);
+          await loadFileManagerTree();
+          await refreshLibraries();
+          if (typeof window.updateLogoAssetsPreview === 'function') {
+            window.updateLogoAssetsPreview();
+          }
+          alert('Папка создана успешно');
+          return;
+        }
         
         console.log('Создание папки:', { folderName: folderName.trim(), targetPath });
         await api.createFolder(folderName.trim(), targetPath);
@@ -884,18 +1275,64 @@ export function initFileManager() {
         alert('Сначала выберите папку (logo или assets)');
         return;
       }
+
+      if (currentBasePath === 'logo') {
+        isRemoteMediaEnabled().then((remoteEnabled) => {
+          if (remoteEnabled) {
+            alert('Загрузка логотипов через локальный UI отключена: логотипы теперь remote-only.');
+            return;
+          }
+          pendingUploadTargetPath = currentPath || currentBasePath;
+          uploadInput.click();
+        }).catch(() => {
+          pendingUploadTargetPath = currentPath || currentBasePath;
+          uploadInput.click();
+        });
+        return;
+      }
+
+      const targetPath = currentPath || currentBasePath;
+      if (currentBasePath === 'assets') {
+        isRemoteMediaEnabled().then((remoteEnabled) => {
+          if (remoteEnabled && !parseRemoteAssetsTargetPath(targetPath)) {
+            const resolvedTargetPath = resolveRemoteUploadTargetPath();
+            if (!resolvedTargetPath) {
+              return;
+            }
+            pendingUploadTargetPath = resolvedTargetPath;
+            uploadInput.click();
+            return;
+          }
+          pendingUploadTargetPath = targetPath;
+          uploadInput.click();
+        }).catch(() => {
+          pendingUploadTargetPath = targetPath;
+          uploadInput.click();
+        });
+        return;
+      }
+
+      pendingUploadTargetPath = targetPath;
       uploadInput.click();
     });
     
     uploadInput.addEventListener('change', async (e) => {
       if (!e.target.files.length) return;
       
-      const targetPath = currentPath || currentBasePath;
+      const targetPath = pendingUploadTargetPath || currentPath || currentBasePath;
       const files = Array.from(e.target.files);
+      const remoteEnabled = currentBasePath === 'assets' ? await isRemoteMediaEnabled().catch(() => false) : false;
       
       try {
+        if (remoteEnabled && !parseRemoteAssetsTargetPath(targetPath)) {
+          throw new Error('Для remote assets выберите конкретную папку вида assets/{folder1}/{folder2}');
+        }
+
         for (const file of files) {
           await api.uploadFile(file, targetPath);
+        }
+        if (remoteEnabled && parseRemoteAssetsTargetPath(targetPath)) {
+          registerRemoteAssetsFolder(targetPath);
         }
         await loadFileManagerTree();
         await refreshLibraries();
@@ -903,12 +1340,13 @@ export function initFileManager() {
         if (typeof window.updateLogoAssetsPreview === 'function') {
           window.updateLogoAssetsPreview();
         }
-        alert(`Загружено файлов: ${files.length}`);
+        alert(remoteEnabled ? `Загружено в remote media: ${files.length}` : `Загружено файлов: ${files.length}`);
       } catch (error) {
         alert(`Ошибка при загрузке файлов: ${error.message}`);
       }
       
       // Очищаем input
+      pendingUploadTargetPath = '';
       uploadInput.value = '';
     });
   }
@@ -926,4 +1364,3 @@ export function initFileManager() {
     });
   }
 }
-

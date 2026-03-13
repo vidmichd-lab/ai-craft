@@ -1,0 +1,11 @@
+{
+  "mediaSources": {
+    "remote": {
+      "enabled": true,
+      "label": "ai-craft-media",
+      "manifestUrl": "https://<api-gateway-domain>/media/manifest",
+      "baseUrl": "",
+      "strategy": "prefer"
+    }
+  }
+}

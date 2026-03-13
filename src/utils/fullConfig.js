@@ -3,6 +3,9 @@
  * Включает все настройки: размеры, значения по умолчанию, множители, фоны и т.д.
  */
 
+import { resolveActiveAppConfig } from './appConfig.js';
+import { getScopedStorageKey } from './appConfig.js';
+
 /**
  * Экспортирует полную конфигурацию в JSON файл
  * Включает все настройки, которые можно передать другой команде
@@ -30,7 +33,7 @@ export const exportFullConfig = () => {
       
       // Значения по умолчанию из админки
       defaultValues: (() => {
-        const saved = localStorage.getItem('default-values');
+        const saved = localStorage.getItem(getScopedStorageKey('default-values'));
         if (saved) {
           try {
             return JSON.parse(saved);
@@ -64,6 +67,20 @@ export const exportFullConfig = () => {
             return JSON.parse(saved);
           } catch (e) {
             console.warn('Ошибка парсинга adminBackgrounds:', e);
+            return null;
+          }
+        }
+        return null;
+      })(),
+
+      // Конфигурация удалённых медиа-источников
+      mediaSources: (() => {
+        const saved = localStorage.getItem(getScopedStorageKey('media-sources'));
+        if (saved) {
+          try {
+            return JSON.parse(saved);
+          } catch (e) {
+            console.warn('Ошибка парсинга media-sources:', e);
             return null;
           }
         }
@@ -159,6 +176,15 @@ export const importFullConfig = (file) => {
             console.warn('Ошибка импорта фонов:', error);
           }
         }
+
+        if (config.mediaSources) {
+          try {
+            localStorage.setItem(getScopedStorageKey('media-sources'), JSON.stringify(config.mediaSources));
+            console.log('✓ Конфигурация удалённых медиа импортирована');
+          } catch (error) {
+            console.warn('Ошибка импорта mediaSources:', error);
+          }
+        }
         
         // Импортируем тему (опционально)
         if (config.theme) {
@@ -200,7 +226,16 @@ export const loadConfigFromFile = async () => {
     if (!response.ok) {
       return null;
     }
-    const config = await response.json();
+    const rawConfig = await response.json();
+    const config = resolveActiveAppConfig(rawConfig);
+
+    if (typeof window !== 'undefined' && config) {
+      window.__APP_CONFIG = config;
+    }
+
+    if (!config) {
+      return null;
+    }
 
     // Импортируем конфигурацию (используем ту же логику, что и при ручном импорте)
     if (config.sizesConfig) {
@@ -219,6 +254,10 @@ export const loadConfigFromFile = async () => {
       localStorage.setItem('adminBackgrounds', JSON.stringify(config.adminBackgrounds));
     }
 
+    if (config.mediaSources) {
+      localStorage.setItem(getScopedStorageKey('media-sources'), JSON.stringify(config.mediaSources));
+    }
+
     if (config.theme) {
       localStorage.setItem('theme', config.theme);
     }
@@ -235,4 +274,3 @@ export const loadConfigFromFile = async () => {
     return null;
   }
 };
-

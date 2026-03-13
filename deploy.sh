@@ -8,14 +8,54 @@
 
 set -e
 
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUCKET_NAME="${YC_BUCKET_NAME:-ai-craft}"
 ENDPOINT_URL="https://storage.yandexcloud.net"
 LOCAL_DIR="."
+RELEASE_VERSION="${RELEASE_VERSION:-$(date -u +%Y%m%d%H%M%S)-$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo local)}"
+WORKSPACE_API_BASE_URL="${WORKSPACE_API_BASE_URL:-https://d5dvnbnk8h8lkshgdjjm.l3hh3szr.apigw.yandexcloud.net}"
+MEDIA_REMOTE_MANIFEST_URL="${MEDIA_REMOTE_MANIFEST_URL:-}"
+MEDIA_REMOTE_BASE_URL="${MEDIA_REMOTE_BASE_URL:-}"
+RELEASE_DIR=""
 
 # Режим деплоя: 0 = только изменённые (по хешу), 1 = полная синхронизация (sync + удаление)
 FULL_DEPLOY=0
 if [ "${1:-}" = "--full" ]; then
   FULL_DEPLOY=1
+fi
+
+SKIP_LEGACY_MEDIA_DEPLOY=0
+if [ -f "config.json" ]; then
+    if python3 - <<'PY' >/dev/null 2>&1
+import json
+
+with open("config.json", "r", encoding="utf-8") as fh:
+    config = json.load(fh)
+
+remote = ((config or {}).get("mediaSources") or {}).get("remote") or {}
+enabled = remote.get("enabled") is True and bool(str(remote.get("manifestUrl") or "").strip())
+raise SystemExit(0 if enabled else 1)
+PY
+    then
+        SKIP_LEGACY_MEDIA_DEPLOY=1
+    fi
+fi
+
+SYNC_MEDIA_EXCLUDES=()
+FIND_MEDIA_EXCLUDES=()
+if [ "$SKIP_LEGACY_MEDIA_DEPLOY" -eq 1 ]; then
+    SYNC_MEDIA_EXCLUDES=(
+        --exclude "assets/3d/*"
+        --exclude "assets/pro/*"
+        --exclude "logo/*"
+        --exclude "font/*"
+    )
+    FIND_MEDIA_EXCLUDES=(
+        ! -path './assets/3d/*'
+        ! -path './assets/pro/*'
+        ! -path './logo/*'
+        ! -path './font/*'
+    )
 fi
 
 # Цвета для вывода
@@ -67,10 +107,14 @@ s3_rm_safe() {
 
 echo -e "${GREEN}🚀 Начинаем деплой в Yandex Object Storage${NC}"
 echo "Бакет: ${BUCKET_NAME}"
+echo "Релиз: ${RELEASE_VERSION}"
 if [ "$FULL_DEPLOY" -eq 1 ]; then
   echo -e "${YELLOW}FULL: полная синхронизация (sync), удаление отсутствующих файлов${NC}"
 else
   echo -e "${GREEN}Только изменения: загрузка файлов с изменённым содержимым (по хешу)${NC}"
+fi
+if [ "$SKIP_LEGACY_MEDIA_DEPLOY" -eq 1 ]; then
+  echo -e "${YELLOW}Remote media включено: legacy media папки не будут деплоиться в ${BUCKET_NAME}${NC}"
 fi
 echo ""
 
@@ -274,6 +318,31 @@ else
 fi
 echo ""
 
+# Готовим staging-артефакт релиза для деплоя
+echo -e "${YELLOW}📦 Подготовка release-артефакта...${NC}"
+if ! command -v node >/dev/null 2>&1; then
+    echo -e "${RED}❌ Node.js не найден, не могу собрать release-артефакт${NC}"
+    exit 1
+fi
+
+RELEASE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ai-craft-release.XXXXXX")"
+if ! (
+    cd "$ROOT_DIR"
+    RELEASE_VERSION="$RELEASE_VERSION" \
+    WORKSPACE_API_BASE_URL="$WORKSPACE_API_BASE_URL" \
+    MEDIA_REMOTE_MANIFEST_URL="$MEDIA_REMOTE_MANIFEST_URL" \
+    MEDIA_REMOTE_BASE_URL="$MEDIA_REMOTE_BASE_URL" \
+    node scripts/prepare-static-release.mjs "$RELEASE_DIR"
+); then
+    echo -e "${RED}❌ Не удалось подготовить release-артефакт${NC}"
+    exit 1
+fi
+
+cd "$RELEASE_DIR"
+LOCAL_DIR="."
+echo -e "${GREEN}✅ Release-артефакт готов: ${RELEASE_DIR}${NC}"
+echo ""
+
 # Загрузка файлов (только изменённые)
 echo -e "${YELLOW}📤 Загрузка файлов (только изменённые)...${NC}"
 
@@ -304,31 +373,52 @@ get_content_type() {
 get_cache_control() {
     local file=$1
     local ext="${file##*.}"
+    local base_name
+    base_name="$(basename "$file")"
+
+    if [ "$base_name" = "sw.js" ]; then
+        echo "no-cache, no-store, must-revalidate"
+        return
+    fi
+
+    if [ "$base_name" = "index.html" ]; then
+        echo "no-cache, no-store, must-revalidate"
+        return
+    fi
+
+    if [ "$base_name" = "config.json" ] || [ "$base_name" = "sizes-config.json" ] || [ "$base_name" = "asset-manifest.json" ]; then
+        echo "no-cache, must-revalidate, max-age=0"
+        return
+    fi
+
+    case "$file" in
+        src/*|styles.css)
+            echo "public, max-age=31536000, immutable"
+            return
+            ;;
+        assets/*|font/*|logo/*|fav/*)
+            echo "public, max-age=2592000, immutable"
+            return
+            ;;
+    esac
+
     case "$ext" in
-        html) 
-            # HTML файлы проверяются на актуальность при каждой загрузке
-            # no-cache означает, что браузер должен проверять сервер перед использованием кеша
-            echo "no-cache, must-revalidate, max-age=0" 
+        html)
+            echo "no-cache, no-store, must-revalidate"
             ;;
-        css|js) 
-            # JS/CSS файлы проверяются на обновления при каждой загрузке
-            # Используем no-cache вместо max-age=0 для лучшей совместимости
-            echo "no-cache, must-revalidate" 
+        css|js)
+            echo "public, max-age=31536000, immutable"
             ;;
-        json) 
-            # JSON файлы (конфигурация) тоже должны обновляться
-            echo "no-cache, must-revalidate" 
+        json)
+            echo "no-cache, must-revalidate, max-age=0"
             ;;
         png|jpg|jpeg|gif|webp|svg|ico) 
-            # Изображения кешируются долго, так как они редко меняются
-            echo "public, max-age=31536000, immutable" 
+            echo "public, max-age=2592000, immutable" 
             ;;
         ttf|woff|woff2|otf|eot) 
-            # Шрифты кешируются долго
-            echo "public, max-age=31536000, immutable" 
+            echo "public, max-age=2592000, immutable" 
             ;;
         *) 
-            # Остальные файлы кешируются на день
             echo "public, max-age=86400" 
             ;;
     esac
@@ -366,6 +456,9 @@ SYNC_OUTPUT=$(aws --endpoint-url=${ENDPOINT_URL} s3 sync "${LOCAL_DIR}" "s3://${
     --exclude ".gitignore" \
     --exclude ".deploy-manifest" \
     --exclude "deploy*.sh" \
+    --exclude "migrate*.sh" \
+    --exclude "tests/*" \
+    --exclude "test-results/*" \
     --exclude "compress_images.py" \
     --exclude "DEPLOY.md" \
     --exclude "TROUBLESHOOTING.md" \
@@ -374,6 +467,7 @@ SYNC_OUTPUT=$(aws --endpoint-url=${ENDPOINT_URL} s3 sync "${LOCAL_DIR}" "s3://${
     --exclude "start_server.py" \
     --exclude "*.py" \
     --exclude "*.tmp" \
+    "${SYNC_MEDIA_EXCLUDES[@]}" \
     --dryrun 2>&1)
 
 # Извлекаем список файлов для загрузки и удаления
@@ -515,6 +609,7 @@ else
     ! -name '*.py' \
     ! -name '*.md' \
     ! -name '*.tmp' \
+    "${FIND_MEDIA_EXCLUDES[@]}" \
     ! -name '.gitignore' \
     ! -name '.gitattributes' \
     ! -name '.deploy-manifest' \
@@ -522,7 +617,10 @@ else
     ! -name 'start_server.py' \
     ! -name 'deploy.sh' \
     ! -name 'deploy-*.sh' \
+    ! -name 'migrate*.sh' \
     ! -name 'run_*.sh' \
+    ! -path './tests/*' \
+    ! -path './test-results/*' \
     ! -name 'DEPLOY.md' \
     ! -name 'TROUBLESHOOTING.md' \
     ! -name 'YANDEX_CLOUD_SETUP.md' \
@@ -654,10 +752,12 @@ fi
 
 echo ""
 if [ "$DEPLOY_ERRORS" -gt 0 ]; then
+    [ -n "$RELEASE_DIR" ] && rm -rf "$RELEASE_DIR"
     echo -e "${RED}❌ Деплой завершён с ошибками: ${DEPLOY_ERRORS}${NC}"
     exit 1
 fi
 
+[ -n "$RELEASE_DIR" ] && rm -rf "$RELEASE_DIR"
 echo -e "${GREEN}✅ Деплой завершён успешно!${NC}"
 echo ""
 echo "🌐 Ваш сайт доступен по адресу:"

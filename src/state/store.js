@@ -1,10 +1,41 @@
 import { PRESET_SIZES, FONT_NAME_TO_WEIGHT, FONT_WEIGHT_TO_NAME, getPRESET_SIZES, DEFAULT_KV_PATH } from '../constants.js';
 import { getPresetSizes } from '../utils/sizesConfig.js';
+import { getScopedStorageKey } from '../utils/appConfig.js';
 
 const TITLE_SUBTITLE_RATIO = 1 / 2;
 export const SINGLE_PAIR_MODE = true;
 
 const cloneDeep = (value) => JSON.parse(JSON.stringify(value));
+const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+const safeParseJson = (value, fallback = null) => {
+  if (!value || typeof value !== 'string') return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const readConfigDefaultValues = () => {
+  if (typeof window === 'undefined') return {};
+  const configDefaults = window.__APP_CONFIG?.defaultValues;
+  return isPlainObject(configDefaults) ? cloneDeep(configDefaults) : {};
+};
+
+const readStoredDefaultValues = () => {
+  if (typeof localStorage === 'undefined') return {};
+  const parsed = safeParseJson(localStorage.getItem(getScopedStorageKey('default-values')), {});
+  return isPlainObject(parsed) ? parsed : {};
+};
+
+const getResolvedDefaultValuesSource = () => {
+  const configDefaults = readConfigDefaultValues();
+  const storedDefaults = readStoredDefaultValues();
+  return {
+    ...configDefaults,
+    ...storedDefaults
+  };
+};
 
 const sanitizeFiniteNumber = (value, fallback, { min = -Infinity, max = Infinity } = {}) => {
   const numeric = Number(value);
@@ -86,12 +117,7 @@ const createTitleSubtitlePair = (index = 0, baseState = null) => {
   const brandName = (baseState && baseState.brandName) || 'Практикума';
 
   const savedDefaults = (() => {
-    if (typeof localStorage === 'undefined') return {};
-    try {
-      return JSON.parse(localStorage.getItem('default-values') || '{}');
-    } catch (e) {
-      return {};
-    }
+    return getResolvedDefaultValuesSource();
   })();
 
   // Контент: для первой пары — из сохранённых или встроенные дефолты, для новых пар — пусто
@@ -136,13 +162,7 @@ const createTitleSubtitlePair = (index = 0, baseState = null) => {
 
 const createInitialState = () => {
   const savedDefaults = (() => {
-    if (typeof localStorage === 'undefined') return {};
-    try {
-      return JSON.parse(localStorage.getItem('default-values') || '{}');
-    } catch (e) {
-      console.warn('Ошибка при загрузке default-values из localStorage:', e);
-      return {};
-    }
+    return getResolvedDefaultValuesSource();
   })();
   // Миграция: старые названия платформ в safeAreas
   if (savedDefaults.safeAreas && typeof savedDefaults.safeAreas === 'object' && savedDefaults.safeAreas['Я.Директ']) {
@@ -595,75 +615,66 @@ export const store = new Store(createInitialState());
 
 // Экспортируем функцию для получения реальных значений по умолчанию
 export const getDefaultValues = () => {
-  // Сначала пытаемся загрузить из localStorage
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('default-values');
-      if (saved) {
-        const savedDefaults = JSON.parse(saved);
-        // Возвращаем значения из localStorage, если они есть
-        return {
-          logoSelected: savedDefaults.logoSelected,
-          defaultLogoRU: savedDefaults.defaultLogoRU,
-          defaultLogoKZ: savedDefaults.defaultLogoKZ,
-          defaultLogoPRO: savedDefaults.defaultLogoPRO,
-          logoDefaultMode: savedDefaults.logoDefaultMode,
-          kvSelected: savedDefaults.kvSelected,
-          title: savedDefaults.title,
-          subtitle: savedDefaults.subtitle,
-          legal: savedDefaults.legal,
-          age: savedDefaults.age,
-          bgColor: savedDefaults.bgColor,
-          bgImage: savedDefaults.bgImage,
-          titleColor: savedDefaults.titleColor,
-          titleOpacity: savedDefaults.titleOpacity,
-          subtitleColor: savedDefaults.subtitleColor,
-          subtitleOpacity: savedDefaults.subtitleOpacity,
-          legalColor: savedDefaults.legalColor,
-          legalOpacity: savedDefaults.legalOpacity,
-          titleAlign: savedDefaults.titleAlign,
-          subtitleAlign: savedDefaults.subtitleAlign,
-          legalAlign: savedDefaults.legalAlign,
-          titleVPos: savedDefaults.titleVPos,
-          titleSize: savedDefaults.titleSize,
-          subtitleSize: savedDefaults.subtitleSize,
-          titleSubtitleRatio: savedDefaults.titleSubtitleRatio,
-          legalSize: savedDefaults.legalSize,
-          ageSize: savedDefaults.ageSize,
-          logoSize: savedDefaults.logoSize,
-          titleWeight: savedDefaults.titleWeight,
-          subtitleWeight: savedDefaults.subtitleWeight,
-          legalWeight: savedDefaults.legalWeight,
-          ageWeight: savedDefaults.ageWeight,
-          titleLetterSpacing: savedDefaults.titleLetterSpacing,
-          subtitleLetterSpacing: savedDefaults.subtitleLetterSpacing,
-          legalLetterSpacing: savedDefaults.legalLetterSpacing,
-          titleLineHeight: savedDefaults.titleLineHeight,
-          subtitleLineHeight: savedDefaults.subtitleLineHeight,
-          legalLineHeight: savedDefaults.legalLineHeight,
-          subtitleGap: savedDefaults.subtitleGap,
-          titleLogoGap: savedDefaults.titleLogoGap,
-          ageGapPercent: savedDefaults.ageGapPercent,
-          logoPos: savedDefaults.logoPos,
-          logoLanguage: savedDefaults.logoLanguage,
-          partnerLogoFile: savedDefaults.partnerLogoFile,
-          kvBorderRadius: savedDefaults.kvBorderRadius,
-          kvPosition: savedDefaults.kvPosition,
-          bgSize: savedDefaults.bgSize,
-          bgImageSize: savedDefaults.bgImageSize,
-          bgPosition: savedDefaults.bgPosition,
-          bgVPosition: savedDefaults.bgVPosition,
-          bgOffsetX: savedDefaults.bgOffsetX,
-          bgOffsetY: savedDefaults.bgOffsetY,
-          textGradientOpacity: savedDefaults.textGradientOpacity,
-          paddingPercent: savedDefaults.paddingPercent,
-          layoutMode: savedDefaults.layoutMode,
-          fontFamily: savedDefaults.fontFamily
-        };
-      }
-    } catch (e) {
-      console.warn('Ошибка при загрузке default-values из localStorage в getDefaultValues:', e);
-    }
+  const savedDefaults = getResolvedDefaultValuesSource();
+  if (Object.keys(savedDefaults).length > 0) {
+    return {
+      logoSelected: savedDefaults.logoSelected,
+      defaultLogoRU: savedDefaults.defaultLogoRU,
+      defaultLogoKZ: savedDefaults.defaultLogoKZ,
+      defaultLogoPRO: savedDefaults.defaultLogoPRO,
+      logoDefaultMode: savedDefaults.logoDefaultMode,
+      kvSelected: savedDefaults.kvSelected,
+      title: savedDefaults.title,
+      subtitle: savedDefaults.subtitle,
+      legal: savedDefaults.legal,
+      age: savedDefaults.age,
+      bgColor: savedDefaults.bgColor,
+      bgImage: savedDefaults.bgImage,
+      titleColor: savedDefaults.titleColor,
+      titleOpacity: savedDefaults.titleOpacity,
+      subtitleColor: savedDefaults.subtitleColor,
+      subtitleOpacity: savedDefaults.subtitleOpacity,
+      legalColor: savedDefaults.legalColor,
+      legalOpacity: savedDefaults.legalOpacity,
+      titleAlign: savedDefaults.titleAlign,
+      subtitleAlign: savedDefaults.subtitleAlign,
+      legalAlign: savedDefaults.legalAlign,
+      titleVPos: savedDefaults.titleVPos,
+      titleSize: savedDefaults.titleSize,
+      subtitleSize: savedDefaults.subtitleSize,
+      titleSubtitleRatio: savedDefaults.titleSubtitleRatio,
+      legalSize: savedDefaults.legalSize,
+      ageSize: savedDefaults.ageSize,
+      logoSize: savedDefaults.logoSize,
+      titleWeight: savedDefaults.titleWeight,
+      subtitleWeight: savedDefaults.subtitleWeight,
+      legalWeight: savedDefaults.legalWeight,
+      ageWeight: savedDefaults.ageWeight,
+      titleLetterSpacing: savedDefaults.titleLetterSpacing,
+      subtitleLetterSpacing: savedDefaults.subtitleLetterSpacing,
+      legalLetterSpacing: savedDefaults.legalLetterSpacing,
+      titleLineHeight: savedDefaults.titleLineHeight,
+      subtitleLineHeight: savedDefaults.subtitleLineHeight,
+      legalLineHeight: savedDefaults.legalLineHeight,
+      subtitleGap: savedDefaults.subtitleGap,
+      titleLogoGap: savedDefaults.titleLogoGap,
+      ageGapPercent: savedDefaults.ageGapPercent,
+      logoPos: savedDefaults.logoPos,
+      logoLanguage: savedDefaults.logoLanguage,
+      partnerLogoFile: savedDefaults.partnerLogoFile,
+      kvBorderRadius: savedDefaults.kvBorderRadius,
+      kvPosition: savedDefaults.kvPosition,
+      bgSize: savedDefaults.bgSize,
+      bgImageSize: savedDefaults.bgImageSize,
+      bgPosition: savedDefaults.bgPosition,
+      bgVPosition: savedDefaults.bgVPosition,
+      bgOffsetX: savedDefaults.bgOffsetX,
+      bgOffsetY: savedDefaults.bgOffsetY,
+      textGradientOpacity: savedDefaults.textGradientOpacity,
+      paddingPercent: savedDefaults.paddingPercent,
+      layoutMode: savedDefaults.layoutMode,
+      fontFamily: savedDefaults.fontFamily
+    };
   }
   
   // Если в localStorage нет значений, используем значения из createInitialState

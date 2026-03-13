@@ -9,11 +9,36 @@ import { openLogoSelectModal, closeLogoSelectModal, selectPreloadedLogo } from '
 import { openKVSelectModal, closeKVSelectModal, selectPreloadedKV } from './kvSelector.js';
 import { getPassword, checkPassword, setPassword, hasPassword } from '../../utils/passwordManager.js';
 import { DEFAULT_KV_PATH } from '../../constants.js';
+import { getScopedStorageKey } from '../../utils/appConfig.js';
 import { t } from '../../utils/i18n.js';
+import { syncWorkspaceTeamDefaults } from '../../utils/workspaceTeamDefaults.js';
+import {
+  canManageWorkspaceTeamDefaults,
+  hasWorkspaceSession,
+  isWorkspaceAccessControlled
+} from '../../utils/workspaceAccess.js';
 
 let adminModal = null;
 let isAdminOpen = false;
 let isAdminAuthenticated = false;
+
+const resolveWorkspaceTeamDefaultsAccess = () => {
+  if (!isWorkspaceAccessControlled()) {
+    return { enforced: false, allowed: false };
+  }
+
+  if (!hasWorkspaceSession()) {
+    alert('Войдите в workspace с ролью lead или admin, чтобы управлять командными defaults.');
+    return { enforced: true, allowed: false };
+  }
+
+  if (!canManageWorkspaceTeamDefaults()) {
+    alert('Эта панель доступна только роли lead или admin в текущей команде.');
+    return { enforced: true, allowed: false };
+  }
+
+  return { enforced: true, allowed: true };
+};
 
 /**
  * Показывает окно ввода пароля
@@ -75,7 +100,6 @@ const showPasswordPrompt = () => {
   
   const checkPasswordHandler = () => {
     const password = passwordInput.value;
-    console.log('Проверка пароля...', password);
     console.log('checkPassword функция:', typeof checkPassword);
     
     try {
@@ -660,20 +684,22 @@ const openLogoAssetsAdmin = async () => {
         flex-shrink: 0;
         background: ${bgSecondary};
       ">
-        <button class="btn" id="logoAssetsAdminChangePassword" style="
-          padding: 8px 16px;
-          background: transparent;
-          border: 1px solid ${borderColor};
-          border-radius: 6px;
-          color: ${textPrimary};
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        " title="${t('admin.logoAssets.changePassword')}">
-          <span class="material-icons" style="font-size: 18px;">lock</span>
-          <span>${t('admin.logoAssets.changePassword')}</span>
-        </button>
+        ${!isWorkspaceAccessControlled() ? `
+          <button class="btn" id="logoAssetsAdminChangePassword" style="
+            padding: 8px 16px;
+            background: transparent;
+            border: 1px solid ${borderColor};
+            border-radius: 6px;
+            color: ${textPrimary};
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          " title="${t('admin.logoAssets.changePassword')}">
+            <span class="material-icons" style="font-size: 18px;">lock</span>
+            <span>${t('admin.logoAssets.changePassword')}</span>
+          </button>
+        ` : '<div></div>'}
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-primary" id="logoAssetsAdminSave">${t('admin.logoAssets.save')}</button>
           <button class="btn" id="logoAssetsAdminCancel">${t('admin.logoAssets.cancel')}</button>
@@ -1019,7 +1045,7 @@ const setupHandlers = () => {
   // Сохранение
   const saveBtn = document.getElementById('logoAssetsAdminSave');
   if (saveBtn) {
-    saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener('click', async () => {
       const state = getState();
       // Сохраняем настройки логотипа
       const logoSize = document.getElementById('logoAssetsDefaultLogoSize');
@@ -1050,7 +1076,7 @@ const setupHandlers = () => {
       // Записываем медиа-дефолты в localStorage default-values
       const nextState = getState();
       try {
-        const saved = JSON.parse(localStorage.getItem('default-values') || '{}');
+        const saved = JSON.parse(localStorage.getItem(getScopedStorageKey('default-values')) || '{}');
         const updated = {
           ...saved,
           logoSelected: nextState.logoSelected,
@@ -1066,9 +1092,15 @@ const setupHandlers = () => {
           kvBorderRadius: nextState.kvBorderRadius,
           kvPosition: nextState.kvPosition
         };
-        localStorage.setItem('default-values', JSON.stringify(updated));
+        localStorage.setItem(getScopedStorageKey('default-values'), JSON.stringify(updated));
       } catch (e) {
         console.warn('Не удалось сохранить default-values:', e);
+      }
+
+      try {
+        await syncWorkspaceTeamDefaults();
+      } catch (error) {
+        console.warn('Не удалось синхронизировать media defaults с workspace API:', error);
       }
       
       closeLogoAssetsAdmin();
@@ -1213,6 +1245,13 @@ const closeLogoAssetsAdmin = () => {
  * Публичная функция для открытия админки
  */
 export const showLogoAssetsAdmin = async () => {
+  const workspaceAccess = resolveWorkspaceTeamDefaultsAccess();
+  if (workspaceAccess.enforced) {
+    if (!workspaceAccess.allowed) return;
+    await openLogoAssetsAdmin();
+    return;
+  }
+
   console.log('showLogoAssetsAdmin вызвана');
   console.log('isAdminAuthenticated (до сброса):', isAdminAuthenticated);
   console.log('hasPassword():', hasPassword());

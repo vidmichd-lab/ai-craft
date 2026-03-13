@@ -1,0 +1,288 @@
+openapi: 3.0.0
+info:
+  title: ai-craft-workspace-api
+  version: 1.0.0
+paths:
+  /workspace/health:
+    get:
+      operationId: workspaceHealth
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Workspace API health
+  /teams/public:
+    get:
+      operationId: listPublicTeams
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Public teams list
+  /admin/teams:
+    get:
+      operationId: adminListTeams
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Admin teams list
+    post:
+      operationId: adminCreateTeam
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team created
+  /admin/teams/update:
+    post:
+      operationId: adminUpdateTeam
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team updated
+  /admin/teams/archive:
+    post:
+      operationId: adminArchiveTeam
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team archived
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team users list
+    post:
+      operationId: adminCreateUser
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: User created
+  /admin/users/reset-password:
+    post:
+      operationId: adminResetUserPassword
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: User password reset
+  /admin/users/role:
+    post:
+      operationId: adminUpdateUserRole
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: User role updated
+  /admin/users/remove:
+    post:
+      operationId: adminRemoveUser
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: User removed from team
+  /auth/login:
+    post:
+      operationId: authLogin
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Login result
+  /auth/register:
+    post:
+      operationId: authRegister
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Register result
+  /auth/logout:
+    post:
+      operationId: authLogout
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Logout result
+  /auth/me:
+    get:
+      operationId: authMe
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Current user
+  /teams/current:
+    get:
+      operationId: currentTeam
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Current team and defaults
+  /team-defaults:
+    get:
+      operationId: getTeamDefaults
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Current team defaults
+    post:
+      operationId: saveTeamDefaults
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team defaults saved
+  /projects:
+    get:
+      operationId: listProjects
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Projects list
+    post:
+      operationId: createProject
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Project created
+  /projects/update:
+    post:
+      operationId: updateProject
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Project updated
+  /projects/archive:
+    post:
+      operationId: archiveProject
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Project archived
+  /snapshots:
+    get:
+      operationId: listSnapshots
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Project snapshots
+    post:
+      operationId: saveSnapshot
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+        service_account_id: ${gateway_service_account_id}
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Snapshot saved

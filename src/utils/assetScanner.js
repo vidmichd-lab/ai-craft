@@ -1,5 +1,110 @@
+import { resolveMediaSources } from './mediaConfig.js';
+
 // Кэш для проверки существования файлов
 const fileExistsCache = new Map();
+let remoteAssetManifestPromise = null;
+
+const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+
+const capitalizeLabel = (value) => {
+  if (typeof value !== 'string' || !value) return '';
+  return value.length <= 3
+    ? value.toUpperCase()
+    : `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+};
+
+const getRemotePathname = (value) => {
+  if (typeof value !== 'string' || !value) return '';
+
+  try {
+    const url = new URL(value, window.location.origin);
+    return decodeURIComponent(url.pathname || '');
+  } catch {
+    return '';
+  }
+};
+
+const getRelativeRemotePath = (entry, rootName, folder2 = '') => {
+  const key = typeof entry?.key === 'string' ? entry.key.trim().replace(/^\/+/, '') : '';
+  const possibleSources = [key, getRemotePathname(entry?.file)];
+
+  for (const source of possibleSources) {
+    if (!source) continue;
+
+    const normalized = source
+      .replace(/^\/+/, '')
+      .replace(/^published\//, '')
+      .replace(/^drafts\//, '');
+
+    const parts = normalized.split('/').filter(Boolean);
+    if (parts[0] !== rootName) continue;
+    if (folder2 && parts[1] !== folder2) continue;
+
+    return parts.slice(folder2 ? 2 : 1).join('/');
+  }
+
+  return '';
+};
+
+const mergeMediaArrays = (localItems = [], remoteItems = [], preferRemote = false) => {
+  if (preferRemote && remoteItems.length > 0) {
+    return [...remoteItems];
+  }
+
+  const merged = [];
+  const seen = new Set();
+
+  [...localItems, ...remoteItems].forEach((item) => {
+    if (!item) return;
+    const key = item.key || item.file || JSON.stringify(item);
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(item);
+  });
+
+  return merged;
+};
+
+const mergeNestedMediaStructures = (localNode, remoteNode, preferRemote = false) => {
+  const localIsArray = Array.isArray(localNode);
+  const remoteIsArray = Array.isArray(remoteNode);
+
+  if (localIsArray || remoteIsArray) {
+    const mergedArray = mergeMediaArrays(
+      localIsArray ? localNode : [],
+      remoteIsArray ? remoteNode : [],
+      preferRemote
+    );
+    return mergedArray.length > 0 ? mergedArray : undefined;
+  }
+
+  const localIsObject = isPlainObject(localNode);
+  const remoteIsObject = isPlainObject(remoteNode);
+
+  if (!localIsObject && !remoteIsObject) {
+    return undefined;
+  }
+
+  const merged = {};
+  const keys = new Set([
+    ...Object.keys(localIsObject ? localNode : {}),
+    ...Object.keys(remoteIsObject ? remoteNode : {})
+  ]);
+
+  keys.forEach((key) => {
+    const value = mergeNestedMediaStructures(
+      localIsObject ? localNode[key] : undefined,
+      remoteIsObject ? remoteNode[key] : undefined,
+      preferRemote
+    );
+
+    if (value !== undefined) {
+      merged[key] = value;
+    }
+  });
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
+};
 
 async function checkFilesParallel(urls, concurrency = 10) {
   const found = [];
@@ -37,6 +142,12 @@ export const checkFileExists = async (url) => {
     fileExistsCache.set(url, false);
     return false;
   }
+};
+
+export const resetAssetScannerCaches = () => {
+  fileExistsCache.clear();
+  assetManifestPromise = null;
+  remoteAssetManifestPromise = null;
 };
 
 /**
@@ -87,6 +198,13 @@ export const checkFilesSmart = async (basePath, startNum = 1, endNum = 35, maxCo
 // Сканирование логотипов из папки logo/ с динамическим обнаружением структуры (аналогично scanKV)
 // Возвращает структурированные данные (объект) вместо плоского массива
 export const scanLogos = async () => {
+  const mediaSources = await resolveMediaSources();
+  const remoteStructure = await loadRemoteAssetManifest();
+  const remoteLogos = buildLogoStructureFromRemoteRoot(remoteStructure?.logo);
+  if (mediaSources?.remote?.enabled) {
+    return remoteLogos || {};
+  }
+
   const logoStructure = {};
   
   // Список возможных папок первого уровня (только реально используемые)
@@ -283,8 +401,8 @@ export const scanLogos = async () => {
     }
   }
 
-  // Возвращаем структурированные данные вместо плоского массива
-  return logoStructure;
+  const preferRemote = mediaSources?.remote?.strategy === 'prefer';
+  return mergeNestedMediaStructures(logoStructure, remoteLogos, preferRemote) || {};
 };
 
 let assetManifestPromise = null;
@@ -310,6 +428,89 @@ const normalizeManifestEntry = (entry) => {
   const trimmed = entry.trim();
   if (!trimmed || trimmed.startsWith('.')) return null;
   return trimmed;
+};
+
+const mergeAssetStructures = (...structures) => {
+  const merged = {};
+
+  structures.forEach((structure) => {
+    if (!structure || typeof structure !== 'object') return;
+
+    Object.entries(structure).forEach(([folder1, level1]) => {
+      if (!level1 || typeof level1 !== 'object') return;
+      if (!merged[folder1]) {
+        merged[folder1] = {};
+      }
+
+      Object.entries(level1).forEach(([folder2, files]) => {
+        if (!Array.isArray(files) || files.length === 0) return;
+        if (!merged[folder1][folder2]) {
+          merged[folder1][folder2] = [];
+        }
+
+        const existingFiles = new Set(merged[folder1][folder2].map((item) => item.file));
+        files.forEach((item) => {
+          if (!item?.file || existingFiles.has(item.file)) return;
+          merged[folder1][folder2].push(item);
+          existingFiles.add(item.file);
+        });
+      });
+    });
+  });
+
+  Object.values(merged).forEach((level1) => {
+    Object.keys(level1).forEach((folder2) => {
+      level1[folder2].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    });
+  });
+
+  return merged;
+};
+
+const isStructureEmpty = (structure) => !structure || Object.keys(structure).length === 0;
+
+const mergeAssetStructuresPreferRemote = (localStructure, remoteStructure) => {
+  if (isStructureEmpty(remoteStructure)) {
+    return localStructure || {};
+  }
+
+  if (isStructureEmpty(localStructure)) {
+    return remoteStructure || {};
+  }
+
+  const merged = {};
+  const level1Keys = new Set([
+    ...Object.keys(localStructure || {}),
+    ...Object.keys(remoteStructure || {})
+  ]);
+
+  level1Keys.forEach((folder1) => {
+    const localLevel1 = localStructure?.[folder1] || {};
+    const remoteLevel1 = remoteStructure?.[folder1] || {};
+    const folder2Keys = new Set([
+      ...Object.keys(localLevel1),
+      ...Object.keys(remoteLevel1)
+    ]);
+
+    folder2Keys.forEach((folder2) => {
+      const remoteFiles = remoteLevel1?.[folder2];
+      const localFiles = localLevel1?.[folder2];
+      const selectedFiles = Array.isArray(remoteFiles) && remoteFiles.length > 0
+        ? remoteFiles
+        : localFiles;
+
+      if (!Array.isArray(selectedFiles) || selectedFiles.length === 0) {
+        return;
+      }
+
+      if (!merged[folder1]) {
+        merged[folder1] = {};
+      }
+      merged[folder1][folder2] = [...selectedFiles];
+    });
+  });
+
+  return merged;
 };
 
 const buildStructureFromManifest = (manifest, knownSecondLevelFolders3d, knownSecondLevelFoldersPro) => {
@@ -365,8 +566,247 @@ const buildStructureFromManifest = (manifest, knownSecondLevelFolders3d, knownSe
   return kvStructure;
 };
 
+const resolveRemoteEntryFile = (entryPath, baseUrl) => {
+  if (typeof entryPath !== 'string') return '';
+
+  const trimmed = entryPath.trim();
+  if (!trimmed) return '';
+  if (/^(https?:)?\/\//i.test(trimmed) || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+
+  if (!baseUrl) return trimmed;
+
+  try {
+    return new URL(trimmed.replace(/^\//, ''), baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).href;
+  } catch {
+    return trimmed;
+  }
+};
+
+const buildRemoteDisplayName = (rawFileName, folder2, explicitName = '') => {
+  if (typeof explicitName === 'string' && explicitName.trim()) {
+    return explicitName.trim();
+  }
+
+  const withoutQuery = rawFileName.split('?')[0];
+  const basename = withoutQuery.split('/').pop() || withoutQuery;
+  const base = basename.replace(/\.(webp|png|jpg|jpeg|svg)$/i, '');
+
+  if (folder2 === 'bg') {
+    const parts = base.split(', ');
+    const shape = parts[0] ? parts[0].split('=')[1] || '' : '';
+    const inside = parts[1] ? parts[1].split('=')[1] || '' : '';
+    const theme = parts[2] ? parts[2].split('=')[1] || '' : '';
+    return `${shape} ${inside} ${theme}`.trim() || base;
+  }
+
+  return base;
+};
+
+const normalizeRemoteManifestEntry = (entry, folder2, baseUrl) => {
+  if (typeof entry === 'string') {
+    const file = resolveRemoteEntryFile(entry, baseUrl);
+    if (!file) return null;
+
+    return {
+      name: buildRemoteDisplayName(entry, folder2),
+      file,
+      key: '',
+      visibility: 'published',
+      source: 'remote'
+    };
+  }
+
+  if (!entry || typeof entry !== 'object') return null;
+
+  const rawFile = entry.file || entry.url || entry.path;
+  const file = resolveRemoteEntryFile(rawFile, baseUrl);
+  if (!file) return null;
+
+  return {
+    name: buildRemoteDisplayName(rawFile, folder2, entry.name),
+    file,
+    key: typeof entry.key === 'string' ? entry.key : '',
+    visibility: typeof entry.visibility === 'string' ? entry.visibility : 'published',
+    source: 'remote'
+  };
+};
+
+const buildStructureFromRemoteManifest = (manifest, baseUrl = '') => {
+  if (!manifest || typeof manifest !== 'object') return {};
+
+  const candidateRoot = manifest.assets && typeof manifest.assets === 'object'
+    ? manifest.assets
+    : manifest;
+
+  const structure = {};
+
+  Object.entries(candidateRoot).forEach(([folder1, level1]) => {
+    if (!level1 || typeof level1 !== 'object') return;
+
+    Object.entries(level1).forEach(([folder2, entries]) => {
+      if (!Array.isArray(entries)) return;
+
+      const files = entries
+        .map((entry) => normalizeRemoteManifestEntry(entry, folder2, baseUrl))
+        .filter(Boolean);
+
+      if (!files.length) return;
+      if (!structure[folder1]) {
+        structure[folder1] = {};
+      }
+      structure[folder1][folder2] = files;
+    });
+  });
+
+  return structure;
+};
+
+const pickRemoteAssetRoots = (remoteStructure) => Object.fromEntries(
+  Object.entries(remoteStructure || {}).filter(([rootName]) => rootName !== 'logo' && rootName !== 'font')
+);
+
+const buildLogoStructureFromRemoteRoot = (remoteLogoRoot) => {
+  const remoteLogos = {};
+
+  Object.entries(isPlainObject(remoteLogoRoot) ? remoteLogoRoot : {}).forEach(([folder1, entries]) => {
+    if (!Array.isArray(entries)) return;
+
+    entries.forEach((entry) => {
+      const relativePath = getRelativeRemotePath(entry, 'logo', folder1);
+      if (!relativePath) return;
+
+      const parts = relativePath.split('/').filter(Boolean);
+      if (parts.length === 0) return;
+
+      const fileName = parts[parts.length - 1];
+      const displayName = fileName.replace(/\.svg$/i, '').replace(/_/g, ' ');
+      const labelParts = [
+        capitalizeLabel(folder1),
+        ...parts.slice(0, -1).map(capitalizeLabel),
+        capitalizeLabel(displayName)
+      ];
+      const remoteItem = {
+        name: labelParts.join(' / '),
+        file: entry.file,
+        key: entry.key || ''
+      };
+
+      if (parts.length === 1) {
+        if (!remoteLogos[folder1]) remoteLogos[folder1] = {};
+        if (!Array.isArray(remoteLogos[folder1].root)) remoteLogos[folder1].root = [];
+        remoteLogos[folder1].root.push(remoteItem);
+        return;
+      }
+
+      if (parts.length === 2) {
+        const [folder2] = parts;
+        if (!remoteLogos[folder1]) remoteLogos[folder1] = {};
+        if (!Array.isArray(remoteLogos[folder1][folder2])) remoteLogos[folder1][folder2] = [];
+        remoteLogos[folder1][folder2].push(remoteItem);
+        return;
+      }
+
+      const [folder2, folder3] = parts;
+      if (!remoteLogos[folder1]) remoteLogos[folder1] = {};
+      if (!isPlainObject(remoteLogos[folder1][folder2])) remoteLogos[folder1][folder2] = {};
+      if (!Array.isArray(remoteLogos[folder1][folder2][folder3])) remoteLogos[folder1][folder2][folder3] = [];
+      remoteLogos[folder1][folder2][folder3].push(remoteItem);
+    });
+  });
+
+  return remoteLogos;
+};
+
+const buildRemoteFontsFromRoot = (remoteFontsRoot) => {
+  const remoteFonts = [];
+
+  Object.entries(isPlainObject(remoteFontsRoot) ? remoteFontsRoot : {}).forEach(([fontFamily, entries]) => {
+    if (!Array.isArray(entries)) return;
+
+    const foundFonts = new Map();
+    entries.forEach((entry) => {
+      const relativePath = getRelativeRemotePath(entry, 'font', fontFamily);
+      const fileName = relativePath.split('/').filter(Boolean).pop();
+      if (!fileName || !/\.woff2?$/i.test(fileName)) return;
+
+      const parsed = parseFontFileName(fileName, fontFamily);
+      const ext = fileName.split('.').pop().toLowerCase();
+      const key = `${fontFamily}-${parsed.weight}-${parsed.style}`;
+      const existing = foundFonts.get(key);
+      const extPriority = { woff2: 2, woff: 1, ttf: 0 };
+
+      if (!existing || (extPriority[ext] || 0) > (extPriority[existing.ext] || 0)) {
+        foundFonts.set(key, {
+          family: fontFamily,
+          name: `${fontFamily} ${parsed.weightName}`,
+          file: entry.file,
+          weight: parsed.weight,
+          style: parsed.style,
+          weightName: parsed.weightName,
+          key: entry.key || '',
+          ext
+        });
+      }
+    });
+
+    foundFonts.forEach((font) => {
+      remoteFonts.push(font);
+    });
+  });
+
+  return remoteFonts;
+};
+
+const loadRemoteAssetManifest = async () => {
+  if (remoteAssetManifestPromise) return remoteAssetManifestPromise;
+
+  remoteAssetManifestPromise = (async () => {
+    const mediaSources = await resolveMediaSources();
+    const remote = mediaSources?.remote;
+
+    if (!remote?.enabled || !remote.manifestUrl) {
+      return {};
+    }
+
+    try {
+      const response = await fetch(remote.manifestUrl, { cache: 'no-store' });
+      if (!response.ok) {
+        console.warn(`Не удалось загрузить remote media manifest: HTTP ${response.status}`);
+        return {};
+      }
+
+      const manifest = await response.json();
+      return buildStructureFromRemoteManifest(manifest, remote.baseUrl);
+    } catch (error) {
+      console.warn('Не удалось загрузить remote media manifest:', error);
+      return {};
+    }
+  })();
+
+  return remoteAssetManifestPromise;
+};
+
+const combineAssetSources = async (localStructure) => {
+  const mediaSources = await resolveMediaSources();
+  const remoteManifestStructure = await loadRemoteAssetManifest();
+
+  if (mediaSources?.remote?.strategy === 'prefer') {
+    return mergeAssetStructuresPreferRemote(localStructure, remoteManifestStructure);
+  }
+
+  return mergeAssetStructures(localStructure, remoteManifestStructure);
+};
+
 // Сканирование KV из папки assets/ с динамическим обнаружением структуры
 export const scanKV = async () => {
+  const mediaSources = await resolveMediaSources();
+  const remoteAssetStructure = pickRemoteAssetRoots(await loadRemoteAssetManifest());
+  if (mediaSources?.remote?.enabled) {
+    return remoteAssetStructure || {};
+  }
+
   const kvStructure = {};
   
   // Список реальных папок первого уровня.
@@ -384,7 +824,7 @@ export const scanKV = async () => {
   if (manifest) {
     const manifestStructure = buildStructureFromManifest(manifest, knownSecondLevelFolders3d, knownSecondLevelFoldersPro);
     if (Object.keys(manifestStructure).length > 0) {
-      return manifestStructure;
+      return combineAssetSources(manifestStructure);
     }
   }
   
@@ -571,7 +1011,7 @@ export const scanKV = async () => {
     }
   }
   
-  return kvStructure;
+  return combineAssetSources(kvStructure);
 };
 
 // Сканирование фоновых изображений из папки assets/ с динамическим обнаружением структуры
@@ -649,6 +1089,17 @@ const parseFontFileName = (fileName, fontFamilyName) => {
 // Сканирование шрифтов из папки font/
 // Возвращает массив объектов { family, name, file, weight, style }
 export const scanFonts = async () => {
+  const mediaSources = await resolveMediaSources();
+  const remoteFonts = buildRemoteFontsFromRoot((await loadRemoteAssetManifest())?.font);
+  if (mediaSources?.remote?.enabled) {
+    return remoteFonts.sort((a, b) => {
+      if (a.family !== b.family) {
+        return a.family.localeCompare(b.family);
+      }
+      return parseInt(a.weight, 10) - parseInt(b.weight, 10);
+    });
+  }
+
   const fonts = [];
   
   // Список известных папок со шрифтами
@@ -775,6 +1226,11 @@ export const scanFonts = async () => {
   }
   
   // Сортируем шрифты: сначала по семейству, затем по весу
+  const preferRemote = mediaSources?.remote?.strategy === 'prefer';
+  const mergedFonts = preferRemote
+    ? mergeMediaArrays(fonts, remoteFonts, true)
+    : mergeMediaArrays(fonts, remoteFonts, false);
+
   fonts.sort((a, b) => {
     if (a.family !== b.family) {
       return a.family.localeCompare(b.family);
@@ -782,5 +1238,12 @@ export const scanFonts = async () => {
     return parseInt(a.weight) - parseInt(b.weight);
   });
   
-  return fonts;
+  mergedFonts.sort((a, b) => {
+    if (a.family !== b.family) {
+      return a.family.localeCompare(b.family);
+    }
+    return parseInt(a.weight, 10) - parseInt(b.weight, 10);
+  });
+
+  return mergedFonts;
 };

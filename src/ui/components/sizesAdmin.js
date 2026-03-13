@@ -24,13 +24,38 @@ import { LAYOUT_CONSTANTS } from '../../renderer/constants.js';
 import { autoSelectLogoByTextColor } from '../ui.js';
 import { getDom } from '../domCache.js';
 import { getPassword, checkPassword, setPassword, hasPassword } from '../../utils/passwordManager.js';
+import { getScopedStorageKey } from '../../utils/appConfig.js';
 import { t } from '../../utils/i18n.js';
+import { syncWorkspaceTeamDefaults } from '../../utils/workspaceTeamDefaults.js';
+import {
+  canManageWorkspaceTeamDefaults,
+  hasWorkspaceSession,
+  isWorkspaceAccessControlled
+} from '../../utils/workspaceAccess.js';
 
 let adminModal = null;
 let isAdminOpen = false;
 let isAdminAuthenticated = false; // Флаг аутентификации
 // Сохраняем исходные значения для возможности отката
 let originalDefaults = null;
+
+const resolveWorkspaceTeamDefaultsAccess = () => {
+  if (!isWorkspaceAccessControlled()) {
+    return { enforced: false, allowed: false };
+  }
+
+  if (!hasWorkspaceSession()) {
+    alert('Войдите в workspace с ролью lead или admin, чтобы управлять командными defaults.');
+    return { enforced: true, allowed: false };
+  }
+
+  if (!canManageWorkspaceTeamDefaults()) {
+    alert('Эта панель доступна только роли lead или admin в текущей команде.');
+    return { enforced: true, allowed: false };
+  }
+
+  return { enforced: true, allowed: true };
+};
 
 /**
  * Формирует подпись размера с указанием платформы
@@ -135,7 +160,7 @@ const buildFormatTypeSummaries = (state) => {
 const renderValuesTab = () => {
   // ВАЖНО: Берем значения из сохраненных значений по умолчанию, а НЕ из текущего state
   // Это позволяет редактировать настройки по умолчанию независимо от текущего макета
-  const savedDefaults = localStorage.getItem('default-values');
+  const savedDefaults = localStorage.getItem(getScopedStorageKey('default-values'));
   const savedValues = savedDefaults ? JSON.parse(savedDefaults) : null;
   
   const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border-color') || '#2a2a2a';
@@ -1986,7 +2011,14 @@ const renderBackgroundsTab = () => {
 /**
  * Создает и показывает модальное окно админки размеров
  */
-export const showSizesAdmin = () => {
+export const showSizesAdmin = async () => {
+  const workspaceAccess = resolveWorkspaceTeamDefaultsAccess();
+  if (workspaceAccess.enforced) {
+    if (!workspaceAccess.allowed) return;
+    await openSizesAdmin();
+    return;
+  }
+
   console.log('showSizesAdmin вызвана');
   console.log('isAdminOpen:', isAdminOpen);
   console.log('adminModal:', adminModal);
@@ -2019,14 +2051,14 @@ export const showSizesAdmin = () => {
   if (!hasPassword()) {
     console.log('Пароль не установлен, открываем без пароля');
     isAdminAuthenticated = true;
-    openSizesAdmin().catch(err => console.error('Ошибка при открытии админки:', err));
+    await openSizesAdmin().catch(err => console.error('Ошибка при открытии админки:', err));
     return;
   }
   
   // Если уже аутентифицирован в этой сессии (не должно произойти после сброса выше, но на всякий случай)
   if (isAdminAuthenticated) {
     console.log('Уже аутентифицирован, открываем админку');
-    openSizesAdmin().catch(err => console.error('Ошибка при открытии админки:', err));
+    await openSizesAdmin().catch(err => console.error('Ошибка при открытии админки:', err));
     return;
   }
   
@@ -2575,20 +2607,22 @@ const openSizesAdmin = async () => {
       
       <div class="sizes-admin-footer" style="padding: 16px 20px; border-top: 1px solid ${borderColor}; display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-shrink: 0; background: ${bgSecondary};">
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="btn" id="sizesAdminChangePassword" style="
-            padding: 8px 16px;
-            background: transparent;
-            border: 1px solid ${borderColor};
-            border-radius: 6px;
-            color: ${textPrimary};
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-          " title="Изменить пароль">
-            <span class="material-icons" style="font-size: 18px;">lock</span>
-            <span>Изменить пароль</span>
-          </button>
+          ${!isWorkspaceAccessControlled() ? `
+            <button class="btn" id="sizesAdminChangePassword" style="
+              padding: 8px 16px;
+              background: transparent;
+              border: 1px solid ${borderColor};
+              border-radius: 6px;
+              color: ${textPrimary};
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            " title="Изменить пароль">
+              <span class="material-icons" style="font-size: 18px;">lock</span>
+              <span>Изменить пароль</span>
+            </button>
+          ` : ''}
           <button class="btn" id="sizesAdminExportFull" title="Экспортировать полную конфигурацию (все настройки) для передачи другой команде">
             <span class="material-icons">file_download</span> Экспорт полной конфигурации
           </button>
@@ -3644,7 +3678,7 @@ const setupAdminHandlers = (initialSizes) => {
   }
   
   // Сохранение
-  document.getElementById('sizesAdminSave').addEventListener('click', () => {
+  document.getElementById('sizesAdminSave').addEventListener('click', async () => {
     // Валидация размеров
     for (const [platform, sizes] of Object.entries(currentSizes)) {
       if (!platform || !platform.trim()) {
@@ -3791,7 +3825,7 @@ const setupAdminHandlers = (initialSizes) => {
     }
     
     // Сохраняем значения по умолчанию в localStorage
-    localStorage.setItem('default-values', JSON.stringify(defaultValues));
+    localStorage.setItem(getScopedStorageKey('default-values'), JSON.stringify(defaultValues));
     
     // Сохраняем пользовательские охранные области
     state = getState(); // Обновляем state после возможных изменений
@@ -3821,6 +3855,12 @@ const setupAdminHandlers = (initialSizes) => {
       const updatedMultipliers = JSON.parse(JSON.stringify(currentMultipliers));
       // Принудительно обновляем state, даже если объект выглядит одинаковым
       setState({ formatMultipliers: updatedMultipliers });
+    }
+
+    try {
+      await syncWorkspaceTeamDefaults();
+    } catch (error) {
+      console.warn('Не удалось синхронизировать team defaults с workspace API:', error);
     }
     
     // Небольшая задержка перед рендером, чтобы state успел обновиться
@@ -3982,7 +4022,7 @@ const setupAdminHandlers = (initialSizes) => {
     try {
       // Очищаем все данные из localStorage
       localStorage.removeItem('sizes-config');
-      localStorage.removeItem('default-values');
+      localStorage.removeItem(getScopedStorageKey('default-values'));
       localStorage.removeItem('format-multipliers');
       localStorage.removeItem('adminBackgrounds');
       localStorage.removeItem('brandName');

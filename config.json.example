@@ -2,6 +2,7 @@
   "version": "1.0.0",
   "exportDate": "2024-01-01T00:00:00.000Z",
   "description": "Полная конфигурация сервиса для генерации макетов",
+  "defaultTeam": "academy",
   "sizesConfig": {
     "Общие": [
       { "width": 1080, "height": 1080, "checked": true },
@@ -13,8 +14,11 @@
     ]
   },
   "defaultValues": {
-    "logoSelected": "logo/white/ru/main.svg",
-    "kvSelected": "assets/3d/sign/01.webp",
+    "defaultLogoRU": "logo/white/ru/main.svg",
+    "defaultLogoKZ": "logo/white/kz/main.svg",
+    "defaultLogoPRO": "logo/white/pro/main.svg",
+    "logoDefaultMode": "perVariant",
+    "kvSelected": "assets/pro/assets/1.webp",
     "title": "Курс «Frontend-разработчик» от Практикума",
     "subtitle": "Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев",
     "legal": "Рекламодатель АНО ДПО «Образовательные технологии Яндекса»...",
@@ -39,6 +43,40 @@
     "vertical": 0.8
   },
   "adminBackgrounds": [],
-  "theme": "dark"
+  "mediaSources": {
+    "remote": {
+      "enabled": true,
+      "label": "ai-craft-media",
+      "manifestUrl": "https://example.com/api/media/manifest.json",
+      "baseUrl": "",
+      "strategy": "prefer"
+    }
+  },
+  "workspaceApi": {
+    "enabled": true,
+    "baseUrl": "https://example.com/api"
+  },
+  "theme": "dark",
+  "teamProfiles": {
+    "academy": {
+      "brandName": "Практикума",
+      "defaultValues": {
+        "defaultLogoRU": "logo/white/ru/main.svg",
+        "defaultLogoKZ": "logo/white/kz/main.svg",
+        "defaultLogoPRO": "logo/white/pro/main.svg",
+        "kvSelected": "assets/pro/assets/1.webp",
+        "fontFamily": "YS Text"
+      }
+    },
+    "fintech": {
+      "brandName": "Fintech Team",
+      "defaultValues": {
+        "defaultLogoRU": "logo/black/ru/main.svg",
+        "defaultLogoKZ": "logo/black/kz/main.svg",
+        "defaultLogoPRO": "logo/black/pro/main.svg",
+        "kvSelected": "assets/3d/logos/40.webp",
+        "fontFamily": "YS Display"
+      }
+    }
+  }
 }
-

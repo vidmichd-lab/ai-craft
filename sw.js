@@ -8,11 +8,10 @@ const CACHE_VERSION = SW_URL.searchParams.get('v') || 'dev';
 const CACHE_NAME = `ai-craft-v${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `ai-craft-static-v${CACHE_VERSION}`;
 const IMAGE_CACHE_NAME = `ai-craft-images-v${CACHE_VERSION}`;
+const HTML_CACHE_NAME = `ai-craft-html-v${CACHE_VERSION}`;
 
 // Ресурсы для кеширования при установке (с версионированием)
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
   `/styles.css?v=${CACHE_VERSION}`,
   `/src/main.js?v=${CACHE_VERSION}`,
   `/src/constants.js?v=${CACHE_VERSION}`,
@@ -22,10 +21,12 @@ const STATIC_ASSETS = [
   `/src/ui/domCache.js?v=${CACHE_VERSION}`,
   `/src/ui/eventHandler.js?v=${CACHE_VERSION}`,
   `/src/utils/assetScanner.js?v=${CACHE_VERSION}`,
+  `/src/utils/mediaConfig.js?v=${CACHE_VERSION}`,
+  `/src/utils/remoteMediaApi.js?v=${CACHE_VERSION}`,
   `/src/utils/sizesConfig.js?v=${CACHE_VERSION}`,
   `/src/utils/imageCache.js?v=${CACHE_VERSION}`,
-  `/sizes-config.json?v=${CACHE_VERSION}`,
-  '/assets/asset-manifest.json'
+  `/assets/logo.svg?v=${CACHE_VERSION}`,
+  `/fav/favicon.png?v=${CACHE_VERSION}`
 ];
 
 // Максимальное количество изображений в кеше
@@ -90,25 +91,47 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Не перехватываем cross-origin запросы: API Gateway, внешние манифесты и аналитика
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // Не перехватываем запросы к аналитике/трекингу — пусть идут в сеть без SW (избегаем 408 при блокировке)
   if (isAnalyticsOrTracking(request.url)) {
     return;
   }
 
   if (isHtmlRequest(request)) {
-    event.respondWith(networkFirstWithCache(request, STATIC_CACHE_NAME));
+    event.respondWith(networkFirstWithCache(request, HTML_CACHE_NAME, {
+      maxCacheAgeMs: 60 * 1000
+    }));
     return;
   }
 
   // Стратегия для статических ресурсов
   if (isStaticAsset(request.url)) {
-    // Для JS файлов используем Network First, чтобы всегда получать свежие версии
-    if (isJavaScript(request.url)) {
-      event.respondWith(networkFirstWithCache(request, STATIC_CACHE_NAME));
+    if (isConfigRequest(request.url) || isManifestRequest(request.url)) {
+      event.respondWith(networkFirstWithCache(request, HTML_CACHE_NAME, {
+        maxCacheAgeMs: 60 * 1000
+      }));
       return;
     }
-    // Для CSS и прочей versioned статики используем Cache First
-    event.respondWith(cacheFirst(request, STATIC_CACHE_NAME));
+
+    if (isVersionedAsset(request.url)) {
+      event.respondWith(cacheFirst(request, STATIC_CACHE_NAME));
+      return;
+    }
+
+    if (isJavaScript(request.url)) {
+      event.respondWith(networkFirstWithCache(request, STATIC_CACHE_NAME, {
+        maxCacheAgeMs: 5 * 60 * 1000
+      }));
+      return;
+    }
+
+    event.respondWith(networkFirstWithCache(request, STATIC_CACHE_NAME, {
+      maxCacheAgeMs: 5 * 60 * 1000
+    }));
     return;
   }
 
@@ -151,6 +174,33 @@ function isStaticAsset(url) {
          url.includes('/src/') ||
          url.endsWith('/') ||
          url.endsWith('/index.html');
+}
+
+function isVersionedAsset(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.searchParams.has('v');
+  } catch (e) {
+    return false;
+  }
+}
+
+function isConfigRequest(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname === '/config.json' || parsed.pathname === '/sizes-config.json';
+  } catch (e) {
+    return false;
+  }
+}
+
+function isManifestRequest(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname === '/assets/asset-manifest.json';
+  } catch (e) {
+    return false;
+  }
 }
 
 function isHtmlRequest(request) {
@@ -318,7 +368,9 @@ async function networkFirst(request) {
 /**
  * Стратегия Network First с кешированием (для JS файлов)
  */
-async function networkFirstWithCache(request, cacheName) {
+async function networkFirstWithCache(request, cacheName, options = {}) {
+  const { maxCacheAgeMs = 5 * 60 * 1000 } = options;
+
   try {
     // Всегда пытаемся загрузить с сети, игнорируя кеш
     // Для внешних CDN не используем credentials
@@ -358,8 +410,8 @@ async function networkFirstWithCache(request, cacheName) {
       const cachedDate = cached.headers.get('sw-cached-date');
       if (cachedDate) {
         const age = Date.now() - parseInt(cachedDate);
-        // Если кеш старше 5 минут, не используем его
-        if (age < 5 * 60 * 1000) {
+        // Если кеш старше допустимого окна, не используем его
+        if (age < maxCacheAgeMs) {
           return cached;
         }
       } else {

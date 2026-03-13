@@ -1,0 +1,159 @@
+openapi: 3.0.0
+info:
+  title: ai-craft-workspace-api
+  version: 1.0.0
+paths:
+  /workspace/health:
+    get:
+      operationId: workspaceHealth
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Workspace API health
+  /auth/login:
+    post:
+      operationId: authLogin
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Login result
+  /auth/logout:
+    post:
+      operationId: authLogout
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Logout result
+  /auth/me:
+    get:
+      operationId: authMe
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Current user
+  /teams/current:
+    get:
+      operationId: currentTeam
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Current team and defaults
+  /team-defaults:
+    get:
+      operationId: getTeamDefaults
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Current team defaults
+    post:
+      operationId: saveTeamDefaults
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team defaults saved
+  /projects:
+    get:
+      operationId: listProjects
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Projects list
+    post:
+      operationId: createProject
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Project created
+  /projects/update:
+    post:
+      operationId: updateProject
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Project updated
+  /projects/archive:
+    post:
+      operationId: archiveProject
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Project archived
+  /snapshots:
+    get:
+      operationId: listSnapshots
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Project snapshots
+    post:
+      operationId: saveSnapshot
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Snapshot saved
+

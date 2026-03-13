@@ -147,7 +147,7 @@ import {
 } from './ui/ui.js';
 import { renderer } from './renderer.js';
 import { clearTextMeasurementCache } from './renderer/text.js';
-import { setKey, getState, ensurePresetSelection, getCheckedSizes, updatePresetSizesFromConfig } from './state/store.js';
+import { setKey, getState, ensurePresetSelection, getCheckedSizes, updatePresetSizesFromConfig, getDefaultValues } from './state/store.js';
 import { exportPNG, exportJPG } from './exporter.js';
 import { scanFonts } from './utils/assetScanner.js';
 import { setAvailableFonts, initializePresetSizes, DEFAULT_KV_PATH } from './constants.js';
@@ -157,6 +157,7 @@ import { showLogoAssetsAdmin } from './ui/components/logoAssetsAdmin.js';
 import { openGuideModal, closeGuideModal } from './ui/ui.js';
 import { setLanguage, getLanguage, updateUI, t } from './utils/i18n.js';
 import { initPanelResizers } from './utils/panelResizer.js';
+import { initWorkspacePanel } from './ui/components/workspacePanel.js';
 
 const initializeEventDelegation = (dom) => {
   dom.presetSizesList.addEventListener('click', handlePresetContainerClick);
@@ -280,11 +281,15 @@ async function hardResetCache() {
     indexedDB.deleteDatabase('imageCache');
   } catch (e) {}
 
-  const protectedKeys = ['default-values', 'theme', 'admin_password', 'brandName', 'sizes-config', 'format-multipliers'];
+  const protectedKeys = ['default-values', 'theme', 'admin_password', 'brandName', 'sizes-config', 'format-multipliers', 'media-sources'];
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (!protectedKeys.includes(key)) keysToRemove.push(key);
+    if (!key) continue;
+    const isProtected = protectedKeys.includes(key)
+      || key.startsWith('default-values::team::')
+      || key.startsWith('media-sources::team::');
+    if (!isProtected) keysToRemove.push(key);
   }
   keysToRemove.forEach(k => localStorage.removeItem(k));
 
@@ -480,6 +485,27 @@ const exposeGlobals = () => {
 // Кеш для загруженных шрифтов
 const loadedFonts = new Set();
 
+const getFontFileExtension = (filePath) => {
+  if (typeof filePath !== 'string') return '';
+
+  try {
+    const url = new URL(filePath, window.location.origin);
+    const pathname = decodeURIComponent(url.pathname || '');
+    return pathname.split('.').pop()?.toLowerCase() || '';
+  } catch {
+    return filePath.split('?')[0].split('.').pop()?.toLowerCase() || '';
+  }
+};
+
+const resolveFontFileUrl = (filePath) => {
+  if (typeof filePath !== 'string') return '';
+  if (/^(https?:)?\/\//i.test(filePath) || filePath.startsWith('blob:') || filePath.startsWith('data:')) {
+    return filePath;
+  }
+
+  return filePath.split('/').map(part => encodeURIComponent(part)).join('/');
+};
+
 // Функция для динамической загрузки шрифтов через @font-face
 export const loadFonts = async (fonts, preloadOnly = false) => {
   // Создаем стиль для @font-face правил
@@ -515,19 +541,18 @@ export const loadFonts = async (fonts, preloadOnly = false) => {
         }
         
         // Определяем формат файла по расширению
-        const ext = font.file.split('.').pop().toLowerCase();
+        const ext = getFontFileExtension(font.file);
         let format = 'truetype';
         if (ext === 'woff') format = 'woff';
         else if (ext === 'woff2') format = 'woff2';
         else if (ext === 'otf') format = 'opentype';
         
-        // Правильно кодируем URL для шрифтов
-        const encodedUrl = font.file.split('/').map(part => encodeURIComponent(part)).join('/');
+        const resolvedUrl = resolveFontFileUrl(font.file);
         
         fontFaceRules += `
 @font-face {
   font-family: '${family}';
-  src: url('${encodedUrl}') format('${format}');
+  src: url('${resolvedUrl}') format('${format}');
   font-weight: ${font.weight};
   font-style: ${font.style};
   font-display: swap;
@@ -556,9 +581,9 @@ export const loadFonts = async (fonts, preloadOnly = false) => {
         const link = document.createElement('link');
         link.rel = 'preload';
         link.as = 'font';
-        const ext = font.file.split('.').pop().toLowerCase();
+        const ext = getFontFileExtension(font.file);
         link.type = `font/${ext}`;
-        link.href = font.file.split('/').map(part => encodeURIComponent(part)).join('/');
+        link.href = resolveFontFileUrl(font.file);
         link.crossOrigin = 'anonymous';
         preloadLinks.push(link);
         preloadedFamilies.add(font.family);
@@ -708,26 +733,20 @@ const initialize = async () => {
     // Убеждаемся, что есть выбранные размеры
     ensurePresetSelection();
     
-    // Загружаем сохраненные значения по умолчанию из localStorage
+    // Загружаем командные дефолты из config.json и локальные overrides из localStorage
     try {
-      const savedDefaults = localStorage.getItem('default-values');
-      if (savedDefaults) {
-        const defaults = JSON.parse(savedDefaults);
-        if (defaults.fontFamily === 'system-ui') {
-          defaults.fontFamily = 'YS Text';
+      const defaults = getDefaultValues();
+      if (defaults && Object.keys(defaults).length > 0) {
+        const normalizedDefaults = { ...defaults };
+        if (normalizedDefaults.fontFamily === 'system-ui') {
+          normalizedDefaults.fontFamily = 'YS Text';
         }
-        // Применяем сохраненные значения к state только в память (не пишем в localStorage)
-        Object.keys(defaults).forEach(key => {
-          setKey(key, defaults[key]);
+        Object.keys(normalizedDefaults).forEach(key => {
+          if (normalizedDefaults[key] !== undefined) {
+            setKey(key, normalizedDefaults[key]);
+          }
         });
-        // Очищаем кэш измерений текста, так как могли измениться шрифты
         clearTextMeasurementCache();
-        
-        // Загружаем brandName из defaultValues, если он там есть
-        // Используем уже модифицированный объект defaults вместо повторного парсинга
-        if (defaults.brandName) {
-          localStorage.setItem('brandName', defaults.brandName);
-        }
       }
     } catch (e) {
       console.warn('Ошибка при загрузке сохраненных значений по умолчанию:', e);
@@ -1081,6 +1100,7 @@ const initialize = async () => {
       
       // Инициализируем фон после загрузки основных ресурсов
       initializeBackgroundUI();
+      await initWorkspacePanel();
     }, 0);
     
     // Проверяем, что showSizesAdmin доступна
@@ -1113,6 +1133,13 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     // Регистрируем с задержкой, чтобы не блокировать основную загрузку
     setTimeout(() => {
+      let isRefreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (isRefreshing) return;
+        isRefreshing = true;
+        window.location.reload();
+      });
+
       navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(window.APP_VERSION || 'dev')}`, { updateViaCache: 'none' })
         .then((registration) => {
           console.log('Service Worker зарегистрирован:', registration.scope);
@@ -1124,14 +1151,9 @@ if ('serviceWorker' in navigator) {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed') {
                   if (navigator.serviceWorker.controller) {
-                    // Новый service worker установлен, очищаем кеш и обновляем страницу
-                    console.log('Новая версия Service Worker установлена, очищаем кеш и обновляем страницу...');
-                    // Отправляем сообщение для очистки кеша
-                    newWorker.postMessage({ type: 'CLEAR_CACHE' });
-                    // Обновляем страницу через небольшую задержку
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 100);
+                    // Новый worker готов заменить старый без ручной очистки всего кеша.
+                    console.log('Новая версия Service Worker установлена, активируем её...');
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
                   } else {
                     // Первая установка
                     console.log('Service Worker установлен впервые');
@@ -1144,14 +1166,16 @@ if ('serviceWorker' in navigator) {
           // Принудительно проверяем обновления сразу
           registration.update();
           
-          // Проверяем обновления каждые 10 секунд (более часто)
+          // Периодическая проверка нужна, но без агрессивного polling.
           setInterval(() => {
             registration.update();
-          }, 10000);
+          }, 5 * 60 * 1000);
           
-          // Проверяем обновления при фокусе на окне
-          window.addEventListener('focus', () => {
-            registration.update();
+          // Проверяем обновления при возвращении пользователя к приложению.
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+              registration.update();
+            }
           });
         })
         .catch((error) => {

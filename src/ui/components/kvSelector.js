@@ -39,6 +39,37 @@ let selectedFolder2 = null;
 let currentKVModalPairIndex = null;
 let currentKVModalSlotIndex = 0;
 
+const canUseDirectPreviewSrc = (src) => typeof src === 'string' && (
+  src.startsWith('http') || src.startsWith('data:') || src.startsWith('blob:')
+);
+
+const flattenNestedFiles = (node) => {
+  if (Array.isArray(node)) return [...node];
+  if (!node || typeof node !== 'object') return [];
+  return Object.values(node).flatMap((value) => flattenNestedFiles(value));
+};
+
+const findResolvedKVSource = async (kvFile) => {
+  if (!kvFile || typeof kvFile !== 'string') return null;
+
+  if (!cachedKV && !kvScanning) {
+    cachedKV = await scanKV().catch(() => null);
+  }
+
+  const allKV = flattenNestedFiles(cachedKV);
+  if (!allKV.length) return null;
+
+  const normalizedLocalPath = kvFile.replace(/^assets\//, '');
+  return allKV.find((item) => {
+    if (!item?.file) return false;
+    if (item.file === kvFile) return true;
+    if (typeof item.key === 'string' && item.key) {
+      return item.key.endsWith(kvFile) || item.key.endsWith(normalizedLocalPath);
+    }
+    return false;
+  }) || null;
+};
+
 export const setKVModalTargetSlot = (slotIndex = 0) => {
   const normalized = Number.isFinite(Number(slotIndex)) ? Number(slotIndex) : 0;
   currentKVModalSlotIndex = Math.max(0, Math.min(2, normalized));
@@ -131,7 +162,7 @@ export const updateKVUI = () => {
       kvPreviewImg.src = kv.src;
       kvPreviewImg.style.display = 'block';
       kvPreviewPlaceholder.style.display = 'none';
-    } else if (kvSelected) {
+    } else if (canUseDirectPreviewSrc(kvSelected)) {
       // Предзагруженный KV
       kvPreviewImg.src = kvSelected;
       kvPreviewImg.style.display = 'block';
@@ -308,9 +339,37 @@ export const selectPreloadedKV = async (kvFile) => {
     }
 
     try {
-      const img = await loadImage(normalizedKVFile);
+      const resolvedKV = !normalizedKVFile.startsWith('http')
+        ? await findResolvedKVSource(normalizedKVFile)
+        : null;
+      let resolvedFile = resolvedKV?.file || normalizedKVFile;
+      try {
+        const img = await loadImage(resolvedFile);
+        if (!img.complete || (img.naturalWidth || img.width) <= 0 || (img.naturalHeight || img.height) <= 0) {
+          throw new Error(`Изображение не загружено: ${resolvedFile}`);
+        }
+        setState({
+          [targetImageKey]: img,
+          [targetPathKey]: normalizedKVFile,
+          showKV: true
+        });
+        if (dom.showKV) dom.showKV.checked = true;
+        if (typeof window.__refreshRsyaVisualReorder === 'function') {
+          window.__refreshRsyaVisualReorder();
+        }
+        renderer.render();
+        return;
+      } catch (primaryError) {
+        const fallbackKV = await findResolvedKVSource(normalizedKVFile);
+        if (!fallbackKV?.file || fallbackKV.file === resolvedFile) {
+          throw primaryError;
+        }
+        resolvedFile = fallbackKV.file;
+      }
+
+      const img = await loadImage(resolvedFile);
       if (!img.complete || (img.naturalWidth || img.width) <= 0 || (img.naturalHeight || img.height) <= 0) {
-        throw new Error(`Изображение не загружено: ${normalizedKVFile}`);
+        throw new Error(`Изображение не загружено: ${resolvedFile}`);
       }
       setState({
         [targetImageKey]: img,
@@ -355,16 +414,39 @@ export const selectPreloadedKV = async (kvFile) => {
   const activeIndex = 0;
   updatePairKV(activeIndex, normalizedKVFile);
   
-  // Сначала устанавливаем kvSelected, чтобы UI обновился
-  setState({ kvSelected: normalizedKVFile, showKV: true });
   if (dom.showKV) dom.showKV.checked = true;
   updateKVTriggerText(normalizedKVFile);
 
   try {
-    const img = await loadImage(normalizedKVFile);
+    const resolvedKV = !normalizedKVFile.startsWith('http')
+      ? await findResolvedKVSource(normalizedKVFile)
+      : null;
+    let resolvedFile = resolvedKV?.file || normalizedKVFile;
+    try {
+      const img = await loadImage(resolvedFile);
+      // Проверяем, что изображение действительно загрузилось
+      if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+        throw new Error(`Изображение не загружено: ${resolvedFile}`);
+      }
+      // Обновляем оба поля: kv и kvSelected, и включаем показ KV
+      setState({ kv: img, kvSelected: normalizedKVFile, showKV: true });
+      if (dom.kvSelect) dom.kvSelect.value = normalizedKVFile;
+      if (dom.showKV) dom.showKV.checked = true;
+      updateKVUI();
+      renderer.render();
+      return;
+    } catch (primaryError) {
+      const fallbackKV = await findResolvedKVSource(normalizedKVFile);
+      if (!fallbackKV?.file || fallbackKV.file === resolvedFile) {
+        throw primaryError;
+      }
+      resolvedFile = fallbackKV.file;
+    }
+
+    const img = await loadImage(resolvedFile);
     // Проверяем, что изображение действительно загрузилось
     if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
-      throw new Error(`Изображение не загружено: ${normalizedKVFile}`);
+      throw new Error(`Изображение не загружено: ${resolvedFile}`);
     }
     // Обновляем оба поля: kv и kvSelected, и включаем показ KV
     setState({ kv: img, kvSelected: normalizedKVFile, showKV: true });

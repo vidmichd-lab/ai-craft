@@ -1,0 +1,45 @@
+openapi: 3.0.0
+info:
+  title: ai-craft-media-api
+  version: 1.0.0
+paths:
+  /media/manifest:
+    get:
+      operationId: getMediaManifest
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e3s4dv5idfo06a7m7o
+        tag: latest
+      responses:
+        '200':
+          description: Remote media manifest
+  /media/presign-upload:
+    post:
+      operationId: presignUpload
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e3s4dv5idfo06a7m7o
+        tag: latest
+      responses:
+        '200':
+          description: Presigned upload URL
+  /media/object:
+    delete:
+      operationId: deleteMediaObject
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e3s4dv5idfo06a7m7o
+        tag: latest
+      responses:
+        '200':
+          description: Object deleted
+  /media/publish:
+    post:
+      operationId: publishMediaObject
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e3s4dv5idfo06a7m7o
+        tag: latest
+      responses:
+        '200':
+          description: Object visibility updated
