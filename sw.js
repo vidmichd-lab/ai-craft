@@ -2,12 +2,12 @@
  * Service Worker для кеширования статических ресурсов
  */
 
-// Версия кеша - обновлять при каждом деплое
-// ⚠️ MUST MATCH APP_VERSION in index.html
-const CACHE_VERSION = '1.0.4';
-const CACHE_NAME = `practicum-banners-v${CACHE_VERSION}`;
-const STATIC_CACHE_NAME = `practicum-banners-static-v${CACHE_VERSION}`;
-const IMAGE_CACHE_NAME = `practicum-banners-images-v${CACHE_VERSION}`;
+// Версия кеша берется из query-параметра service worker registration: /sw.js?v=...
+const SW_URL = new URL(self.location.href);
+const CACHE_VERSION = SW_URL.searchParams.get('v') || 'dev';
+const CACHE_NAME = `ai-craft-v${CACHE_VERSION}`;
+const STATIC_CACHE_NAME = `ai-craft-static-v${CACHE_VERSION}`;
+const IMAGE_CACHE_NAME = `ai-craft-images-v${CACHE_VERSION}`;
 
 // Ресурсы для кеширования при установке (с версионированием)
 const STATIC_ASSETS = [
@@ -95,6 +95,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (isHtmlRequest(request)) {
+    event.respondWith(networkFirstWithCache(request, STATIC_CACHE_NAME));
+    return;
+  }
+
   // Стратегия для статических ресурсов
   if (isStaticAsset(request.url)) {
     // Для JS файлов используем Network First, чтобы всегда получать свежие версии
@@ -102,7 +107,7 @@ self.addEventListener('fetch', (event) => {
       event.respondWith(networkFirstWithCache(request, STATIC_CACHE_NAME));
       return;
     }
-    // Для CSS и HTML используем Cache First
+    // Для CSS и прочей versioned статики используем Cache First
     event.respondWith(cacheFirst(request, STATIC_CACHE_NAME));
     return;
   }
@@ -146,6 +151,13 @@ function isStaticAsset(url) {
          url.includes('/src/') ||
          url.endsWith('/') ||
          url.endsWith('/index.html');
+}
+
+function isHtmlRequest(request) {
+  if (!request) return false;
+  if (request.mode === 'navigate') return true;
+  const accept = request.headers.get('accept') || '';
+  return accept.includes('text/html');
 }
 
 /**
@@ -325,9 +337,16 @@ async function networkFirstWithCache(request, cacheName) {
     if (response.ok) {
       // Обновляем кеш только если получили успешный ответ
       const cache = await caches.open(cacheName);
-      // Удаляем старую версию из кеша перед добавлением новой
+      const responseToCache = response.clone();
+      const headers = new Headers(responseToCache.headers);
+      headers.set('sw-cached-date', Date.now().toString());
+      const cachedResponse = new Response(responseToCache.body, {
+        status: responseToCache.status,
+        statusText: responseToCache.statusText,
+        headers
+      });
       await cache.delete(request);
-      cache.put(request, response.clone());
+      cache.put(request, cachedResponse);
     }
     
     return response;
@@ -348,7 +367,8 @@ async function networkFirstWithCache(request, cacheName) {
         return cached;
       }
     }
-    throw error;
+    console.warn('[SW] networkFirstWithCache fetch failed, no cache:', request.url, error.message);
+    return new Response('', { status: 408, statusText: 'Request Timeout' });
   }
 }
 

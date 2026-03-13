@@ -27,24 +27,34 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="dns-prefetch" href="https://fonts.googleapis.com">
   
-  <!-- Версия приложения для обхода кеша -->
-  <!-- ⚠️ ALSO UPDATE CACHE_VERSION in sw.js -->
+  <!-- Единый источник версии приложения -->
   <script>
-    window.APP_VERSION = '1.0.4';
+    window.APP_VERSION = '1.0.5';
     window.APP_BUILD_TIME = new Date().toISOString();
+
+    (function injectVersionedAssets(version) {
+      const head = document.head;
+      const makeUrl = (path) => `${path}?v=${encodeURIComponent(version)}`;
+      const appendLink = (rel, href, extra = {}) => {
+        const link = document.createElement('link');
+        link.rel = rel;
+        link.href = href;
+        Object.entries(extra).forEach(([key, value]) => {
+          link.setAttribute(key, value);
+        });
+        head.appendChild(link);
+      };
+
+      appendLink('preload', makeUrl('styles.css'), { as: 'style' });
+      appendLink('modulepreload', makeUrl('src/main.js'));
+      appendLink('modulepreload', makeUrl('src/constants.js'));
+      appendLink('modulepreload', makeUrl('src/state/store.js'));
+      appendLink('prefetch', makeUrl('sizes-config.json'), { as: 'fetch', crossorigin: '' });
+      appendLink('modulepreload', makeUrl('src/utils/assetScanner.js'));
+      appendLink('modulepreload', makeUrl('src/utils/imageCache.js'));
+      appendLink('stylesheet', makeUrl('styles.css'));
+    })(window.APP_VERSION);
   </script>
-  
-  <!-- Preload критических ресурсов -->
-  <link rel="preload" href="styles.css?v=1.0.4" as="style">
-  <link rel="modulepreload" href="src/main.js?v=1.0.4">
-  <link rel="modulepreload" href="src/constants.js?v=1.0.4">
-  <link rel="modulepreload" href="src/state/store.js?v=1.0.4">
-  <!-- Do not preload or script-load renderer.js; it must load only via import from main.js (ES module) -->
-  <link rel="prefetch" href="sizes-config.json?v=1.0.4" as="fetch" crossorigin>
-  <link rel="modulepreload" href="src/utils/assetScanner.js?v=1.0.4">
-  <link rel="modulepreload" href="src/utils/imageCache.js?v=1.0.4">
-  
-  <link rel="stylesheet" href="styles.css?v=1.0.4">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script>
     // Инициализация темы до загрузки страницы (избегаем мерцания)
@@ -1280,6 +1290,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
   <!-- Единственная точка входа приложения: только как ES module -->
-  <script type="module" src="./src/main.js?v=1.0.4"></script>
+  <script>
+    (function injectEntryModule(version) {
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.src = `./src/main.js?v=${encodeURIComponent(version)}`;
+      document.body.appendChild(script);
+    })(window.APP_VERSION);
+  </script>
 </body>
 </html>

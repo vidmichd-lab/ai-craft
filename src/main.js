@@ -1113,7 +1113,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     // Регистрируем с задержкой, чтобы не блокировать основную загрузку
     setTimeout(() => {
-      navigator.serviceWorker.register('/sw.js?v=1.0.4', { updateViaCache: 'none' })
+      navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(window.APP_VERSION || 'dev')}`, { updateViaCache: 'none' })
         .then((registration) => {
           console.log('Service Worker зарегистрирован:', registration.scope);
           
