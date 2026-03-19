@@ -602,59 +602,14 @@ let currentProgress = 0;
 
 // Функции для управления индикатором загрузки
 const showLoadingIndicator = () => {
-  const indicator = document.getElementById('loadingIndicator');
-  if (indicator) {
-    indicator.style.display = 'flex';
-  }
-  // Скрываем все canvas
-  const canvases = ['previewCanvasNarrow', 'previewCanvasSquare', 'previewCanvasWide'];
-  canvases.forEach(id => {
-    const canvas = document.getElementById(id);
-    if (canvas) {
-      canvas.style.display = 'none';
-      canvas.style.opacity = '0';
-    }
-  });
-  
-  // Сбрасываем прогресс
   currentProgress = 0;
-  updateProgress(0);
-  
-  // Запускаем симуляцию прогресса (будет обновляться реальным прогрессом)
-  startProgressSimulation();
 };
 
 const hideLoadingIndicator = () => {
-  // Останавливаем интервалы
   if (progressInterval) {
     clearInterval(progressInterval);
     progressInterval = null;
   }
-  
-  // Устанавливаем 100% перед скрытием
-  updateProgress(100);
-  
-  // Ждем немного, чтобы показать 100%
-  setTimeout(() => {
-    const indicator = document.getElementById('loadingIndicator');
-    if (indicator) {
-      indicator.style.display = 'none';
-    }
-    // Показываем все canvas с плавным появлением
-    const canvases = ['previewCanvasNarrow', 'previewCanvasSquare', 'previewCanvasWide'];
-    canvases.forEach(id => {
-      const canvas = document.getElementById(id);
-      if (canvas) {
-        canvas.style.display = 'block';
-        // Используем requestAnimationFrame для плавного появления
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            canvas.style.opacity = '1';
-          });
-        });
-      }
-    });
-  }, 300);
 };
 
 const updateProgress = (percent) => {
@@ -667,46 +622,15 @@ const updateProgress = (percent) => {
 };
 
 const startProgressSimulation = () => {
-  // Симуляция прогресса (будет переопределена реальным прогрессом)
-  let simulatedProgress = 0;
-  
   if (progressInterval) {
     clearInterval(progressInterval);
   }
-  
-  progressInterval = setInterval(() => {
-    // Медленно увеличиваем прогресс до 90% (остальные 10% будут при завершении)
-    if (simulatedProgress < 90 && currentProgress < 90) {
-      simulatedProgress = Math.min(90, simulatedProgress + Math.random() * 3);
-      updateProgress(simulatedProgress);
-    }
-  }, 200);
 };
 
 const initialize = async () => {
   console.log('=== Начало инициализации ===');
   try {
-    // Показываем индикатор загрузки сразу (до любых других операций)
-    // Важно: показываем до проверки DOM, чтобы он был виден при обновлении страницы
-    console.log('Проверяем наличие loadingIndicator...');
-    const indicator = document.getElementById('loadingIndicator');
-    console.log('loadingIndicator найден:', !!indicator);
-    if (indicator) {
-      indicator.style.display = 'flex';
-      // Скрываем все canvas сразу
-      const canvases = ['previewCanvasNarrow', 'previewCanvasSquare', 'previewCanvasWide'];
-      canvases.forEach(id => {
-        const canvas = document.getElementById(id);
-        if (canvas) {
-          canvas.style.display = 'none';
-          canvas.style.opacity = '0';
-        }
-      });
-      // Инициализируем прогресс
-      currentProgress = 0;
-      updateProgress(0);
-      startProgressSimulation();
-    }
+    showLoadingIndicator();
     
     // Опциональная загрузка конфигурации из config.json:
     // по умолчанию отключена, чтобы не создавать 404 в проде, где файла нет.

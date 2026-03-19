@@ -14,7 +14,6 @@ import {
 } from '../ui.js';
 import {
   archiveAdminWorkspaceTeam,
-  archiveWorkspaceProject,
   createAdminWorkspaceTeam,
   createAdminWorkspaceUser,
   createWorkspaceProject,
@@ -25,17 +24,16 @@ import {
   listAdminWorkspaceTeams,
   listAdminWorkspaceUsers,
   listPublicWorkspaceTeams,
+  listWorkspaceTeamMembers,
   listWorkspaceProjects,
   listWorkspaceSnapshots,
   loginWorkspace,
   logoutWorkspace,
   removeAdminWorkspaceUser,
-  registerWorkspace,
   resetAdminWorkspaceUserPassword,
   saveWorkspaceSnapshot,
   updateAdminWorkspaceUserRole,
-  updateAdminWorkspaceTeam,
-  updateWorkspaceProject
+  updateAdminWorkspaceTeam
 } from '../../utils/workspaceApi.js';
 import { applyWorkspaceTeamDefaultsLocally } from '../../utils/workspaceTeamDefaults.js';
 import { setWorkspaceAccessState } from '../../utils/workspaceAccess.js';
@@ -43,6 +41,8 @@ import { setWorkspaceAccessState } from '../../utils/workspaceAccess.js';
 const STORAGE_PREFIX = 'workspace-current-project-id';
 const SESSION_HINT_KEY = 'workspace-session-hint';
 const PREFERRED_TEAM_KEY = 'workspace-preferred-team';
+const LOCAL_DRAFT_PREFIX = 'workspace-local-draft';
+const AUTH_HERO_IMAGE = 'assets/pro/photo_env/14.webp';
 
 const workspaceState = {
   enabled: false,
@@ -53,25 +53,54 @@ const workspaceState = {
   currentProject: null,
   projects: [],
   templates: [],
+  projectsLoading: false,
+  templatesLoading: false,
+  projectsModalLoadSeq: 0,
+  projectActionPending: '',
+  projectModalError: '',
+  projectModalNotice: '',
+  projectComposer: {
+    mode: '',
+    name: '',
+    description: '',
+    templateName: ''
+  },
   modalView: '',
-  authMode: 'login',
+  settingsView: 'account',
   authScreenVisible: false,
   authLoading: false,
   authError: '',
+  authDraft: {
+    email: '',
+    password: ''
+  },
   publicTeams: [],
   preferredTeamSlug: '',
   hasLoadedTeams: false,
   adminTeams: [],
   adminUsers: [],
+  teamMembers: [],
+  teamMembersError: '',
   adminSelectedTeamId: '',
   adminError: '',
   adminNotice: '',
-  adminSecret: null
+  adminSecret: null,
+  adminTeamDraft: {
+    mode: 'create',
+    teamId: '',
+    name: '',
+    slug: ''
+  }
 };
 
 const getScopedProjectStorageKey = (teamSlug = '') => {
   const normalizedTeam = (teamSlug || 'default').trim().toLowerCase();
   return `${STORAGE_PREFIX}::${normalizedTeam}`;
+};
+
+const getLocalDraftStorageKey = (teamSlug = '') => {
+  const normalizedTeam = (teamSlug || 'default').trim().toLowerCase();
+  return `${LOCAL_DRAFT_PREFIX}::${normalizedTeam}`;
 };
 
 const getPersistedProjectId = (teamSlug = '') => {
@@ -90,6 +119,30 @@ const setPersistedProjectId = (teamSlug = '', projectId = '') => {
     } else {
       localStorage.removeItem(key);
     }
+  } catch {
+    // no-op
+  }
+};
+
+const loadLocalDraftSnapshot = (teamSlug = '') => {
+  try {
+    const raw = localStorage.getItem(getLocalDraftStorageKey(teamSlug));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveLocalDraftSnapshot = (teamSlug = '', snapshot = null) => {
+  try {
+    const key = getLocalDraftStorageKey(teamSlug);
+    if (!snapshot) {
+      localStorage.removeItem(key);
+      return;
+    }
+    localStorage.setItem(key, JSON.stringify(snapshot));
   } catch {
     // no-op
   }
@@ -202,6 +255,29 @@ const syncUiAfterStateApply = async (snapshot) => {
   renderer.render();
 };
 
+const createEmptyProjectComposer = () => ({
+  mode: '',
+  name: '',
+  description: '',
+  templateName: ''
+});
+
+const getProjectComposer = () => ({
+  ...createEmptyProjectComposer(),
+  ...(workspaceState.projectComposer || {})
+});
+
+const setProjectComposer = (next = {}) => {
+  workspaceState.projectComposer = {
+    ...createEmptyProjectComposer(),
+    ...(next || {})
+  };
+};
+
+const resetProjectComposer = () => {
+  setProjectComposer(createEmptyProjectComposer());
+};
+
 const setActiveWorkspaceTeam = (teamSlug = '') => {
   if (!window.__APP_CONFIG) {
     window.__APP_CONFIG = {};
@@ -267,9 +343,127 @@ const updateSelectedTeamSlug = (teamSlug = '') => {
   setPreferredTeamSlug(normalized);
 };
 
+const getAuthDraft = () => ({
+  email: String(workspaceState.authDraft?.email || ''),
+  password: String(workspaceState.authDraft?.password || '')
+});
+
+const updateAuthDraftField = (field, value) => {
+  if (!['email', 'password'].includes(field)) return;
+  workspaceState.authDraft = {
+    ...getAuthDraft(),
+    [field]: typeof value === 'string' ? value : ''
+  };
+};
+
+const getImplicitAuthTeamSlug = () => {
+  const preferred = resolveSelectedTeamSlug();
+  if (preferred) return preferred;
+
+  const configDefaultTeam = String(window.__APP_CONFIG?.defaultTeam || '').trim().toLowerCase();
+  if (configDefaultTeam) return configDefaultTeam;
+
+  return String(workspaceState.publicTeams[0]?.slug || '').trim().toLowerCase();
+};
+
+const isAuthDraftComplete = () => {
+  const draft = getAuthDraft();
+  return Boolean(draft.email.trim() && draft.password.length > 0);
+};
+
+const syncAuthSubmitState = () => {
+  const submitButton = document.querySelector('#workspaceAuthForm .workspace-auth-submit');
+  if (!submitButton) return;
+  submitButton.disabled = !workspaceState.ready || workspaceState.authLoading || !isAuthDraftComplete();
+};
+
 const isWorkspaceSuperadmin = () => !!workspaceState.user?.isSuperadmin;
 const getWorkspaceRole = () => String(workspaceState.user?.role || '').trim().toLowerCase();
 const canManageWorkspaceTeamDefaults = () => isWorkspaceSuperadmin() || ['admin', 'lead'].includes(getWorkspaceRole());
+const canViewWorkspaceTeamTab = () => !isWorkspaceSuperadmin() && getWorkspaceRole() === 'lead';
+
+const createEmptyAdminTeamDraft = () => ({
+  mode: 'create',
+  teamId: '',
+  name: '',
+  slug: ''
+});
+
+const getAdminTeamDraft = () => ({
+  ...createEmptyAdminTeamDraft(),
+  ...(workspaceState.adminTeamDraft || {})
+});
+
+const setAdminTeamDraft = (draft = {}) => {
+  workspaceState.adminTeamDraft = {
+    ...createEmptyAdminTeamDraft(),
+    ...(draft || {})
+  };
+};
+
+const resetAdminTeamDraft = () => {
+  setAdminTeamDraft(createEmptyAdminTeamDraft());
+};
+
+const getAvailableSettingsViews = () => {
+  const views = [{ id: 'account', label: 'Аккаунт' }];
+  if (isWorkspaceSuperadmin()) {
+    views.push(
+      { id: 'teams', label: 'Команды' },
+      { id: 'users', label: 'Пользователи' }
+    );
+    return views;
+  }
+
+  if (canViewWorkspaceTeamTab()) {
+    views.push({ id: 'team', label: 'Команда' });
+  }
+
+  return views;
+};
+
+const ensureSettingsView = () => {
+  const views = getAvailableSettingsViews();
+  if (!views.some((view) => view.id === workspaceState.settingsView)) {
+    workspaceState.settingsView = views[0]?.id || 'account';
+  }
+  return workspaceState.settingsView;
+};
+
+const setSettingsView = (viewId = '') => {
+  workspaceState.settingsView = viewId;
+  return ensureSettingsView();
+};
+
+const copyTextToClipboard = async (text) => {
+  const value = String(text || '');
+  if (!value) return false;
+
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    // fallback below
+  }
+
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = value;
+    textarea.setAttribute('readonly', 'readonly');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.pointerEvents = 'none';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return copied;
+  } catch {
+    return false;
+  }
+};
 
 const formatWorkspaceRoleLabel = (user = workspaceState.user) => {
   if (!user) return '';
@@ -332,18 +526,17 @@ const renderWorkspaceSummary = () => {
   const statusText = (() => {
     if (!workspaceState.enabled) return 'Workspace off';
     if (!workspaceState.ready) return 'Workspace...';
+    if (workspaceState.projectActionPending) return workspaceState.projectActionPending;
     if (!workspaceState.user || !workspaceState.team) return 'Нужен вход';
-    if (workspaceState.currentProject?.name) {
-      return `${workspaceState.team.name} / ${workspaceState.currentProject.name}`;
-    }
-    return `${workspaceState.team.name} / без проекта`;
+    return `${workspaceState.team.name} / личный черновик`;
   })();
 
   els.status.textContent = statusText;
-  els.projectsBtn.disabled = !workspaceState.ready || !workspaceState.user;
-  els.saveBtn.disabled = !workspaceState.ready || !workspaceState.user;
-  els.templateBtn.disabled = !workspaceState.ready || !workspaceState.user || !workspaceState.currentProject;
-  els.accountBtn.disabled = !workspaceState.ready;
+  const isBusy = Boolean(workspaceState.projectActionPending);
+  els.projectsBtn.disabled = !workspaceState.ready || !workspaceState.user || isBusy;
+  els.saveBtn.disabled = !workspaceState.ready || !workspaceState.user || isBusy;
+  els.templateBtn.disabled = !workspaceState.ready || !workspaceState.user || isBusy;
+  els.accountBtn.disabled = !workspaceState.ready || isBusy;
   els.accountBtn.textContent = workspaceState.user ? 'Настройки' : 'Войти';
   syncWorkspaceAccessControls();
 };
@@ -356,6 +549,14 @@ const closeModal = () => {
   if (previousView === 'settings') {
     workspaceState.adminSecret = null;
   }
+  if (previousView === 'projects') {
+    workspaceState.projectModalError = '';
+    workspaceState.projectModalNotice = '';
+    workspaceState.projectsLoading = false;
+    workspaceState.templatesLoading = false;
+    resetProjectComposer();
+  }
+  delete els.modal.dataset.modalView;
   els.modal.style.display = 'none';
 };
 
@@ -365,11 +566,98 @@ const openModal = (title, html, modalView = '') => {
   workspaceState.modalView = modalView;
   els.modalTitle.textContent = title;
   els.modalBody.innerHTML = html;
+  els.modal.dataset.modalView = modalView;
   els.modal.style.display = 'flex';
 };
 
-const openAuthScreen = (mode = workspaceState.authMode) => {
-  workspaceState.authMode = mode;
+const rerenderProjectsModal = () => {
+  if (workspaceState.modalView !== 'projects') return;
+  const els = getEls();
+  if (!els.modalBody || !els.modalTitle) return;
+  els.modalTitle.textContent = 'Шаблоны';
+  els.modalBody.innerHTML = renderProjectsModal();
+  bindProjectsModalForms();
+};
+
+const setProjectsLoadingState = (loading) => {
+  workspaceState.projectsLoading = loading;
+  rerenderProjectsModal();
+};
+
+const setTemplatesLoadingState = (loading) => {
+  workspaceState.templatesLoading = loading;
+  rerenderProjectsModal();
+};
+
+const setProjectActionPending = (label = '') => {
+  workspaceState.projectActionPending = String(label || '');
+  renderWorkspaceSummary();
+  rerenderProjectsModal();
+};
+
+const bindProjectsModalForms = () => {
+  const templateForm = document.getElementById('workspaceTemplateComposerForm');
+  if (templateForm && !templateForm.dataset.workspaceBound) {
+    templateForm.dataset.workspaceBound = '1';
+    templateForm.addEventListener('input', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (target.name !== 'templateName') return;
+      workspaceState.projectComposer.templateName = target.value;
+    });
+    templateForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        await handleTemplateComposerSubmit(event.currentTarget);
+      } catch (error) {
+        setProjectActionPending('');
+        workspaceState.projectModalError = error.message || 'Не удалось сохранить шаблон';
+        workspaceState.projectModalNotice = '';
+        rerenderProjectsModal();
+      }
+    });
+  }
+};
+
+const bindSettingsModalForms = () => {
+  const createTeamForm = document.getElementById('workspaceAdminCreateTeamForm');
+  if (createTeamForm && !createTeamForm.dataset.workspaceBound) {
+    createTeamForm.dataset.workspaceBound = '1';
+    createTeamForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        await handleAdminCreateTeamForm(event.currentTarget);
+      } catch (error) {
+        workspaceState.adminError = error.message || 'Не удалось выполнить admin-операцию';
+        workspaceState.adminNotice = '';
+        workspaceState.adminSecret = null;
+        await openSettingsModal();
+      }
+    });
+  }
+
+  const createUserForm = document.getElementById('workspaceAdminCreateUserForm');
+  if (createUserForm && !createUserForm.dataset.workspaceBound) {
+    createUserForm.dataset.workspaceBound = '1';
+    createUserForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        await handleAdminCreateUserForm(event.currentTarget);
+      } catch (error) {
+        workspaceState.adminError = error.message || 'Не удалось выполнить admin-операцию';
+        workspaceState.adminNotice = '';
+        workspaceState.adminSecret = null;
+        await openSettingsModal();
+      }
+    });
+  }
+};
+
+const syncWorkspaceAppVisibility = () => {
+  document.body.classList.toggle('workspace-auth-active', Boolean(isWorkspaceApiEnabled() && workspaceState.authScreenVisible && !workspaceState.user));
+};
+
+const openAuthScreen = () => {
   workspaceState.authScreenVisible = true;
   renderAuthOverlay();
 };
@@ -394,6 +682,7 @@ const getCurrentStateSnapshot = () => {
 };
 
 const applyProjectSelection = async (project) => {
+  setProjectActionPending('Открываем проект...');
   workspaceState.currentProject = project;
   setPersistedProjectId(workspaceState.team?.slug, project?.id || '');
 
@@ -404,13 +693,17 @@ const applyProjectSelection = async (project) => {
   workspaceState.templates = [];
   if (project?.id) {
     try {
+      workspaceState.templatesLoading = true;
       const response = await listWorkspaceSnapshots({ projectId: project.id, kind: 'template' });
       workspaceState.templates = Array.isArray(response?.snapshots) ? response.snapshots : [];
     } catch (error) {
       console.warn('Не удалось загрузить шаблоны проекта:', error);
+    } finally {
+      workspaceState.templatesLoading = false;
     }
   }
 
+  setProjectActionPending('');
   renderWorkspaceSummary();
 };
 
@@ -427,132 +720,240 @@ const refreshWorkspaceProjects = async () => {
   renderWorkspaceSummary();
 };
 
-const createProjectInteractively = async () => {
-  const name = window.prompt('Название проекта');
-  if (!name) return null;
-  const description = window.prompt('Описание проекта', '') || '';
-  const state = getCurrentStateSnapshot();
-  const response = await createWorkspaceProject({ name, description, state });
+const ensureTemplateProject = async () => {
+  if (workspaceState.currentProject?.id) {
+    return workspaceState.currentProject;
+  }
+
+  if (!workspaceState.projects.length) {
+    await refreshWorkspaceProjects();
+  }
+
+  if (workspaceState.currentProject?.id) {
+    return workspaceState.currentProject;
+  }
+
+  const fallbackName = workspaceState.user?.displayName
+    ? `${workspaceState.user.displayName} template storage`
+    : 'Template storage';
+  const response = await createWorkspaceProject({
+    name: fallbackName,
+    description: 'system-template-project',
+    state: getCurrentStateSnapshot()
+  });
   const project = response?.project || null;
-  if (!project) return null;
-  await refreshWorkspaceProjects();
-  await applyProjectSelection(project);
+  if (project) {
+    workspaceState.projects = [project, ...workspaceState.projects.filter((item) => item.id !== project.id)];
+    workspaceState.currentProject = project;
+    setPersistedProjectId(workspaceState.team?.slug, project.id);
+  }
   return project;
 };
 
 const saveCurrentProject = async () => {
   if (!workspaceState.user) {
-    openAuthScreen('login');
+    openAuthScreen();
     return;
   }
-
-  let project = workspaceState.currentProject;
-  if (!project) {
-    project = await createProjectInteractively();
-    if (!project) return;
-  }
-
   const snapshot = getCurrentStateSnapshot();
-  const response = await updateWorkspaceProject({
-    projectId: project.id,
-    name: project.name,
-    description: project.description || '',
+  setProjectActionPending('Сохраняем черновик...');
+  saveLocalDraftSnapshot(workspaceState.team?.slug, {
+    savedAt: new Date().toISOString(),
     state: snapshot
   });
-
-  if (response?.project) {
-    workspaceState.currentProject = response.project;
-    await refreshWorkspaceProjects();
-    renderWorkspaceSummary();
-    alert(`Проект "${response.project.name}" сохранен`);
-  }
+  workspaceState.projectModalError = '';
+  workspaceState.projectModalNotice = 'Черновик сохранен в браузере.';
+  setProjectActionPending('');
+  rerenderProjectsModal();
 };
 
-const saveTemplateInteractively = async () => {
-  if (!workspaceState.currentProject) {
-    alert('Сначала откройте или создайте проект.');
+const saveTemplateInteractively = async (templateName = '') => {
+  const name = String(templateName || '').trim();
+  if (!name) return;
+
+  const project = await ensureTemplateProject();
+  if (!project?.id) {
+    workspaceState.projectModalError = 'Не удалось подготовить хранилище шаблонов.';
+    rerenderProjectsModal();
     return;
   }
 
-  const name = window.prompt('Название шаблона');
-  if (!name) return;
-
   const snapshot = getCurrentStateSnapshot();
+  setProjectActionPending('Сохраняем шаблон...');
   const response = await saveWorkspaceSnapshot({
-    projectId: workspaceState.currentProject.id,
+    projectId: project.id,
     name,
     kind: 'template',
     state: snapshot
   });
 
   if (response?.snapshot) {
+    workspaceState.projectsModalLoadSeq += 1;
     workspaceState.templates = [response.snapshot, ...workspaceState.templates];
-    alert(`Шаблон "${response.snapshot.name}" сохранен`);
+    workspaceState.projectModalError = '';
+    workspaceState.projectModalNotice = `Шаблон "${response.snapshot.name}" сохранен.`;
+    rerenderProjectsModal();
   }
+  setProjectActionPending('');
 };
 
-const renderProjectsModal = () => {
-  const projectsHtml = workspaceState.projects.length
-    ? workspaceState.projects.map((project) => `
-      <div class="workspace-list-item ${workspaceState.currentProject?.id === project.id ? 'is-active' : ''}" data-workspace-project-id="${escapeHtml(project.id)}">
-        <div class="workspace-list-main">
-          <div class="workspace-list-title">${escapeHtml(project.name)}</div>
-          <div class="workspace-list-meta">${escapeHtml(project.description || 'Без описания')}</div>
-        </div>
-        <div class="workspace-list-actions">
-          <button class="btn btn-small" data-workspace-action="open-project" data-project-id="${escapeHtml(project.id)}">Открыть</button>
-          <button class="btn btn-small btn-danger" data-workspace-action="archive-project" data-project-id="${escapeHtml(project.id)}">Архив</button>
-        </div>
-      </div>
-    `).join('')
-    : '<div class="workspace-empty">У команды пока нет проектов.</div>';
+const getProjectPreviewData = (snapshot = {}) => {
+  const activeIndex = Number.isInteger(snapshot?.activePairIndex) ? snapshot.activePairIndex : 0;
+  const activePair = Array.isArray(snapshot?.titleSubtitlePairs) ? snapshot.titleSubtitlePairs[activeIndex] || snapshot.titleSubtitlePairs[0] : null;
+  return {
+    title: activePair?.title || snapshot?.brandName || 'AI-Craft',
+    subtitle: activePair?.subtitle || '',
+    backgroundColor: snapshot?.bgColor || '#111111',
+    backgroundImage: activePair?.bgImageSelected || snapshot?.kvSelected || '',
+    logo: snapshot?.logoSelected || ''
+  };
+};
 
-  const templatesHtml = workspaceState.currentProject && workspaceState.templates.length
-    ? workspaceState.templates.map((template) => `
-      <div class="workspace-list-item" data-workspace-template-id="${escapeHtml(template.id)}">
-        <div class="workspace-list-main">
-          <div class="workspace-list-title">${escapeHtml(template.name)}</div>
-          <div class="workspace-list-meta">${new Date(template.createdAt).toLocaleString('ru-RU')}</div>
-        </div>
-        <div class="workspace-list-actions">
-          <button class="btn btn-small" data-workspace-action="apply-template" data-template-id="${escapeHtml(template.id)}">Применить</button>
-        </div>
-      </div>
-    `).join('')
-    : '<div class="workspace-empty">Для текущего проекта шаблонов пока нет.</div>';
+const renderProjectPreview = (snapshot = {}, label = '') => {
+  const preview = getProjectPreviewData(snapshot);
+  const imageHtml = preview.backgroundImage
+    ? `<img class="workspace-project-preview-image" src="${escapeHtml(preview.backgroundImage)}" alt="">`
+    : '';
+  const logoHtml = preview.logo
+    ? `<img class="workspace-project-preview-logo" src="${escapeHtml(preview.logo)}" alt="">`
+    : '';
 
   return `
-    <div class="workspace-modal-stack">
-      <div class="workspace-toolbar">
-        <button class="btn" data-workspace-action="create-project">Создать проект</button>
-        <button class="btn" data-workspace-action="rename-project" ${workspaceState.currentProject ? '' : 'disabled'}>Переименовать текущий</button>
-        <button class="btn" data-workspace-action="save-project">Сохранить текущий</button>
-        <button class="btn" data-workspace-action="save-template" ${workspaceState.currentProject ? '' : 'disabled'}>Сохранить как шаблон</button>
-      </div>
-      <div class="workspace-section">
-        <div class="workspace-section-title">Проекты</div>
-        <div class="workspace-list">${projectsHtml}</div>
-      </div>
-      <div class="workspace-section">
-        <div class="workspace-section-title">Шаблоны текущего проекта</div>
-        <div class="workspace-list">${templatesHtml}</div>
+    <div class="workspace-project-preview" style="background:${escapeHtml(preview.backgroundColor)};">
+      ${imageHtml}
+      <div class="workspace-project-preview-overlay"></div>
+      <div class="workspace-project-preview-content">
+        ${logoHtml}
+        <div class="workspace-project-preview-label">${escapeHtml(label)}</div>
+        <div class="workspace-project-preview-title">${escapeHtml(preview.title)}</div>
+        ${preview.subtitle ? `<div class="workspace-project-preview-subtitle">${escapeHtml(preview.subtitle)}</div>` : ''}
       </div>
     </div>
   `;
 };
 
-const openProjectsModal = async () => {
-  await refreshWorkspaceProjects();
-  if (workspaceState.currentProject?.id) {
-    try {
-      const response = await listWorkspaceSnapshots({ projectId: workspaceState.currentProject.id, kind: 'template' });
-      workspaceState.templates = Array.isArray(response?.snapshots) ? response.snapshots : [];
-    } catch (error) {
-      console.warn('Не удалось загрузить шаблоны для модального окна:', error);
-    }
+const renderProjectsFeedback = () => {
+  if (workspaceState.projectModalError) {
+    return `<div class="workspace-auth-error">${escapeHtml(workspaceState.projectModalError)}</div>`;
   }
+  if (workspaceState.projectModalNotice) {
+    return `<div class="workspace-note">${escapeHtml(workspaceState.projectModalNotice)}</div>`;
+  }
+  return '';
+};
 
-  openModal('Проекты команды', renderProjectsModal(), 'projects');
+const renderTemplateComposer = () => {
+  const composer = getProjectComposer();
+  if (composer.mode !== 'template') return '';
+
+  return `
+    <div class="workspace-project-composer">
+      <div class="workspace-project-composer-head">
+        <div class="workspace-settings-surface-title">Сохранить как шаблон</div>
+        <button class="btn btn-small" type="button" data-workspace-action="cancel-project-composer">Отмена</button>
+      </div>
+      <form id="workspaceTemplateComposerForm" class="workspace-settings-form" novalidate>
+        <label class="workspace-settings-field">
+          <span class="workspace-settings-field-label">Название шаблона</span>
+          <input class="workspace-settings-input" name="templateName" type="text" value="${escapeHtml(composer.templateName)}" placeholder="Например, Базовый KV" required>
+        </label>
+        <div class="workspace-settings-form-actions">
+          <button class="btn primary" type="submit" ${workspaceState.projectActionPending ? 'disabled' : ''}>Сохранить шаблон</button>
+        </div>
+      </form>
+    </div>
+  `;
+};
+
+const renderProjectsModal = () => {
+  const currentSnapshot = getCurrentStateSnapshot();
+  const templatesHtml = workspaceState.templatesLoading
+    ? '<div class="workspace-loader-card"><span class="refresh-spinner">⟳</span>Загружаем шаблоны...</div>'
+    : workspaceState.templates.length
+      ? workspaceState.templates.map((template) => `
+        <article class="workspace-project-card workspace-project-card-template" data-workspace-template-id="${escapeHtml(template.id)}">
+          ${renderProjectPreview(template.state || {}, template.name)}
+          <div class="workspace-project-card-body">
+            <div class="workspace-project-card-title">${escapeHtml(template.name)}</div>
+            <div class="workspace-project-card-meta">${new Date(template.createdAt).toLocaleString('ru-RU')}</div>
+            <div class="workspace-project-card-actions">
+              <button class="btn btn-small" data-workspace-action="apply-template" data-template-id="${escapeHtml(template.id)}">Применить</button>
+            </div>
+          </div>
+        </article>
+      `).join('')
+      : '<div class="workspace-empty">Шаблонов пока нет. Работай в личном черновике и сохраняй удачные варианты сюда.</div>';
+
+  return `
+    <div class="workspace-modal-stack">
+      <div class="workspace-projects-header">
+        <div>
+          <div class="workspace-settings-view-title">Шаблоны</div>
+          <div class="workspace-settings-view-subtitle">Работаешь в личном черновике, а удачные варианты сохраняешь как шаблоны.</div>
+        </div>
+        <div class="workspace-toolbar">
+          <button class="btn primary" data-workspace-action="save-template" ${workspaceState.projectActionPending ? 'disabled' : ''}>Сохранить как шаблон</button>
+          <button class="btn" data-workspace-action="refresh-projects" ${workspaceState.templatesLoading || workspaceState.projectActionPending ? 'disabled' : ''}>Обновить</button>
+        </div>
+      </div>
+      ${renderProjectsFeedback()}
+      <div class="workspace-projects-layout">
+        <section class="workspace-projects-main">
+          <div class="workspace-section">
+            <div class="workspace-section-title">Библиотека шаблонов</div>
+            <div class="workspace-project-grid workspace-project-grid-templates">${templatesHtml}</div>
+          </div>
+        </section>
+        <aside class="workspace-projects-side">
+          <div class="workspace-project-composer workspace-project-composer-current">
+            <div class="workspace-project-composer-head">
+              <div class="workspace-settings-surface-title">Личный черновик</div>
+            </div>
+            ${renderProjectPreview(currentSnapshot, 'Текущий макет')}
+          </div>
+          ${renderTemplateComposer()}
+        </aside>
+      </div>
+    </div>
+  `;
+};
+
+const loadProjectsModalData = async () => {
+  if (!workspaceState.user) return;
+  const loadSeq = ++workspaceState.projectsModalLoadSeq;
+  workspaceState.projectModalError = '';
+  setTemplatesLoadingState(true);
+  try {
+    if (!workspaceState.currentProject?.id) {
+      await refreshWorkspaceProjects();
+    }
+    if (loadSeq !== workspaceState.projectsModalLoadSeq) return;
+    if (workspaceState.currentProject?.id) {
+      const response = await listWorkspaceSnapshots({ projectId: workspaceState.currentProject.id, kind: 'template' });
+      if (loadSeq !== workspaceState.projectsModalLoadSeq) return;
+      workspaceState.templates = Array.isArray(response?.snapshots) ? response.snapshots : [];
+    } else {
+      workspaceState.templates = [];
+    }
+  } catch (error) {
+    if (loadSeq !== workspaceState.projectsModalLoadSeq) return;
+    workspaceState.projectModalError = error.message || 'Не удалось загрузить шаблоны';
+  } finally {
+    if (loadSeq !== workspaceState.projectsModalLoadSeq) return;
+    setTemplatesLoadingState(false);
+  }
+};
+
+const openProjectsModal = async ({ skipReload = false } = {}) => {
+  if (!skipReload) {
+    workspaceState.projectsLoading = true;
+    workspaceState.templatesLoading = Boolean(workspaceState.currentProject?.id);
+  }
+  openModal('Шаблоны', renderProjectsModal(), 'projects');
+  bindProjectsModalForms();
+  if (!skipReload) {
+    void loadProjectsModalData();
+  }
 };
 
 const refreshAdminTeamsData = async () => {
@@ -591,185 +992,350 @@ const refreshAdminWorkspaceData = async ({ preserveSecret = true } = {}) => {
   }
 };
 
-const renderSettingsModal = () => {
-  const teams = getSelectableTeams();
-  const selectedTeamSlug = resolveSelectedTeamSlug();
-  const currentTeamSlug = workspaceState.team?.slug || '';
-  const accountTitle = workspaceState.user?.displayName || workspaceState.user?.email || 'Аккаунт';
-  const accountMeta = [workspaceState.user?.email || '', workspaceState.team?.name || '', formatWorkspaceRoleLabel()]
-    .filter(Boolean)
-    .join(' · ');
-  const teamDefaultsNote = canManageWorkspaceTeamDefaults() && !isWorkspaceSuperadmin()
-    ? '<div class="workspace-note">Роль lead может менять defaults и режимы макетов только внутри своей команды: логотип, визуалы, тексты, legal, ограничения, фоны, шрифты, быстрые палитры и наборы режимов вроде KZ/PRO/Reskill.</div>'
-    : '';
+const refreshWorkspaceTeamMembers = async () => {
+  if (!canViewWorkspaceTeamTab()) {
+    workspaceState.teamMembers = [];
+    workspaceState.teamMembersError = '';
+    return;
+  }
 
-  const teamsHtml = teams.length
-    ? teams.map((team) => {
-      const isCurrent = team.slug === currentTeamSlug;
-      const isPreferred = team.slug === selectedTeamSlug;
-      return `
-        <button
-          type="button"
-          class="workspace-team-card ${isPreferred ? 'is-active' : ''}"
-          data-workspace-action="select-settings-team"
-          data-team-slug="${escapeHtml(team.slug)}"
-        >
-          <span class="workspace-team-card-title">${escapeHtml(team.name)}</span>
-          <span class="workspace-team-card-meta">${escapeHtml(team.slug)}${isCurrent ? ' · активна сейчас' : ''}</span>
-        </button>
-      `;
-    }).join('')
-    : '<div class="workspace-empty">Команды пока не загрузились. Текущая сессия продолжит работать без переключения.</div>';
+  try {
+    const response = await listWorkspaceTeamMembers();
+    workspaceState.teamMembers = Array.isArray(response?.users) ? response.users : [];
+    workspaceState.teamMembersError = '';
+  } catch (error) {
+    workspaceState.teamMembers = [];
+    workspaceState.teamMembersError = error.message || 'Не удалось загрузить состав команды';
+  }
+};
 
-  const reloginHint = selectedTeamSlug && currentTeamSlug && selectedTeamSlug !== currentTeamSlug
-    ? '<div class="workspace-note">Новая команда сохранена в браузере. Чтобы применить ее сразу, выйдите и войдите заново.</div>'
-    : '<div class="workspace-note">Выбранную команду сохраняем в браузере и используем как команду по умолчанию при следующем входе.</div>';
+const renderSettingsReadonlyField = (label, value) => `
+  <label class="workspace-settings-field">
+    <span class="workspace-settings-field-label">${escapeHtml(label)}</span>
+    <input class="workspace-settings-input" type="text" value="${escapeHtml(value || '—')}" readonly>
+  </label>
+`;
 
-  const adminEnabled = isWorkspaceSuperadmin();
-  const adminTeamId = resolveAdminTeamId();
-  const adminSelectedTeam = workspaceState.adminTeams.find((team) => team.id === adminTeamId) || null;
-  const adminTeamsHtml = adminEnabled
-    ? (workspaceState.adminTeams.length
-      ? workspaceState.adminTeams.map((team) => `
-        <div class="workspace-list-item ${team.id === adminTeamId ? 'is-active' : ''}">
-          <div class="workspace-list-main">
-            <div class="workspace-list-title">${escapeHtml(team.name)}</div>
-            <div class="workspace-list-meta">${escapeHtml(team.slug)} · ${escapeHtml(team.status === 'archived' ? 'archived' : 'active')}</div>
-          </div>
-          <div class="workspace-list-actions">
-            <button class="btn btn-small" data-workspace-action="select-admin-team" data-team-id="${escapeHtml(team.id)}">${team.id === adminTeamId ? 'Выбрана' : 'Открыть'}</button>
-            <button class="btn btn-small" data-workspace-action="rename-admin-team" data-team-id="${escapeHtml(team.id)}">Переименовать</button>
-            ${team.id !== workspaceState.team?.id
-              ? `<button class="btn btn-small btn-danger" data-workspace-action="archive-admin-team" data-team-id="${escapeHtml(team.id)}">Архив</button>`
-              : ''}
-          </div>
-        </div>
-      `).join('')
-      : '<div class="workspace-empty">Команд пока нет. Создайте первую вручную ниже.</div>')
-    : '';
+const renderSettingsFeedback = () => {
+  if (workspaceState.adminError) {
+    return `<div class="workspace-auth-error">${escapeHtml(workspaceState.adminError)}</div>`;
+  }
+  if (workspaceState.adminNotice) {
+    return `<div class="workspace-note">${escapeHtml(workspaceState.adminNotice)}</div>`;
+  }
+  return '';
+};
 
-  const adminUsersHtml = adminEnabled
-    ? (workspaceState.adminUsers.length
-      ? workspaceState.adminUsers.map((user) => `
-        <div class="workspace-list-item">
-          <div class="workspace-list-main">
-            <div class="workspace-list-title">${escapeHtml(user.displayName || user.email)}</div>
-            <div class="workspace-list-meta">${escapeHtml(user.email)} · ${escapeHtml(user.role)} · ${escapeHtml(user.status)}</div>
-          </div>
-          <div class="workspace-list-actions">
-            ${!user.isSuperadmin && (user.role === 'editor' || user.role === 'lead')
-              ? `<button class="btn btn-small" data-workspace-action="set-admin-user-role" data-user-id="${escapeHtml(user.id)}" data-role="${user.role === 'lead' ? 'editor' : 'lead'}">${user.role === 'lead' ? 'Сделать editor' : 'Сделать lead'}</button>`
-              : ''}
-            <button class="btn btn-small" data-workspace-action="reset-admin-user-password" data-user-id="${escapeHtml(user.id)}">Новый пароль</button>
-            ${!user.isSuperadmin
-              ? `<button class="btn btn-small btn-danger" data-workspace-action="remove-admin-user" data-user-id="${escapeHtml(user.id)}">Удалить</button>`
-              : ''}
-          </div>
-        </div>
-      `).join('')
-      : `<div class="workspace-empty">${adminSelectedTeam ? 'В этой команде пока нет пользователей.' : 'Выберите команду, чтобы увидеть пользователей.'}</div>`)
-    : '';
-
-  const adminSecretHtml = workspaceState.adminSecret
-    ? `
-      <div class="workspace-secret-card">
-        <div class="workspace-section-title">Сгенерированный пароль</div>
-        <div class="workspace-secret-line">${escapeHtml(workspaceState.adminSecret.email)}</div>
-        <code class="workspace-secret-value">${escapeHtml(workspaceState.adminSecret.password)}</code>
-      </div>
-    `
-    : '';
-
-  const adminFeedbackHtml = workspaceState.adminError
-    ? `<div class="workspace-auth-error">${escapeHtml(workspaceState.adminError)}</div>`
-    : (workspaceState.adminNotice ? `<div class="workspace-note">${escapeHtml(workspaceState.adminNotice)}</div>` : '');
-
-  const adminSectionHtml = adminEnabled
-    ? `
-      <div class="workspace-section">
-        <div class="workspace-section-title">Superadmin</div>
-        <div class="workspace-note">Только вы можете создавать и архивировать команды, вручную создавать пользователей, сбрасывать им пароли, удалять их из команды и выдавать роль lead.</div>
-        ${adminFeedbackHtml}
-        ${adminSecretHtml}
-      </div>
-      <div class="workspace-section">
-        <div class="workspace-section-title">Команды workspace</div>
-        <div class="workspace-list">${adminTeamsHtml}</div>
-        <form id="workspaceAdminCreateTeamForm" class="workspace-auth-form">
-          <label class="workspace-field">
-            <span>Новая команда</span>
-            <input name="name" type="text" placeholder="Например, Яндекс Практикум" required>
-          </label>
-          <label class="workspace-field">
-            <span>Slug</span>
-            <input name="slug" type="text" placeholder="yandex-practicum">
-          </label>
-          <button class="btn primary" type="submit">Создать команду</button>
-        </form>
-      </div>
-      <div class="workspace-section">
-        <div class="workspace-section-title">Пользователи ${adminSelectedTeam ? `· ${escapeHtml(adminSelectedTeam.name)}` : ''}</div>
-        <div class="workspace-list">${adminUsersHtml}</div>
-        <form id="workspaceAdminCreateUserForm" class="workspace-auth-form" ${adminTeamId ? '' : 'style="display:none;"'}>
-          <label class="workspace-field">
-            <span>Email пользователя</span>
-            <input name="email" type="email" placeholder="user@example.com" required>
-          </label>
-          <label class="workspace-field">
-            <span>Имя</span>
-            <input name="displayName" type="text" placeholder="Опционально">
-          </label>
-          <label class="workspace-field">
-            <span>Роль</span>
-            <select name="role">
-              <option value="editor">editor</option>
-              <option value="lead">lead</option>
-            </select>
-          </label>
-          <button class="btn primary" type="submit">Создать пользователя и сгенерировать пароль</button>
-        </form>
-      </div>
-    `
-    : '';
+const renderSettingsSecret = () => {
+  if (!workspaceState.adminSecret) return '';
 
   return `
-    <div class="workspace-modal-stack">
-      <div class="workspace-account-card">
-        <div class="workspace-account-eyebrow">Аккаунт</div>
-        <div class="workspace-account-title">${escapeHtml(accountTitle)}</div>
-        <div class="workspace-account-meta">${escapeHtml(accountMeta || 'Авторизованный пользователь')}</div>
+    <div class="workspace-secret-card">
+      <div class="workspace-section-title">Сгенерированный пароль</div>
+      <div class="workspace-secret-line">${escapeHtml(workspaceState.adminSecret.email)}</div>
+      <code class="workspace-secret-value">${escapeHtml(workspaceState.adminSecret.password)}</code>
+    </div>
+  `;
+};
+
+const renderSettingsTeamMembersList = (members, { allowRoleActions = false } = {}) => {
+  if (!Array.isArray(members) || members.length === 0) {
+    return '<div class="workspace-empty">Пока никого нет.</div>';
+  }
+
+  return members.map((user) => `
+    <div class="workspace-settings-list-item">
+      <div class="workspace-settings-list-main">
+        <div class="workspace-settings-list-title">${escapeHtml(user.displayName || user.email)}</div>
+        <div class="workspace-settings-list-meta">${escapeHtml(user.email)}</div>
       </div>
-      <div class="workspace-section">
-        <div class="workspace-section-title">Команда</div>
-        <div class="workspace-team-grid">${teamsHtml}</div>
-      </div>
-      ${reloginHint}
-      ${teamDefaultsNote}
-      ${adminSectionHtml}
-      <div class="workspace-toolbar">
-        <button class="btn" data-workspace-action="close-settings">Готово</button>
-        ${selectedTeamSlug && currentTeamSlug && selectedTeamSlug !== currentTeamSlug
-          ? '<button class="btn" data-workspace-action="logout-and-switch-team">Выйти и сменить</button>'
+      <div class="workspace-settings-list-side">
+        <span class="workspace-settings-role-pill">${escapeHtml(user.role)}</span>
+        ${allowRoleActions && !user.isSuperadmin && (user.role === 'editor' || user.role === 'lead')
+          ? `<button class="btn btn-small" data-workspace-action="set-admin-user-role" data-user-id="${escapeHtml(user.id)}" data-role="${user.role === 'lead' ? 'editor' : 'lead'}">${user.role === 'lead' ? 'Сделать editor' : 'Сделать lead'}</button>`
           : ''}
-        <button class="btn btn-danger" data-workspace-action="logout">Выйти</button>
+        ${allowRoleActions
+          ? `<button class="btn btn-small" data-workspace-action="reset-admin-user-password" data-user-id="${escapeHtml(user.id)}">Новый пароль</button>`
+          : ''}
+        ${allowRoleActions && !user.isSuperadmin
+          ? `<button class="btn btn-small btn-danger" data-workspace-action="remove-admin-user" data-user-id="${escapeHtml(user.id)}">Удалить</button>`
+          : ''}
+      </div>
+    </div>
+  `).join('');
+};
+
+const renderSettingsSidebarMeta = (label, value) => `
+  <div class="workspace-settings-sidebar-meta">
+    <div class="workspace-settings-sidebar-meta-label">${escapeHtml(label)}</div>
+    <div class="workspace-settings-sidebar-meta-value">${escapeHtml(value || '—')}</div>
+  </div>
+`;
+
+const renderSettingsAccountView = () => {
+  const fields = [
+    renderSettingsReadonlyField('Имя', workspaceState.user?.displayName || ''),
+    renderSettingsReadonlyField('Почта', workspaceState.user?.email || '')
+  ];
+
+  if (!isWorkspaceSuperadmin()) {
+    fields.push(
+      renderSettingsReadonlyField('Команда', workspaceState.team?.name || ''),
+      renderSettingsReadonlyField('Роль', formatWorkspaceRoleLabel())
+    );
+  }
+
+  return `
+    <div class="workspace-settings-view">
+      <div class="workspace-settings-view-header">
+        <div>
+          <div class="workspace-settings-view-title">Аккаунт</div>
+          <div class="workspace-settings-view-subtitle">Профиль и активный доступ в workspace.</div>
+        </div>
+        <span class="workspace-settings-role-pill">${escapeHtml(isWorkspaceSuperadmin() ? 'Superadmin' : formatWorkspaceRoleLabel())}</span>
+      </div>
+      <div class="workspace-settings-surface">
+        <div class="workspace-settings-grid workspace-settings-grid-single">
+          ${fields.join('')}
+        </div>
       </div>
     </div>
   `;
 };
 
+const renderSettingsTeamView = () => {
+  const teamMembersContent = workspaceState.teamMembersError
+    ? `<div class="workspace-auth-error">${escapeHtml(workspaceState.teamMembersError)}</div>`
+    : renderSettingsTeamMembersList(workspaceState.teamMembers);
+
+  return `
+    <div class="workspace-settings-view">
+      <div class="workspace-settings-view-header">
+        <div>
+          <div class="workspace-settings-view-title">Команда</div>
+          <div class="workspace-settings-view-subtitle">Название команды и состав участников.</div>
+        </div>
+      </div>
+      <div class="workspace-settings-surface">
+        <div class="workspace-settings-grid workspace-settings-grid-single">
+          ${renderSettingsReadonlyField('Название команды', workspaceState.team?.name || '')}
+        </div>
+      </div>
+      <div class="workspace-settings-surface">
+        <div class="workspace-settings-surface-header">
+          <div class="workspace-settings-surface-title">Кто состоит в этой команде</div>
+        </div>
+        <div class="workspace-settings-list">
+          ${teamMembersContent}
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+const renderSettingsAdminTeamsView = () => {
+  const draft = getAdminTeamDraft();
+  const teamsHtml = workspaceState.adminTeams.length
+    ? workspaceState.adminTeams.map((team) => `
+      <div class="workspace-settings-list-item ${team.id === resolveAdminTeamId() ? 'is-active' : ''}">
+        <div class="workspace-settings-list-main">
+          <div class="workspace-settings-list-title">${escapeHtml(team.name)}</div>
+          <div class="workspace-settings-list-meta">${escapeHtml(team.slug)} · ${escapeHtml(team.status === 'archived' ? 'archived' : 'active')}</div>
+        </div>
+        <div class="workspace-settings-list-side">
+          <button class="btn btn-small" data-workspace-action="select-admin-team" data-team-id="${escapeHtml(team.id)}">${team.id === resolveAdminTeamId() ? 'Выбрана' : 'Открыть'}</button>
+          <button class="btn btn-small" data-workspace-action="rename-admin-team" data-team-id="${escapeHtml(team.id)}">Редактировать</button>
+          ${team.id !== workspaceState.team?.id
+            ? `<button class="btn btn-small btn-danger" data-workspace-action="archive-admin-team" data-team-id="${escapeHtml(team.id)}">Удалить</button>`
+            : ''}
+        </div>
+      </div>
+    `).join('')
+    : '<div class="workspace-empty">Команд пока нет.</div>';
+
+  return `
+    <div class="workspace-settings-view">
+      <div class="workspace-settings-view-header">
+        <div>
+          <div class="workspace-settings-view-title">Команды</div>
+          <div class="workspace-settings-view-subtitle">Все команды workspace, редактирование и удаление.</div>
+        </div>
+      </div>
+      ${renderSettingsFeedback()}
+      <div class="workspace-settings-surface">
+        <div class="workspace-settings-surface-header">
+          <div class="workspace-settings-surface-title">Список всех команд</div>
+        </div>
+        <div class="workspace-settings-list">
+          ${teamsHtml}
+        </div>
+      </div>
+      <div class="workspace-settings-surface">
+        <div class="workspace-settings-surface-header">
+          <div class="workspace-settings-surface-title">${draft.mode === 'edit' ? 'Редактировать команду' : 'Добавить команду'}</div>
+          ${draft.mode === 'edit'
+            ? '<button class="btn btn-small" data-workspace-action="start-admin-team-create">Новая команда</button>'
+            : ''}
+        </div>
+        <form id="workspaceAdminCreateTeamForm" class="workspace-settings-form" novalidate>
+          <input type="hidden" name="mode" value="${escapeHtml(draft.mode)}">
+          <input type="hidden" name="teamId" value="${escapeHtml(draft.teamId)}">
+          <div class="workspace-settings-grid workspace-settings-grid-single">
+            <label class="workspace-settings-field">
+              <span class="workspace-settings-field-label">Имя</span>
+              <input class="workspace-settings-input" name="name" type="text" value="${escapeHtml(draft.name)}" placeholder="Например, Яндекс Практикум" required>
+            </label>
+            <label class="workspace-settings-field">
+              <span class="workspace-settings-field-label">Slug</span>
+              <input class="workspace-settings-input" name="slug" type="text" value="${escapeHtml(draft.slug)}" placeholder="yandex-practicum" required>
+            </label>
+          </div>
+          <div class="workspace-settings-form-actions">
+            <button class="btn primary" type="submit">${draft.mode === 'edit' ? 'Сохранить' : 'Добавить команду'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+};
+
+const renderSettingsAdminUsersView = () => {
+  const adminTeamId = resolveAdminTeamId();
+  const adminSelectedTeam = workspaceState.adminTeams.find((team) => team.id === adminTeamId) || null;
+  const teamSwitchHtml = workspaceState.adminTeams.length
+    ? workspaceState.adminTeams.map((team) => `
+      <button class="workspace-settings-chip ${team.id === adminTeamId ? 'is-active' : ''}" type="button" data-workspace-action="select-admin-team" data-team-id="${escapeHtml(team.id)}">
+        ${escapeHtml(team.name)}
+      </button>
+    `).join('')
+    : '<div class="workspace-empty">Команд пока нет.</div>';
+
+  return `
+    <div class="workspace-settings-view">
+      <div class="workspace-settings-view-header">
+        <div>
+          <div class="workspace-settings-view-title">Пользователи</div>
+          <div class="workspace-settings-view-subtitle">Список пользователей, роли и создание новых аккаунтов.</div>
+        </div>
+      </div>
+      ${renderSettingsFeedback()}
+      ${renderSettingsSecret()}
+      <div class="workspace-settings-surface">
+        <div class="workspace-settings-surface-header">
+          <div class="workspace-settings-surface-title">Команда</div>
+        </div>
+        <div class="workspace-settings-chip-group">
+          ${teamSwitchHtml}
+        </div>
+      </div>
+      <div class="workspace-settings-surface">
+        <div class="workspace-settings-surface-header">
+          <div class="workspace-settings-surface-title">Список пользователей${adminSelectedTeam ? ` · ${escapeHtml(adminSelectedTeam.name)}` : ''}</div>
+        </div>
+        <div class="workspace-settings-list">
+          ${renderSettingsTeamMembersList(workspaceState.adminUsers, { allowRoleActions: true })}
+        </div>
+      </div>
+      <div class="workspace-settings-surface">
+        <div class="workspace-settings-surface-header">
+          <div class="workspace-settings-surface-title">Добавить пользователя</div>
+        </div>
+        <form id="workspaceAdminCreateUserForm" class="workspace-settings-form" novalidate ${adminTeamId ? '' : 'style="display:none;"'}>
+          <div class="workspace-settings-grid workspace-settings-grid-single">
+            <label class="workspace-settings-field">
+              <span class="workspace-settings-field-label">Имя</span>
+              <input class="workspace-settings-input" name="displayName" type="text" placeholder="Имя пользователя">
+            </label>
+            <label class="workspace-settings-field">
+              <span class="workspace-settings-field-label">Email</span>
+              <input class="workspace-settings-input" name="email" type="email" placeholder="user@example.com" required>
+            </label>
+            <label class="workspace-settings-field">
+              <span class="workspace-settings-field-label">Роль</span>
+              <select class="workspace-settings-input" name="role">
+                <option value="editor">editor</option>
+                <option value="lead">lead</option>
+              </select>
+            </label>
+          </div>
+          <div class="workspace-settings-form-actions">
+            <button class="btn primary" type="submit">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+};
+
+const renderSettingsModal = () => {
+  const settingsView = ensureSettingsView();
+  const views = getAvailableSettingsViews();
+  const sidebarMetaHtml = isWorkspaceSuperadmin()
+    ? renderSettingsSidebarMeta('Доступ', 'Superadmin')
+    : [
+      renderSettingsSidebarMeta('Команда', workspaceState.team?.name || ''),
+      renderSettingsSidebarMeta('Роль', formatWorkspaceRoleLabel())
+    ].join('');
+  const navHtml = views.map((view) => `
+    <button
+      type="button"
+      class="workspace-settings-nav-item ${view.id === settingsView ? 'is-active' : ''}"
+      data-workspace-action="open-settings-view"
+      data-settings-view="${escapeHtml(view.id)}"
+    >
+      ${escapeHtml(view.label)}
+    </button>
+  `).join('');
+
+  const contentHtml = (() => {
+    if (settingsView === 'team') return renderSettingsTeamView();
+    if (settingsView === 'teams') return renderSettingsAdminTeamsView();
+    if (settingsView === 'users') return renderSettingsAdminUsersView();
+    return renderSettingsAccountView();
+  })();
+
+  return `
+    <div class="workspace-settings-layout">
+      <aside class="workspace-settings-sidebar">
+        <div class="workspace-settings-sidebar-head">
+          <div class="workspace-settings-sidebar-title">Workspace</div>
+          <div class="workspace-settings-sidebar-subtitle">${escapeHtml(workspaceState.user?.displayName || workspaceState.user?.email || '')}</div>
+        </div>
+        <div class="workspace-settings-nav">
+          ${navHtml}
+        </div>
+        <div class="workspace-settings-sidebar-footer">
+          <div class="workspace-settings-sidebar-meta-list">
+            ${sidebarMetaHtml}
+          </div>
+          <button class="btn btn-full" data-workspace-action="logout">Выйти</button>
+        </div>
+      </aside>
+      <section class="workspace-settings-content">
+        ${contentHtml}
+      </section>
+    </div>
+  `;
+};
+
 const openSettingsModal = async () => {
+  ensureSettingsView();
   if (isWorkspaceSuperadmin()) {
     await refreshAdminWorkspaceData();
+  } else if (workspaceState.settingsView === 'team') {
+    await refreshWorkspaceTeamMembers();
   }
   openModal('Настройки workspace', renderSettingsModal(), 'settings');
+  bindSettingsModalForms();
 };
 
 const renderAuthOverlay = () => {
   const els = getEls();
   if (!els.authOverlay) return;
 
-  if (!workspaceState.enabled || !workspaceState.authScreenVisible) {
+  if (!workspaceState.authScreenVisible) {
     els.authOverlay.style.display = 'none';
+    syncWorkspaceAppVisibility();
     return;
   }
 
@@ -778,113 +1344,58 @@ const renderAuthOverlay = () => {
     updateSelectedTeamSlug(selectedTeamSlug);
   }
 
-  if (!workspaceState.ready) {
-    els.authOverlay.innerHTML = `
-      <div class="workspace-auth-shell workspace-auth-shell-loading">
-        <div class="workspace-auth-card">
-          <div class="workspace-auth-title">Подключаем workspace</div>
-          <div class="workspace-auth-subtitle">Проверяем API и загружаем доступные команды.</div>
-        </div>
-      </div>
-    `;
-    els.authOverlay.style.display = 'flex';
-    return;
-  }
-
-  const teams = getSelectableTeams();
-  const isRegister = workspaceState.authMode === 'register';
-  const title = isRegister ? 'Создать аккаунт' : 'Войти в AI-Craft';
-  const subtitle = isRegister
-    ? 'Создаем доступ в workspace и сразу открываем рабочее пространство.'
-    : 'Войдите в workspace, чтобы открыть проекты, шаблоны и командные defaults.';
-  const buttonLabel = workspaceState.authLoading
-    ? (isRegister ? 'Создаем аккаунт...' : 'Входим...')
-    : (isRegister ? 'Создать аккаунт' : 'Войти');
-  const teamCardsHtml = teams.length
-    ? teams.map((team) => `
-      <button
-        type="button"
-        class="workspace-team-card ${team.slug === selectedTeamSlug ? 'is-active' : ''}"
-        data-workspace-action="select-auth-team"
-        data-team-slug="${escapeHtml(team.slug)}"
-      >
-        <span class="workspace-team-card-title">${escapeHtml(team.name)}</span>
-        <span class="workspace-team-card-meta">${escapeHtml(team.slug)}</span>
-      </button>
-    `).join('')
-    : '';
-
-  const teamFieldHtml = teams.length
-    ? `
-      <div class="workspace-section">
-        <div class="workspace-section-title">Команда</div>
-        <div class="workspace-team-grid">${teamCardsHtml}</div>
-      </div>
-    `
-    : `
-      <label class="workspace-field">
-        <span>Команда</span>
-        <input id="workspaceAuthTeamSlugManual" name="teamSlug" type="text" autocomplete="organization" value="${escapeHtml(selectedTeamSlug)}" placeholder="practicum" required>
-      </label>
-    `;
-
+  const draft = getAuthDraft();
+  const buttonLabel = workspaceState.authLoading ? 'Входим...' : 'Войти';
   const errorHtml = workspaceState.authError
     ? `<div class="workspace-auth-error">${escapeHtml(workspaceState.authError)}</div>`
     : '';
 
   els.authOverlay.innerHTML = `
-    <div class="workspace-auth-shell">
+    <div class="workspace-auth-shell" style="--workspace-auth-hero-image: url('${escapeHtml(AUTH_HERO_IMAGE)}')">
       <div class="workspace-auth-hero">
         <img class="workspace-auth-logo" src="assets/logo.svg" alt="AI-Craft">
-        <div class="workspace-auth-hero-title">Командный вход</div>
-        <div class="workspace-auth-hero-text">
-          Сначала авторизуемся, потом открываем настройки команды и сохраняем выбор в браузере.
+        <div class="workspace-auth-hero-copy">
+          <div class="workspace-auth-eyebrow">Workspace</div>
+          <h1 class="workspace-auth-title">Вход в AI-Craft</h1>
+          <p class="workspace-auth-description">Только для участников команды. Аккаунты editor и lead создает администратор.</p>
         </div>
-        <div class="workspace-auth-hero-pills">
-          <span class="workspace-auth-pill">Projects</span>
-          <span class="workspace-auth-pill">Templates</span>
-          <span class="workspace-auth-pill">Team defaults</span>
-        </div>
+        <div class="workspace-auth-footer">Вайб-код от <a href="https://staff.yandex-team.ru/vidmich" target="_blank" rel="noopener">@vidmich</a></div>
       </div>
       <div class="workspace-auth-card">
-        <div class="workspace-auth-tabs">
-          <button type="button" class="workspace-auth-tab ${workspaceState.authMode === 'login' ? 'is-active' : ''}" data-workspace-auth-mode="login">Войти</button>
-          <button type="button" class="workspace-auth-tab ${workspaceState.authMode === 'register' ? 'is-active' : ''}" data-workspace-auth-mode="register">Создать аккаунт</button>
+        <div class="workspace-auth-header">
+          <div class="workspace-auth-kicker">Авторизация</div>
+          <h2 class="workspace-auth-heading">Войдите по почте и паролю</h2>
+          <p class="workspace-auth-subtitle">Если доступа еще нет, напишите админу или лиду вашей команды.</p>
         </div>
-        <div class="workspace-auth-title">${title}</div>
-        <div class="workspace-auth-subtitle">${subtitle}</div>
-        <form id="workspaceAuthForm" class="workspace-auth-form" data-auth-mode="${escapeHtml(workspaceState.authMode)}">
-          ${teamFieldHtml}
-          ${isRegister ? `
-            <label class="workspace-field">
-              <span>Имя</span>
-              <input id="workspaceRegisterName" name="displayName" type="text" autocomplete="name" placeholder="Ваше имя" required>
-            </label>
-          ` : ''}
+        <form id="workspaceAuthForm" class="workspace-auth-form">
           <label class="workspace-field">
-            <span>Email</span>
-            <input id="workspaceAuthEmail" name="email" type="email" autocomplete="${isRegister ? 'email' : 'username'}" placeholder="name@example.com" required>
+            <input class="workspace-settings-input workspace-auth-input" id="workspaceAuthEmail" name="email" type="email" autocomplete="username" placeholder="Email" value="${escapeHtml(draft.email)}" required>
           </label>
-          <label class="workspace-field">
-            <span>Пароль</span>
-            <input id="workspaceAuthPassword" name="password" type="password" autocomplete="${isRegister ? 'new-password' : 'current-password'}" placeholder="Минимум 8 символов" required>
+          <label class="workspace-field workspace-auth-password-field">
+            <input class="workspace-settings-input workspace-auth-input" id="workspaceAuthPassword" name="password" type="password" autocomplete="current-password" placeholder="Пароль" value="${escapeHtml(draft.password)}" required>
+            <button
+              class="workspace-auth-password-toggle"
+              type="button"
+              data-workspace-password-toggle="true"
+              aria-label="Показать пароль"
+              aria-pressed="false"
+            >
+              <span class="material-icons" aria-hidden="true">visibility</span>
+            </button>
           </label>
           ${errorHtml}
-          <button class="btn primary workspace-auth-submit" type="submit" ${workspaceState.authLoading ? 'disabled' : ''}>${buttonLabel}</button>
+          <button class="btn primary workspace-auth-submit" type="submit" ${(!workspaceState.ready || workspaceState.authLoading || !isAuthDraftComplete()) ? 'disabled' : ''}>${buttonLabel}</button>
         </form>
-        <div class="workspace-auth-footer">
-          Сессию и выбранную команду сохраняем в браузере. Вход через Яндекс ID можно добавить отдельным шагом после OAuth-конфига.
-        </div>
       </div>
     </div>
   `;
 
   els.authOverlay.style.display = 'flex';
+  syncWorkspaceAppVisibility();
 
   if (!workspaceState.authLoading) {
-    const focusId = isRegister ? 'workspaceRegisterName' : 'workspaceAuthEmail';
     window.requestAnimationFrame(() => {
-      document.getElementById(focusId)?.focus();
+      document.getElementById('workspaceAuthEmail')?.focus();
     });
   }
 };
@@ -895,13 +1406,23 @@ const resetWorkspaceSessionState = () => {
   workspaceState.teamDefaults = null;
   workspaceState.projects = [];
   workspaceState.templates = [];
+  workspaceState.projectsLoading = false;
+  workspaceState.templatesLoading = false;
+  workspaceState.projectActionPending = '';
+  workspaceState.projectModalError = '';
+  workspaceState.projectModalNotice = '';
   workspaceState.currentProject = null;
+  workspaceState.settingsView = 'account';
   workspaceState.adminTeams = [];
   workspaceState.adminUsers = [];
+  workspaceState.teamMembers = [];
+  workspaceState.teamMembersError = '';
   workspaceState.adminSelectedTeamId = '';
   workspaceState.adminError = '';
   workspaceState.adminNotice = '';
   workspaceState.adminSecret = null;
+  resetProjectComposer();
+  resetAdminTeamDraft();
 };
 
 const performLogout = async ({ reopenAuth = true } = {}) => {
@@ -912,7 +1433,7 @@ const performLogout = async ({ reopenAuth = true } = {}) => {
     resetWorkspaceSessionState();
     renderWorkspaceSummary();
     if (reopenAuth) {
-      openAuthScreen('login');
+      openAuthScreen();
     }
   }
 };
@@ -959,7 +1480,10 @@ const restoreWorkspaceSession = async () => {
   if (workspaceState.currentProject) {
     await applyProjectSelection(workspaceState.currentProject);
   } else {
-    if (appliedDefaults && Object.keys(appliedDefaults).length > 0) {
+    const localDraft = loadLocalDraftSnapshot(workspaceState.team?.slug);
+    if (localDraft?.state) {
+      await syncUiAfterStateApply(localDraft.state);
+    } else if (appliedDefaults && Object.keys(appliedDefaults).length > 0) {
       await syncUiAfterStateApply(appliedDefaults);
     }
     renderWorkspaceSummary();
@@ -968,75 +1492,56 @@ const restoreWorkspaceSession = async () => {
   closeAuthScreen();
 };
 
-const renameCurrentProject = async () => {
-  if (!workspaceState.currentProject) return;
-  const nextName = window.prompt('Новое название проекта', workspaceState.currentProject.name || '');
-  if (!nextName) return;
-  const response = await updateWorkspaceProject({
-    projectId: workspaceState.currentProject.id,
-    name: nextName,
-    description: workspaceState.currentProject.description || '',
-    state: workspaceState.currentProject.state || getCurrentStateSnapshot()
-  });
-  if (response?.project) {
-    workspaceState.currentProject = response.project;
-    await refreshWorkspaceProjects();
-    renderWorkspaceSummary();
-  }
+const handleTemplateComposerSubmit = async (form) => {
+  const formData = new FormData(form);
+  const templateName = String(formData.get('templateName') || '').trim();
+  if (!templateName) return;
+  await saveTemplateInteractively(templateName);
+  resetProjectComposer();
+  rerenderProjectsModal();
 };
 
 const handleProjectsModalAction = async (action, event) => {
-  if (action === 'create-project') {
-    await createProjectInteractively();
-    await openProjectsModal();
-    return;
-  }
-  if (action === 'rename-project') {
-    await renameCurrentProject();
-    await openProjectsModal();
-    return;
-  }
   if (action === 'save-project') {
     await saveCurrentProject();
-    await openProjectsModal();
     return;
   }
   if (action === 'save-template') {
-    await saveTemplateInteractively();
-    await openProjectsModal();
+    setProjectComposer({
+      mode: 'template',
+      templateName: workspaceState.currentProject ? `${workspaceState.currentProject.name} template` : ''
+    });
+    workspaceState.projectModalError = '';
+    workspaceState.projectModalNotice = '';
+    rerenderProjectsModal();
     return;
   }
-  if (action === 'open-project') {
-    const projectId = event.target.closest('[data-project-id]')?.dataset.projectId || '';
-    const project = workspaceState.projects.find((item) => item.id === projectId);
-    if (!project) return;
-    await applyProjectSelection(project);
-    closeModal();
+  if (action === 'cancel-project-composer') {
+    resetProjectComposer();
+    workspaceState.projectModalError = '';
+    workspaceState.projectModalNotice = '';
+    rerenderProjectsModal();
     return;
   }
-  if (action === 'archive-project') {
-    const projectId = event.target.closest('[data-project-id]')?.dataset.projectId || '';
-    if (!projectId || !window.confirm('Архивировать проект?')) return;
-    await archiveWorkspaceProject({ projectId });
-    if (workspaceState.currentProject?.id === projectId) {
-      workspaceState.currentProject = null;
-      setPersistedProjectId(workspaceState.team?.slug, '');
-    }
-    await refreshWorkspaceProjects();
-    await openProjectsModal();
+  if (action === 'refresh-projects') {
+    void loadProjectsModalData();
     return;
   }
   if (action === 'apply-template') {
     const templateId = event.target.closest('[data-template-id]')?.dataset.templateId || '';
     const template = workspaceState.templates.find((item) => item.id === templateId);
     if (!template) return;
+    setProjectActionPending('Применяем шаблон...');
     await syncUiAfterStateApply(template.state);
+    setProjectActionPending('');
     closeModal();
   }
 };
 
 const handleAdminCreateTeamForm = async (form) => {
   const formData = new FormData(form);
+  const mode = String(formData.get('mode') || 'create').trim().toLowerCase();
+  const teamId = String(formData.get('teamId') || '').trim();
   const name = String(formData.get('name') || '').trim();
   const slug = String(formData.get('slug') || '').trim();
 
@@ -1044,8 +1549,19 @@ const handleAdminCreateTeamForm = async (form) => {
   workspaceState.adminNotice = '';
   workspaceState.adminSecret = null;
 
+  if (mode === 'edit' && teamId) {
+    const response = await updateAdminWorkspaceTeam({ teamId, name, slug });
+    workspaceState.adminSelectedTeamId = response?.team?.id || teamId;
+    resetAdminTeamDraft();
+    await refreshAdminWorkspaceData();
+    workspaceState.adminNotice = `Команда "${response?.team?.name || name}" обновлена.`;
+    await openSettingsModal();
+    return;
+  }
+
   const response = await createAdminWorkspaceTeam({ name, slug });
   workspaceState.adminSelectedTeamId = response?.team?.id || workspaceState.adminSelectedTeamId;
+  resetAdminTeamDraft();
   await refreshAdminWorkspaceData();
   workspaceState.adminNotice = `Команда "${response?.team?.name || name}" создана.`;
   await openSettingsModal();
@@ -1069,18 +1585,22 @@ const handleAdminCreateUserForm = async (form) => {
   workspaceState.adminSecret = null;
 
   const response = await createAdminWorkspaceUser({ teamId, email, displayName, role });
+  const copied = await copyTextToClipboard(response?.generatedPassword || '');
   await refreshAdminWorkspaceData();
   workspaceState.adminSecret = response?.generatedPassword
     ? { email, password: response.generatedPassword }
     : null;
-  workspaceState.adminNotice = `Пользователь ${email} создан с ролью ${response?.user?.role || role}.`;
+  workspaceState.adminNotice = `Пользователь ${email} создан с ролью ${response?.user?.role || role}.${copied ? ' Пароль скопирован в буфер обмена.' : ''}`;
   await openSettingsModal();
 };
 
 const handleSettingsModalAction = async (action, event) => {
-  if (action === 'select-settings-team') {
-    const teamSlug = event.target.closest('[data-team-slug]')?.dataset.teamSlug || '';
-    updateSelectedTeamSlug(teamSlug);
+  if (action === 'open-settings-view') {
+    const nextView = event.target.closest('[data-settings-view]')?.dataset.settingsView || 'account';
+    setSettingsView(nextView);
+    if (nextView === 'team') {
+      await refreshWorkspaceTeamMembers();
+    }
     await openSettingsModal();
     return;
   }
@@ -1098,6 +1618,14 @@ const handleSettingsModalAction = async (action, event) => {
     closeModal();
     return;
   }
+  if (action === 'start-admin-team-create') {
+    resetAdminTeamDraft();
+    workspaceState.adminError = '';
+    workspaceState.adminNotice = '';
+    workspaceState.adminSecret = null;
+    await openSettingsModal();
+    return;
+  }
   if (action === 'select-admin-team') {
     const teamId = event.target.closest('[data-team-id]')?.dataset.teamId || '';
     setAdminTeamId(teamId);
@@ -1112,23 +1640,12 @@ const handleSettingsModalAction = async (action, event) => {
     const teamId = event.target.closest('[data-team-id]')?.dataset.teamId || '';
     const team = workspaceState.adminTeams.find((item) => item.id === teamId);
     if (!team) return;
-
-    const nextName = window.prompt('Новое название команды', team.name || '');
-    if (!nextName) return;
-    const nextSlug = window.prompt('Новый slug команды', team.slug || '') || '';
-
-    workspaceState.adminError = '';
-    workspaceState.adminNotice = '';
-    workspaceState.adminSecret = null;
-
-    await updateAdminWorkspaceTeam({
+    setAdminTeamDraft({
+      mode: 'edit',
       teamId,
-      name: nextName,
-      slug: nextSlug || team.slug
+      name: team.name || '',
+      slug: team.slug || ''
     });
-    workspaceState.adminSelectedTeamId = teamId;
-    await refreshAdminWorkspaceData();
-    workspaceState.adminNotice = `Команда "${nextName}" обновлена.`;
     await openSettingsModal();
     return;
   }
@@ -1146,6 +1663,10 @@ const handleSettingsModalAction = async (action, event) => {
     if (workspaceState.adminSelectedTeamId === teamId) {
       workspaceState.adminSelectedTeamId = '';
     }
+    const draft = getAdminTeamDraft();
+    if (draft.teamId === teamId) {
+      resetAdminTeamDraft();
+    }
     await refreshAdminWorkspaceData();
     workspaceState.adminNotice = `Команда "${team.name}" архивирована.`;
     await openSettingsModal();
@@ -1162,11 +1683,12 @@ const handleSettingsModalAction = async (action, event) => {
     workspaceState.adminSecret = null;
 
     const response = await resetAdminWorkspaceUserPassword({ teamId, userId });
+    const copied = await copyTextToClipboard(response?.generatedPassword || '');
     await refreshAdminWorkspaceData();
     workspaceState.adminSecret = response?.generatedPassword
       ? { email: user.email, password: response.generatedPassword }
       : null;
-    workspaceState.adminNotice = `Пароль для ${user.email} обновлен.`;
+    workspaceState.adminNotice = `Пароль для ${user.email} обновлен.${copied ? ' Новый пароль скопирован в буфер обмена.' : ''}`;
     await openSettingsModal();
     return;
   }
@@ -1209,32 +1731,22 @@ const submitAuthForm = async (form) => {
   if (workspaceState.authLoading) return;
 
   const formData = new FormData(form);
-  const fallbackTeamSlug = typeof formData.get('teamSlug') === 'string'
-    ? formData.get('teamSlug')
-    : '';
-  const teamSlug = (resolveSelectedTeamSlug() || String(fallbackTeamSlug || '')).trim().toLowerCase();
+  const teamSlug = getImplicitAuthTeamSlug();
   const email = String(formData.get('email') || '').trim();
   const password = String(formData.get('password') || '');
-  const displayName = String(formData.get('displayName') || '').trim();
-
-  if (!teamSlug) {
-    workspaceState.authError = 'Выберите команду перед входом.';
-    renderAuthOverlay();
-    return;
-  }
 
   workspaceState.authLoading = true;
   workspaceState.authError = '';
+  workspaceState.authDraft = { email, password };
   renderAuthOverlay();
 
   try {
-    if (workspaceState.authMode === 'register') {
-      await registerWorkspace({ displayName, email, password, teamSlug });
-    } else {
-      await loginWorkspace({ email, password, teamSlug });
-    }
+    await loginWorkspace({ email, password, teamSlug });
 
-    updateSelectedTeamSlug(teamSlug);
+    if (teamSlug) {
+      updateSelectedTeamSlug(teamSlug);
+    }
+    updateAuthDraftField('password', '');
     setWorkspaceSessionHint(true);
     await restoreWorkspaceSession();
     if (workspaceState.user) {
@@ -1257,7 +1769,7 @@ const attachGlobalListeners = () => {
 
   els.accountBtn.addEventListener('click', async () => {
     if (!workspaceState.user) {
-      openAuthScreen('login');
+      openAuthScreen();
       return;
     }
     await openSettingsModal();
@@ -1275,14 +1787,22 @@ const attachGlobalListeners = () => {
     try {
       await saveCurrentProject();
     } catch (error) {
+      setProjectActionPending('');
       alert(error.message || 'Не удалось сохранить проект');
     }
   });
 
   els.templateBtn.addEventListener('click', async () => {
     try {
-      await saveTemplateInteractively();
+      setProjectComposer({
+        mode: 'template',
+        templateName: workspaceState.currentProject ? `${workspaceState.currentProject.name} template` : ''
+      });
+      workspaceState.projectModalError = '';
+      workspaceState.projectModalNotice = '';
+      await openProjectsModal({ skipReload: false });
     } catch (error) {
+      setProjectActionPending('');
       alert(error.message || 'Не удалось сохранить шаблон');
     }
   });
@@ -1305,6 +1825,13 @@ const attachGlobalListeners = () => {
         await handleSettingsModalAction(action, event);
       }
     } catch (error) {
+      if (workspaceState.modalView === 'projects') {
+        setProjectActionPending('');
+        workspaceState.projectModalError = error.message || 'Ошибка project-операции';
+        workspaceState.projectModalNotice = '';
+        rerenderProjectsModal();
+        return;
+      }
       if (workspaceState.modalView === 'settings') {
         workspaceState.adminError = error.message || 'Ошибка admin-операции';
         workspaceState.adminNotice = '';
@@ -1316,48 +1843,27 @@ const attachGlobalListeners = () => {
     }
   });
 
-  els.modal.addEventListener('submit', async (event) => {
-    if (event.target.id !== 'workspaceAdminCreateTeamForm' && event.target.id !== 'workspaceAdminCreateUserForm') {
-      return;
-    }
-
-    event.preventDefault();
-
-    try {
-      if (event.target.id === 'workspaceAdminCreateTeamForm') {
-        await handleAdminCreateTeamForm(event.target);
-      }
-      if (event.target.id === 'workspaceAdminCreateUserForm') {
-        await handleAdminCreateUserForm(event.target);
-      }
-    } catch (error) {
-      workspaceState.adminError = error.message || 'Не удалось выполнить admin-операцию';
-      workspaceState.adminNotice = '';
-      workspaceState.adminSecret = null;
-      await openSettingsModal();
-    }
+  els.authOverlay.addEventListener('input', (event) => {
+    if (!(event.target instanceof HTMLInputElement)) return;
+    if (event.target.form?.id !== 'workspaceAuthForm') return;
+    updateAuthDraftField(event.target.name, event.target.value);
+    syncAuthSubmitState();
   });
 
   els.authOverlay.addEventListener('click', (event) => {
-    const mode = event.target.closest('[data-workspace-auth-mode]')?.dataset.workspaceAuthMode;
-    if (mode && mode !== workspaceState.authMode) {
-      workspaceState.authMode = mode;
-      workspaceState.authError = '';
-      renderAuthOverlay();
-      return;
-    }
+    const toggle = event.target.closest('[data-workspace-password-toggle]');
+    if (!toggle) return;
 
-    const action = event.target.closest('[data-workspace-action]')?.dataset.workspaceAction;
-    if (action === 'select-auth-team') {
-      const teamSlug = event.target.closest('[data-team-slug]')?.dataset.teamSlug || '';
-      updateSelectedTeamSlug(teamSlug);
-      renderAuthOverlay();
-    }
-  });
+    const passwordInput = document.getElementById('workspaceAuthPassword');
+    if (!(passwordInput instanceof HTMLInputElement)) return;
 
-  els.authOverlay.addEventListener('change', (event) => {
-    if (event.target.id === 'workspaceAuthTeamSlugManual') {
-      updateSelectedTeamSlug(event.target.value || '');
+    const shouldShow = passwordInput.type === 'password';
+    passwordInput.type = shouldShow ? 'text' : 'password';
+    toggle.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
+    toggle.setAttribute('aria-label', shouldShow ? 'Скрыть пароль' : 'Показать пароль');
+    const icon = toggle.querySelector('.material-icons');
+    if (icon) {
+      icon.textContent = shouldShow ? 'visibility_off' : 'visibility';
     }
   });
 
@@ -1377,9 +1883,9 @@ const injectWorkspaceUi = () => {
   controls.className = 'workspace-controls';
   controls.innerHTML = `
     <div id="workspaceStatus" class="workspace-status">Workspace...</div>
-    <button id="workspaceProjectsBtn" class="btn">Проекты</button>
+    <button id="workspaceProjectsBtn" class="btn">Шаблоны</button>
     <button id="workspaceSaveBtn" class="btn">Сохранить</button>
-    <button id="workspaceTemplateBtn" class="btn">Шаблон</button>
+    <button id="workspaceTemplateBtn" class="btn">Сохранить как шаблон</button>
     <button id="workspaceAccountBtn" class="btn primary">Войти</button>
   `;
   headerActions.prepend(controls);
@@ -1438,11 +1944,9 @@ export const initWorkspacePanel = async () => {
     return;
   }
 
-  await loadPublicTeams();
-
   if (!hasWorkspaceSessionHint()) {
     renderWorkspaceSummary();
-    openAuthScreen('login');
+    openAuthScreen();
     return;
   }
 
@@ -1454,7 +1958,7 @@ export const initWorkspacePanel = async () => {
     } else {
       console.warn('Workspace session restore failed:', error);
     }
-    openAuthScreen('login');
+    openAuthScreen();
   }
 
   renderWorkspaceSummary();

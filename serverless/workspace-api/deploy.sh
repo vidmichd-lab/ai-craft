@@ -72,6 +72,7 @@ CREATE_ARGS=(
   --environment WORKSPACE_STORAGE="${WORKSPACE_STORAGE:-memory}"
   --environment WORKSPACE_JWT_SECRET="${WORKSPACE_JWT_SECRET:-change-me}"
   --environment WORKSPACE_ALLOWED_ORIGINS="${WORKSPACE_ALLOWED_ORIGINS:-https://ai-craft.website.yandexcloud.net,http://localhost:8000}"
+  --environment WORKSPACE_SUPERADMIN_EMAILS="${WORKSPACE_SUPERADMIN_EMAILS:-vidmichd@ya.ru}"
   --environment WORKSPACE_COOKIE_SECURE="${WORKSPACE_COOKIE_SECURE:-true}"
   --environment WORKSPACE_COOKIE_SAME_SITE="${WORKSPACE_COOKIE_SAME_SITE:-none}"
   --environment WORKSPACE_DEBUG_EVENT="${WORKSPACE_DEBUG_EVENT:-false}"

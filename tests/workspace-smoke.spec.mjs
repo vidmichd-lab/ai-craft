@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('workspace flow allows login, project save and template save', async ({ page }) => {
+test('workspace flow allows login, draft save and template save', async ({ page }) => {
   const state = {
     loggedIn: false,
     user: {
@@ -29,16 +29,6 @@ test('workspace flow allows login, project save and template save', async ({ pag
     projects: [],
     templatesByProject: {}
   };
-
-  const dialogAnswers = ['Launch Project', 'Demo description', 'Launch Template'];
-  page.on('dialog', async (dialog) => {
-    if (dialog.type() === 'prompt') {
-      await dialog.accept(dialogAnswers.shift() || '');
-      return;
-    }
-
-    await dialog.accept();
-  });
 
   await page.route('**/workspace/health', async (route) => {
     await route.fulfill({
@@ -244,7 +234,7 @@ test('workspace flow allows login, project save and template save', async ({ pag
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
 
-  await expect(page.locator('#workspaceControls')).toBeVisible();
+  await expect(page.locator('#workspaceControls')).toBeHidden();
   await expect(page.locator('#workspaceStatus')).toContainText('Нужен вход');
   await expect(page.locator('#workspaceAuthOverlay')).toBeVisible();
 
@@ -252,20 +242,22 @@ test('workspace flow allows login, project save and template save', async ({ pag
   await page.fill('#workspaceAuthPassword', 'change-me-now');
   await page.click('#workspaceAuthForm button[type="submit"]');
 
+  await expect(page.locator('#workspaceControls')).toBeVisible();
   await expect(page.locator('#workspaceStatus')).toContainText('Demo Team');
   await expect(page.locator('#workspaceModalBody')).toContainText('Workspace Admin');
 
-  await page.click('[data-workspace-action="close-settings"]');
+  await page.click('#workspaceModalCloseBtn');
 
   await page.click('#workspaceSaveBtn');
-  await expect(page.locator('#workspaceStatus')).toContainText('Launch Project');
+  await expect(page.locator('#workspaceStatus')).toContainText('личный черновик');
 
   await page.click('#workspaceProjectsBtn');
-  await expect(page.locator('#workspaceModalBody')).toContainText('Launch Project');
+  await expect(page.locator('#workspaceModalBody')).toContainText('Шаблонов пока нет');
 
   await page.click('#workspaceModalCloseBtn');
   await page.click('#workspaceTemplateBtn');
-  await page.click('#workspaceProjectsBtn');
+  await page.fill('#workspaceTemplateComposerForm input[name="templateName"]', 'Launch Template');
+  await page.click('#workspaceTemplateComposerForm button[type="submit"]');
   await expect(page.locator('#workspaceModalBody')).toContainText('Launch Template');
 });
 
@@ -542,19 +534,21 @@ test('superadmin can create a team and a user with generated password', async ({
   await page.click('#workspaceAuthForm button[type="submit"]');
 
   await expect(page.locator('#workspaceModalBody')).toContainText('Superadmin');
+  await page.click('[data-workspace-action="open-settings-view"][data-settings-view="teams"]');
   await page.fill('#workspaceAdminCreateTeamForm input[name="name"]', 'Design Ops');
   await page.fill('#workspaceAdminCreateTeamForm input[name="slug"]', 'design-ops');
   await page.click('#workspaceAdminCreateTeamForm button[type="submit"]');
 
   await expect(page.locator('#workspaceModalBody')).toContainText('Design Ops');
-  await page.click('[data-workspace-action="select-admin-team"][data-team-id="team-2"]');
+  await page.click('[data-workspace-action="open-settings-view"][data-settings-view="users"]');
+  await expect(page.locator('#workspaceModalBody')).toContainText('Список пользователей · Design Ops');
 
   await page.fill('#workspaceAdminCreateUserForm input[name="email"]', 'editor@example.com');
   await page.fill('#workspaceAdminCreateUserForm input[name="displayName"]', 'Editor User');
   await page.selectOption('#workspaceAdminCreateUserForm select[name="role"]', 'lead');
   await Promise.all([
     page.waitForResponse((response) => response.url().includes('/admin/users') && response.request().method() === 'POST'),
-    page.locator('#workspaceAdminCreateUserForm').evaluate((form) => form.requestSubmit())
+    page.click('#workspaceAdminCreateUserForm button[type="submit"]')
   ]);
 
   await expect(page.locator('#workspaceModalBody')).toContainText('editor@example.com');

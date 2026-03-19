@@ -100,15 +100,12 @@ export const removeAdminWorkspaceUser = ({ teamId, userId }) => request('/admin/
 });
 export const loginWorkspace = ({ email, password, teamSlug }) => request('/auth/login', {
   method: 'POST',
-  body: { email, password, teamSlug }
-});
-export const registerWorkspace = ({ displayName, email, password, teamSlug }) => request('/auth/register', {
-  method: 'POST',
-  body: { displayName, email, password, teamSlug }
+  body: teamSlug ? { email, password, teamSlug } : { email, password }
 });
 export const logoutWorkspace = () => request('/auth/logout', { method: 'POST' });
 export const getWorkspaceMe = () => request('/auth/me');
 export const getCurrentWorkspaceTeam = () => request('/teams/current');
+export const listWorkspaceTeamMembers = () => request('/team-members');
 export const getWorkspaceTeamDefaults = () => request('/team-defaults');
 export const saveWorkspaceTeamDefaults = ({ defaults, mediaSources }) => request('/team-defaults', {
   method: 'POST',

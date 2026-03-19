@@ -2382,49 +2382,7 @@ const handleLogin = async (event, origin) => withStorageErrors(origin, async () 
 });
 
 const handleRegister = async (event, origin) => withStorageErrors(origin, async () => {
-  const body = parseBody(event);
-  const displayName = sanitizeDisplayName(body.displayName);
-  const email = sanitizeEmail(body.email);
-  const password = typeof body.password === 'string' ? body.password : '';
-  const teamSlug = sanitizeTeamSlug(body.teamSlug);
-
-  if (!displayName || !email || !password || !teamSlug) {
-    return json(400, toError('displayName, email, password and teamSlug are required'), origin);
-  }
-  if (!isValidEmail(email)) {
-    return json(400, toError('Invalid email'), origin);
-  }
-  if (!isValidPassword(password)) {
-    return json(400, toError('Password must be at least 8 characters'), origin);
-  }
-
-  const team = await storage.getTeamBySlug({ teamSlug });
-  if (!team || !PUBLIC_TEAM_STATUSES.has(team.status)) {
-    return json(404, toError('Team not found', { teamSlug }), origin);
-  }
-
-  const existingUser = await storage.getUserByEmail({ email });
-  if (existingUser) {
-    return json(409, toError('Account already exists'), origin);
-  }
-
-  const user = await storage.createUser({
-    email,
-    password,
-    displayName
-  });
-  const membership = await storage.createMembership({
-    teamId: team.id,
-    userId: user.id,
-    role: isSuperAdminEmail(email) ? 'admin' : resolveDefaultRole()
-  });
-
-  return createAuthSuccessResponse({
-    user,
-    team,
-    membership,
-    origin
-  });
+  return json(403, toError('Self-registration is disabled. Ask an admin or lead to create your account.'), origin);
 });
 
 const handleLogout = async (event, origin) => {
@@ -2491,6 +2449,28 @@ const handleCurrentTeam = async (event, origin) => withStorageErrors(origin, asy
         updatedAt: currentTeam.defaults.updatedAt
       }
       : null
+  }, origin);
+});
+
+const handleTeamMembers = async (event, origin) => withStorageErrors(origin, async () => {
+  const session = await requireAuth(event);
+  if (!session) {
+    return json(401, toError('Unauthorized'), origin);
+  }
+  if (!requireSuperAdmin(session) && !requireRole(session, [...TEAM_DEFAULTS_ROLES])) {
+    return json(403, toError('Forbidden'), origin);
+  }
+
+  const currentTeam = await storage.getCurrentTeam({ teamId: session.teamId });
+  if (!currentTeam?.team) {
+    return json(404, toError('Team not found', { teamId: session.teamId }), origin);
+  }
+
+  const users = await storage.listTeamMembers({ teamId: session.teamId, includeInactive: true });
+  return json(200, {
+    ok: true,
+    team: buildPublicTeam(currentTeam.team),
+    users: users.map(buildAdminMember)
   }, origin);
 });
 
@@ -2809,6 +2789,9 @@ export const handler = async (event) => {
     }
     if (method === 'GET' && path.endsWith('/teams/current')) {
       return handleCurrentTeam(event, origin);
+    }
+    if (method === 'GET' && path.endsWith('/team-members')) {
+      return handleTeamMembers(event, origin);
     }
     if (method === 'GET' && path.endsWith('/team-defaults')) {
       return handleGetTeamDefaults(event, origin);

@@ -15,6 +15,124 @@ paths:
       responses:
         '200':
           description: Workspace API health
+  /teams/public:
+    get:
+      operationId: listPublicTeams
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Public teams list
+  /admin/teams:
+    get:
+      operationId: adminListTeams
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Admin teams list
+    post:
+      operationId: adminCreateTeam
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team created
+  /admin/teams/update:
+    post:
+      operationId: adminUpdateTeam
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team updated
+  /admin/teams/archive:
+    post:
+      operationId: adminArchiveTeam
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team archived
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Team users list
+    post:
+      operationId: adminCreateUser
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: User created
+  /admin/users/reset-password:
+    post:
+      operationId: adminResetUserPassword
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: User password reset
+  /admin/users/role:
+    post:
+      operationId: adminUpdateUserRole
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: User role updated
+  /admin/users/remove:
+    post:
+      operationId: adminRemoveUser
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: User removed from team
   /auth/login:
     post:
       operationId: authLogin
@@ -27,6 +145,18 @@ paths:
       responses:
         '200':
           description: Login result
+  /auth/register:
+    post:
+      operationId: authRegister
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Register result
   /auth/logout:
     post:
       operationId: authLogout
@@ -63,6 +193,18 @@ paths:
       responses:
         '200':
           description: Current team and defaults
+  /team-members:
+    get:
+      operationId: teamMembers
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Current team members
   /team-defaults:
     get:
       operationId: getTeamDefaults
