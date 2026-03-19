@@ -46,12 +46,6 @@
       };
 
       appendLink('preload', makeUrl('styles.css'), { as: 'style' });
-      appendLink('modulepreload', makeUrl('src/main.js'));
-      appendLink('modulepreload', makeUrl('src/constants.js'));
-      appendLink('modulepreload', makeUrl('src/state/store.js'));
-      appendLink('prefetch', makeUrl('sizes-config.json'), { as: 'fetch', crossorigin: '' });
-      appendLink('modulepreload', makeUrl('src/utils/assetScanner.js'));
-      appendLink('modulepreload', makeUrl('src/utils/imageCache.js'));
       appendLink('stylesheet', makeUrl('styles.css'));
     })(window.APP_VERSION);
   </script>
@@ -73,6 +67,9 @@
         localStorage.setItem('language', 'ru');
       }
     })();
+
+    // Не показываем редактор до тех пор, пока workspace auth не будет разрешен.
+    document.documentElement.setAttribute('data-workspace-boot', 'pending');
   </script>
 </head>
 <body>
@@ -92,34 +89,7 @@
           </div>
         </div>
       </div>
-      <div class="header-actions">
-          <div class="language-selector">
-            <div class="custom-select-wrapper">
-              <div class="custom-select-button" id="languageSelectBtn">
-                <span id="languageSelectText">RU</span>
-                <span class="custom-select-arrow">▼</span>
-              </div>
-              <div class="custom-select-dropdown" id="languageSelectDropdown">
-                <div class="custom-select-option selected" data-value="ru" data-i18n="common.language.ru">RU</div>
-                <div class="custom-select-option" data-value="en" data-i18n="common.language.en">EN</div>
-                <div class="custom-select-option" data-value="tr" data-i18n="common.language.tr">TR</div>
-              </div>
-            </div>
-          </div>
-          <div class="theme-toggle" style="display: flex; align-items: center; gap: 12px;">
-            <div class="toggle-switch" id="themeToggle" data-value="dark" data-options="2" data-i18n-title="theme.toggle">
-              <div class="toggle-switch-slider"></div>
-              <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="dark">
-                  <span class="material-icons">dark_mode</span>
-                </div>
-                <div class="toggle-switch-option" data-value="light">
-                  <span class="material-icons">light_mode</span>
-                </div>
-              </div>
-            </div>
-          </div>
-      </div>
+      <div class="header-actions"></div>
     </div>
     <div class="main">
       <!-- Icons Panel -->
@@ -153,13 +123,9 @@
         <!-- Layout Section -->
         <div class="panel-section active" id="panel-section-layout">
             <div class="form-group">
-              <div class="toggle-switch mode-toggle mode-toggle-3 mode-toggle-secondary mode-toggle-panel" id="variantModeToggle" data-value="reskill" data-options="3">
-                <div class="toggle-switch-slider"></div>
-                <div class="toggle-switch-track">
-                  <div class="toggle-switch-option active" data-value="reskill">Reskill</div>
-                  <div class="toggle-switch-option" data-value="pro">PRO</div>
-                  <div class="toggle-switch-option" data-value="kz">KZ</div>
-                </div>
+              <div class="workspace-layout-departments">
+                <div class="workspace-layout-departments-label">Отдел</div>
+                <div id="workspaceDepartmentTags" class="workspace-layout-department-tags"></div>
               </div>
             </div>
             <div class="form-group">
@@ -1138,12 +1104,6 @@
 
         <div class="form-group-section">
           <div id="content-settings">
-            <div class="form-group" style="margin-top: 8px;">
-              <button class="btn btn-full" data-function="showSizesAdmin" data-i18n-title="export.settings.admin" data-i18n="export.settings.admin">Все настройки</button>
-            </div>
-            <div class="form-group" style="margin-top: 8px;">
-              <button class="btn btn-full" data-function="showLogoAssetsAdmin" data-i18n-title="export.settings.media" data-i18n="export.settings.media">Медиа</button>
-            </div>
             <button class="btn btn-danger" onclick="hardResetCache()" style="margin-top: 8px; width: 100%;">
               <span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">delete_sweep</span>
               <span data-i18n="settings.hardReset">Очистить кеш</span>

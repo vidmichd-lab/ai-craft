@@ -466,7 +466,7 @@ export function initFileManager() {
 
     if (remoteLogoMode) {
       hint.style.display = 'block';
-      hint.textContent = 'Логотипы теперь ожидаются только из remote manifest. Локальное управление папками logo через этот UI отключено.';
+      hint.textContent = 'Логотипы сейчас берутся из общей библиотеки команды. Здесь можно быстро просматривать структуру, а для добавления новых логотипов нужен отдельный remote logo flow.';
       return;
     }
 
@@ -899,7 +899,7 @@ export function initFileManager() {
           }
 
           if (currentBasePath === 'logo' && await isRemoteMediaEnabled().catch(() => false)) {
-            alert('Переименование папок logo отключено: логотипы теперь берутся только из remote manifest.');
+            alert('Переименование логотипных папок пока недоступно: для remote logo еще нет отдельного folder API.');
             input.remove();
             nameSpan.style.display = '';
             return;
@@ -1015,7 +1015,7 @@ export function initFileManager() {
         try {
           if (type === 'folder') {
             if (currentBasePath === 'logo' && await isRemoteMediaEnabled().catch(() => false)) {
-              throw new Error('Удаление папок logo через локальный API отключено: логотипы теперь remote-only.');
+              throw new Error('Удаление логотипных папок пока недоступно: для remote logo еще нет отдельного folder API.');
             }
             if (currentBasePath === 'assets' && await isRemoteMediaEnabled().catch(() => false)) {
               const folderNode = getFolderContent(latestStructure, path);
@@ -1190,7 +1190,7 @@ export function initFileManager() {
       }
 
       if (currentBasePath === 'logo' && await isRemoteMediaEnabled().catch(() => false)) {
-        alert('Создание папок logo через локальный UI отключено: логотипы теперь remote-only.');
+        alert('Создание папок для remote logo пока не поддерживается. Для логотипов сейчас доступен просмотр командной библиотеки.');
         return;
       }
       
@@ -1279,7 +1279,7 @@ export function initFileManager() {
       if (currentBasePath === 'logo') {
         isRemoteMediaEnabled().then((remoteEnabled) => {
           if (remoteEnabled) {
-            alert('Загрузка логотипов через локальный UI отключена: логотипы теперь remote-only.');
+            alert('Прямая загрузка логотипов в remote logo пока не подключена. Для логотипов здесь доступна библиотека команды, а загрузка ассетов работает ниже без ограничений.');
             return;
           }
           pendingUploadTargetPath = currentPath || currentBasePath;

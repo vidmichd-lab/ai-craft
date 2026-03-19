@@ -142,6 +142,35 @@ test('workspace flow allows login, draft save and template save', async ({ page 
     });
   });
 
+  await page.route('**/admin/team-defaults?*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        teamId: state.currentTeam.id,
+        team: state.currentTeam,
+        defaults: {
+          version: 1,
+          defaults: {
+            __workspace: {
+              departments: {
+                general: {
+                  id: 'general',
+                  name: 'Общий',
+                  slug: 'common'
+                },
+                items: []
+              }
+            }
+          },
+          mediaSources: {},
+          updatedAt: '2026-03-13T12:00:00.000Z'
+        }
+      })
+    });
+  });
+
   await page.route('**/projects', async (route) => {
     const body = JSON.parse(route.request().postData() || '{}');
     const project = {
@@ -198,7 +227,9 @@ test('workspace flow allows login, draft save and template save', async ({ page 
   await page.route('**/snapshots?*', async (route) => {
     const url = new URL(route.request().url());
     const projectId = url.searchParams.get('projectId') || '';
-    const templates = state.templatesByProject[projectId] || [];
+    const templates = projectId
+      ? (state.templatesByProject[projectId] || [])
+      : Object.values(state.templatesByProject).flat();
 
     await route.fulfill({
       status: 200,
@@ -220,6 +251,7 @@ test('workspace flow allows login, draft save and template save', async ({ page 
       kind: body.kind,
       state: body.state,
       createdBy: state.user.id,
+      authorName: state.user.displayName,
       createdAt: '2026-03-13T12:30:00.000Z'
     };
     state.templatesByProject[body.projectId] = [snapshot, ...(state.templatesByProject[body.projectId] || [])];
@@ -258,6 +290,8 @@ test('workspace flow allows login, draft save and template save', async ({ page 
   await page.click('#workspaceTemplateBtn');
   await page.fill('#workspaceTemplateComposerForm input[name="templateName"]', 'Launch Template');
   await page.click('#workspaceTemplateComposerForm button[type="submit"]');
+  await expect(page.locator('#workspaceModalBody')).toContainText('Автор: Workspace Admin');
+  await expect(page.locator('#workspaceModalBody')).toContainText('Доступ: вся команда');
   await expect(page.locator('#workspaceModalBody')).toContainText('Launch Template');
 });
 
@@ -413,8 +447,11 @@ test('superadmin can create a team and a user with generated password', async ({
     });
   });
 
-  await page.route('**/admin/teams', async (route) => {
-    if (route.request().method() === 'GET') {
+  await page.route('**/admin/teams*', async (route) => {
+    const method = route.request().method();
+    const url = route.request().url();
+
+    if (method === 'GET') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -427,6 +464,32 @@ test('superadmin can create a team and a user with generated password', async ({
     }
 
     const body = JSON.parse(route.request().postData() || '{}');
+    if (url.includes('/admin/teams/update')) {
+      const nextTeam = state.teams.find((team) => team.id === body.teamId);
+      if (!nextTeam) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: false, error: 'Team not found' })
+        });
+        return;
+      }
+
+      nextTeam.name = body.name || nextTeam.name;
+      nextTeam.slug = body.slug || nextTeam.slug;
+      nextTeam.status = body.status || nextTeam.status;
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          team: nextTeam
+        })
+      });
+      return;
+    }
+
     const createdTeam = {
       id: `team-${state.teams.length + 1}`,
       slug: body.slug || `team-${state.teams.length + 1}`,
@@ -531,17 +594,20 @@ test('superadmin can create a team and a user with generated password', async ({
 
   await page.fill('#workspaceAuthEmail', 'vidmichd@ya.ru');
   await page.fill('#workspaceAuthPassword', 'change-me-now');
+  await expect(page.locator('#workspaceAuthForm button[type="submit"]')).toBeEnabled();
   await page.click('#workspaceAuthForm button[type="submit"]');
 
-  await expect(page.locator('#workspaceModalBody')).toContainText('Superadmin');
-  await page.click('[data-workspace-action="open-settings-view"][data-settings-view="teams"]');
+  await expect(page.locator('#workspaceModalBody')).toContainText('admin');
+  await page.click('#workspaceModalCloseBtn');
+  await page.click('#workspaceTeamBtn');
+  await page.click('[data-workspace-action="start-admin-team-create"]');
+  await expect(page.locator('#workspaceModalBody')).toContainText('Новая команда');
   await page.fill('#workspaceAdminCreateTeamForm input[name="name"]', 'Design Ops');
   await page.fill('#workspaceAdminCreateTeamForm input[name="slug"]', 'design-ops');
   await page.click('#workspaceAdminCreateTeamForm button[type="submit"]');
 
   await expect(page.locator('#workspaceModalBody')).toContainText('Design Ops');
-  await page.click('[data-workspace-action="open-settings-view"][data-settings-view="users"]');
-  await expect(page.locator('#workspaceModalBody')).toContainText('Список пользователей · Design Ops');
+  await expect(page.locator('#workspaceModalBody')).toContainText('Кто в команде · Design Ops');
 
   await page.fill('#workspaceAdminCreateUserForm input[name="email"]', 'editor@example.com');
   await page.fill('#workspaceAdminCreateUserForm input[name="displayName"]', 'Editor User');
@@ -575,6 +641,23 @@ test('lead can access team defaults controls after workspace login', async ({ pa
       name: 'Demo Team',
       status: 'active',
       settings: {}
+    },
+    defaults: {
+      version: 1,
+      defaults: {
+        __workspace: {
+          departments: {
+            general: {
+              id: 'general',
+              name: 'Общий',
+              slug: 'common'
+            },
+            items: []
+          }
+        }
+      },
+      mediaSources: {},
+      updatedAt: '2026-03-13T12:00:00.000Z'
     }
   };
 
@@ -664,7 +747,40 @@ test('lead can access team defaults controls after workspace login', async ({ pa
       body: JSON.stringify({
         ok: true,
         team: state.team,
-        defaults: null
+        defaults: state.defaults
+      })
+    });
+  });
+
+  await page.route('**/team-defaults', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          teamId: state.team.id,
+          defaults: state.defaults
+        })
+      });
+      return;
+    }
+
+    const body = JSON.parse(route.request().postData() || '{}');
+    state.defaults = {
+      version: (state.defaults?.version || 1) + 1,
+      defaults: body.defaults || {},
+      mediaSources: body.mediaSources || {},
+      updatedAt: '2026-03-13T12:10:00.000Z'
+    };
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        teamId: state.team.id,
+        defaults: state.defaults
       })
     });
   });
@@ -683,14 +799,20 @@ test('lead can access team defaults controls after workspace login', async ({ pa
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
 
-  await expect(page.locator('[data-function="showSizesAdmin"]')).toBeDisabled();
-  await expect(page.locator('[data-function="showLogoAssetsAdmin"]')).toBeDisabled();
-
   await page.fill('#workspaceAuthEmail', 'lead@example.com');
   await page.fill('#workspaceAuthPassword', 'change-me-now');
   await page.click('#workspaceAuthForm button[type="submit"]');
 
+  await page.click('#workspaceModalCloseBtn');
+  await page.click('#workspaceTeamBtn');
   await expect(page.locator('#workspaceModalBody')).toContainText('lead');
-  await expect(page.locator('[data-function="showSizesAdmin"]')).toBeEnabled();
-  await expect(page.locator('[data-function="showLogoAssetsAdmin"]')).toBeEnabled();
+  await expect(page.locator('[data-workspace-action="open-team-defaults"][data-department-id="general"]')).toBeVisible();
+  await expect(page.locator('#workspaceEmbeddedMediaManager')).toBeVisible();
+  await expect(page.locator('#fileManagerLogoBtn')).toBeVisible();
+  await expect(page.locator('#fileManagerAssetsBtn')).toBeVisible();
+  await page.fill('#workspaceDepartmentForm input[name="name"]', 'Маркетинг');
+  await page.fill('#workspaceDepartmentForm input[name="slug"]', 'marketing');
+  await page.click('#workspaceDepartmentForm button[type="submit"]');
+  await expect(page.locator('#workspaceModalBody')).toContainText('Маркетинг');
+  await expect(page.locator('#workspaceModalBody')).toContainText('marketing');
 });

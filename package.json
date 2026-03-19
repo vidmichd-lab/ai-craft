@@ -3,13 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
+    "build:web": "npm --prefix apps/web run build",
     "test:workspace": "playwright test tests/workspace-smoke.spec.mjs",
     "test:live": "playwright test tests/live-smoke.spec.mjs",
-    "test:renderer": "playwright test tests/renderer-regression.spec.mjs"
+    "test:renderer": "playwright test tests/renderer-regression.spec.mjs",
+    "typecheck:web": "npm --prefix apps/web run typecheck"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.0",
     "playwright": "^1.54.0"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
   }
 }

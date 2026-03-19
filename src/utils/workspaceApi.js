@@ -73,13 +73,9 @@ export const createAdminWorkspaceTeam = ({ name, slug }) => request('/admin/team
   method: 'POST',
   body: { name, slug }
 });
-export const updateAdminWorkspaceTeam = ({ teamId, name, slug }) => request('/admin/teams/update', {
+export const updateAdminWorkspaceTeam = ({ teamId, name, slug, status }) => request('/admin/teams/update', {
   method: 'POST',
-  body: { teamId, name, slug }
-});
-export const archiveAdminWorkspaceTeam = ({ teamId }) => request('/admin/teams/archive', {
-  method: 'POST',
-  body: { teamId }
+  body: { teamId, name, slug, status }
 });
 export const listAdminWorkspaceUsers = ({ teamId }) => request(`/admin/users?teamId=${encodeURIComponent(teamId)}`);
 export const createAdminWorkspaceUser = ({ teamId, email, displayName, role }) => request('/admin/users', {
@@ -104,12 +100,21 @@ export const loginWorkspace = ({ email, password, teamSlug }) => request('/auth/
 });
 export const logoutWorkspace = () => request('/auth/logout', { method: 'POST' });
 export const getWorkspaceMe = () => request('/auth/me');
+export const updateWorkspaceAccount = ({ displayName }) => request('/account/profile', {
+  method: 'POST',
+  body: { displayName }
+});
 export const getCurrentWorkspaceTeam = () => request('/teams/current');
 export const listWorkspaceTeamMembers = () => request('/team-members');
 export const getWorkspaceTeamDefaults = () => request('/team-defaults');
 export const saveWorkspaceTeamDefaults = ({ defaults, mediaSources }) => request('/team-defaults', {
   method: 'POST',
   body: { defaults, mediaSources }
+});
+export const getAdminWorkspaceTeamDefaults = ({ teamId }) => request(`/admin/team-defaults?teamId=${encodeURIComponent(teamId)}`);
+export const saveAdminWorkspaceTeamDefaults = ({ teamId, defaults, mediaSources }) => request('/admin/team-defaults', {
+  method: 'POST',
+  body: { teamId, defaults, mediaSources }
 });
 export const listWorkspaceProjects = ({ includeArchived = false } = {}) => request(`/projects?includeArchived=${includeArchived ? 'true' : 'false'}`);
 export const createWorkspaceProject = ({ name, description = '', state = {} }) => request('/projects', {
@@ -124,8 +129,9 @@ export const archiveWorkspaceProject = ({ projectId }) => request('/projects/arc
   method: 'POST',
   body: { projectId }
 });
-export const listWorkspaceSnapshots = ({ projectId, kind = '' }) => {
-  const query = new URLSearchParams({ projectId });
+export const listWorkspaceSnapshots = ({ projectId = '', kind = '' } = {}) => {
+  const query = new URLSearchParams();
+  if (projectId) query.set('projectId', projectId);
   if (kind) query.set('kind', kind);
   return request(`/snapshots?${query.toString()}`);
 };

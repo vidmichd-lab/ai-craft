@@ -10,8 +10,8 @@ const getEnv = (name, fallback = '') => {
 
 const verifyPassword = (password, storedHash) => {
   if (!password || !storedHash || typeof storedHash !== 'string') return false;
-  const [salt, expected] = storedHash.split(':');
-  if (!salt || !expected) return false;
+  const [algorithm, salt, expected] = storedHash.split('$');
+  if (algorithm !== 'scrypt' || !salt || !expected) return false;
   const actual = scryptSync(password, salt, 64).toString('hex');
   return timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
 };

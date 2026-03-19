@@ -81,6 +81,7 @@ import {
   selectAllSizesAction,
   deselectAllSizesAction,
   showSizesAdmin,
+  showLogoAssetsAdmin,
   saveSettings,
   loadSettings,
   resetAll,
@@ -153,11 +154,30 @@ import { scanFonts } from './utils/assetScanner.js';
 import { setAvailableFonts, initializePresetSizes, DEFAULT_KV_PATH } from './constants.js';
 import { preloadImages } from './utils/imageCache.js';
 import { loadConfigFromFile } from './utils/fullConfig.js';
-import { showLogoAssetsAdmin } from './ui/components/logoAssetsAdmin.js';
 import { openGuideModal, closeGuideModal } from './ui/ui.js';
 import { setLanguage, getLanguage, updateUI, t } from './utils/i18n.js';
 import { initPanelResizers } from './utils/panelResizer.js';
-import { initWorkspacePanel } from './ui/components/workspacePanel.js';
+
+let renderDebounceTimer = null;
+const DEBOUNCED_RENDER_KEYS = new Set(['title', 'subtitle', 'legal', 'age']);
+
+const schedulePreviewRender = (key) => {
+  if (key && DEBOUNCED_RENDER_KEYS.has(key)) {
+    clearTimeout(renderDebounceTimer);
+    renderDebounceTimer = setTimeout(() => {
+      renderDebounceTimer = null;
+      renderer.render();
+    }, 48);
+    return;
+  }
+
+  renderer.render();
+};
+
+const initWorkspacePanel = async (...args) => {
+  const module = await import('./ui/components/workspacePanel.js');
+  return module.initWorkspacePanel(...args);
+};
 
 const initializeEventDelegation = (dom) => {
   dom.presetSizesList.addEventListener('click', handlePresetContainerClick);
@@ -177,7 +197,6 @@ const initializeLanguageSelector = () => {
   const languageDropdown = document.getElementById('languageSelectDropdown');
   
   if (!languageBtn || !languageText || !languageDropdown) {
-    console.warn('Элементы селектора языка не найдены');
     return;
   }
   
@@ -348,7 +367,7 @@ const exposeGlobals = () => {
           }
         } else {
           try {
-            renderer.render();
+            schedulePreviewRender(key);
           } catch (renderError) {
             console.error('Ошибка асинхронного рендеринга:', renderError);
           }
@@ -704,7 +723,7 @@ const initialize = async () => {
       console.warn('Ошибка при загрузке названия бренда:', e);
     }
     
-    // Инициализируем фавиконку
+    // Всегда используем системную фавиконку приложения.
     try {
       let link = document.querySelector("link[rel~='icon']");
       if (!link) {
@@ -712,18 +731,11 @@ const initialize = async () => {
         link.rel = 'icon';
         document.getElementsByTagName('head')[0].appendChild(link);
       }
-      const savedFavicon = localStorage.getItem('favicon');
-      if (savedFavicon) {
-        link.href = savedFavicon;
-        const { getState, setKey } = await import('./state/store.js');
-        if (!getState().favicon) setKey('favicon', savedFavicon);
-      } else {
-        // Используем фавиконку из папки fav по умолчанию
-        link.href = 'fav/favicon.png';
-        link.type = 'image/png';
-      }
+      link.href = 'fav/favicon.png';
+      link.type = 'image/png';
+      localStorage.removeItem('favicon');
     } catch (e) {
-      console.warn('Ошибка при загрузке фавиконки:', e);
+      console.warn('Ошибка при инициализации фавиконки:', e);
     }
     
     console.log('Кешируем DOM элементы...');
@@ -810,11 +822,6 @@ const initialize = async () => {
     } else {
       console.error('✗ showSizesAdmin НЕ доступна в window после exposeGlobals');
       console.error('showSizesAdmin из импорта:', typeof showSizesAdmin);
-      // Пытаемся добавить вручную, если не добавилось
-      if (typeof showSizesAdmin === 'function') {
-        window.showSizesAdmin = showSizesAdmin;
-        console.log('✓ showSizesAdmin добавлена в window вручную');
-      }
     }
     
     // Проверяем, что showLogoAssetsAdmin доступна сразу после exposeGlobals
@@ -823,11 +830,6 @@ const initialize = async () => {
     } else {
       console.error('✗ showLogoAssetsAdmin НЕ доступна в window после exposeGlobals');
       console.error('showLogoAssetsAdmin из импорта:', typeof showLogoAssetsAdmin);
-      // Пытаемся добавить вручную, если не добавилось
-      if (typeof showLogoAssetsAdmin === 'function') {
-        window.showLogoAssetsAdmin = showLogoAssetsAdmin;
-        console.log('✓ showLogoAssetsAdmin добавлена в window вручную');
-      }
     }
     
     renderPresetSizes();
@@ -1024,7 +1026,18 @@ const initialize = async () => {
       
       // Инициализируем фон после загрузки основных ресурсов
       initializeBackgroundUI();
-      await initWorkspacePanel();
+
+      const startWorkspacePanel = () => {
+        initWorkspacePanel().catch((error) => {
+          console.warn('Ошибка инициализации workspace panel:', error);
+        });
+      };
+
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(startWorkspacePanel, { timeout: 1500 });
+      } else {
+        setTimeout(startWorkspacePanel, 300);
+      }
     }, 0);
     
     // Проверяем, что showSizesAdmin доступна
@@ -1053,7 +1066,7 @@ const initialize = async () => {
 };
 
 // Регистрация Service Worker для кеширования (не блокируем загрузку при ошибках)
-if ('serviceWorker' in navigator) {
+if (!window.__DISABLE_SW__ && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     // Регистрируем с задержкой, чтобы не блокировать основную загрузку
     setTimeout(() => {

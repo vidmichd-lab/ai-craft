@@ -211,6 +211,9 @@ const createInitialState = () => {
   if (typeof localStorage !== 'undefined') {
     initialFavicon = localStorage.getItem('favicon') || '';
   }
+  const selectedDepartmentId = typeof localStorage !== 'undefined'
+    ? (localStorage.getItem(getScopedStorageKey('workspace-selected-department')) || '').trim()
+    : '';
 
   const safeAreasFromDefaults = sanitizeSafeAreas(d('safeAreas', DEFAULT_SAFE_AREAS), DEFAULT_SAFE_AREAS);
   const safeAreas = userSafeAreas ? sanitizeSafeAreas(userSafeAreas, safeAreasFromDefaults) : safeAreasFromDefaults;
@@ -304,6 +307,7 @@ const createInitialState = () => {
     logoOffsetBottomPx: d('logoOffsetBottomPx', 0),
     logoLanguage: d('logoLanguage', 'ru'), // ru или kz
     proMode: d('proMode', false), // PRO режим
+    departmentId: d('departmentId', selectedDepartmentId || ''),
     projectMode: initialProjectMode, // layouts | rsya
     variantMode: d('variantMode', d('proMode', false) ? 'pro' : (d('logoLanguage', 'ru') === 'kz' ? 'kz' : 'reskill')), // reskill | pro | kz
     rsyaLayout: d('rsyaLayout', 'center'), // center | left
@@ -1147,6 +1151,9 @@ export const applySavedSettings = (snapshot) => {
   }
   if (nextSnapshot.variantMode !== undefined && !['reskill', 'pro', 'kz'].includes(nextSnapshot.variantMode)) {
     nextSnapshot.variantMode = current.variantMode || 'reskill';
+  }
+  if (nextSnapshot.departmentId !== undefined && typeof nextSnapshot.departmentId !== 'string') {
+    nextSnapshot.departmentId = current.departmentId || '';
   }
   if (nextSnapshot.rsyaLayout !== undefined && !['center', 'left'].includes(nextSnapshot.rsyaLayout)) {
     nextSnapshot.rsyaLayout = current.rsyaLayout || 'center';

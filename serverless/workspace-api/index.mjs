@@ -363,8 +363,33 @@ const buildPublicSnapshot = (snapshot) => ({
   kind: snapshot.kind,
   state: cloneJson(snapshot.state),
   createdBy: snapshot.createdBy,
+  authorName: snapshot.authorName || '',
   createdAt: snapshot.createdAt
 });
+
+const enrichSnapshotsWithAuthors = async (snapshots = []) => {
+  const items = Array.isArray(snapshots) ? snapshots : [];
+  const uniqueUserIds = Array.from(new Set(items.map((snapshot) => snapshot?.createdBy).filter(Boolean)));
+  if (!uniqueUserIds.length) {
+    return items.map((snapshot) => ({ ...snapshot, authorName: '' }));
+  }
+
+  const authorEntries = await Promise.all(uniqueUserIds.map(async (userId) => {
+    try {
+      const user = await storage.getUserById({ userId });
+      const authorName = user?.displayName || user?.email || '';
+      return [userId, authorName];
+    } catch {
+      return [userId, ''];
+    }
+  }));
+  const authorMap = new Map(authorEntries);
+
+  return items.map((snapshot) => ({
+    ...snapshot,
+    authorName: authorMap.get(snapshot.createdBy) || ''
+  }));
+};
 
 const toIsoOrNull = (value) => {
   if (!value) return null;
@@ -631,11 +656,15 @@ const createMemoryStorage = () => {
       state.teams.set(team.id, team);
       return cloneJson(team);
     },
-    async updateTeam({ teamId, slug, name }) {
+    async updateTeam({ teamId, slug, name, status }) {
       const team = state.teams.get(teamId);
       if (!team) return null;
       if (slug) team.slug = slug;
       if (name) team.name = name;
+      if (status === 'active' || status === 'inactive') {
+        team.status = status;
+        team.archivedAt = status === 'inactive' ? (team.archivedAt || toTimestamp()) : null;
+      }
       team.updatedAt = toTimestamp();
       return cloneJson(team);
     },
@@ -729,6 +758,13 @@ const createMemoryStorage = () => {
       const user = state.users.get(userId);
       if (!user) return null;
       user.passwordHash = passwordHash;
+      user.updatedAt = toTimestamp();
+      return cloneJson(user);
+    },
+    async updateUserProfile({ userId, displayName }) {
+      const user = state.users.get(userId);
+      if (!user) return null;
+      user.displayName = displayName;
       user.updatedAt = toTimestamp();
       return cloneJson(user);
     },
@@ -847,9 +883,9 @@ const createMemoryStorage = () => {
       project.updatedAt = project.archivedAt;
       return cloneJson(project);
     },
-    async listSnapshots({ teamId, projectId, kind }) {
+    async listSnapshots({ teamId, projectId = '', kind }) {
       return Array.from(state.snapshots.values())
-        .filter((snapshot) => snapshot.teamId === teamId && snapshot.projectId === projectId && (!kind || snapshot.kind === kind))
+        .filter((snapshot) => snapshot.teamId === teamId && (!projectId || snapshot.projectId === projectId) && (!kind || snapshot.kind === kind))
         .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
         .map((snapshot) => cloneJson(snapshot));
     },
@@ -1006,7 +1042,7 @@ const createYdbStorage = () => ({
 
     return team;
   },
-  async updateTeam({ teamId, slug, name }) {
+  async updateTeam({ teamId, slug, name, status }) {
     const current = await this.getTeamById({ teamId });
     if (!current) return null;
 
@@ -1014,8 +1050,12 @@ const createYdbStorage = () => ({
       ...current,
       slug: slug || current.slug,
       name: name || current.name,
+      status: status === 'active' || status === 'inactive' ? status : current.status,
       updatedAt: toTimestamp()
     };
+    updated.archivedAt = updated.status === 'inactive'
+      ? (current.archivedAt || updated.updatedAt)
+      : null;
 
     await executeYdbQuery(`
       DECLARE $id AS Utf8;
@@ -1118,12 +1158,14 @@ const createYdbStorage = () => ({
       SELECT id, email, password_hash, display_name, status, created_at, updated_at, last_login_at
       FROM users
       WHERE email = $email
+        AND status = "active"
+      ORDER BY updated_at DESC, id ASC
       LIMIT 1;
     `, {
       $email: TypedValues.utf8(email)
     }));
 
-    if (!user || user.status !== 'active') {
+    if (!user) {
       return null;
     }
 
@@ -1379,6 +1421,57 @@ const createYdbStorage = () => ({
     const updated = {
       ...user,
       passwordHash,
+      updatedAt: toTimestamp()
+    };
+
+    await executeYdbQuery(`
+      DECLARE $id AS Utf8;
+      DECLARE $email AS Utf8;
+      DECLARE $password_hash AS Utf8;
+      DECLARE $display_name AS Utf8;
+      DECLARE $status AS Utf8;
+      DECLARE $created_at AS Timestamp;
+      DECLARE $updated_at AS Timestamp;
+      DECLARE $last_login_at AS Timestamp?;
+
+      UPSERT INTO users (
+        id, email, password_hash, display_name, status, created_at, updated_at, last_login_at
+      ) VALUES (
+        $id, $email, $password_hash, $display_name, $status, $created_at, $updated_at, $last_login_at
+      );
+    `, {
+      $id: TypedValues.utf8(updated.id),
+      $email: TypedValues.utf8(updated.email),
+      $password_hash: TypedValues.utf8(updated.passwordHash),
+      $display_name: TypedValues.utf8(updated.displayName),
+      $status: TypedValues.utf8(updated.status),
+      $created_at: TypedValues.timestamp(new Date(updated.createdAt)),
+      $updated_at: TypedValues.timestamp(new Date(updated.updatedAt)),
+      $last_login_at: optionalTimestamp(updated.lastLoginAt)
+    }, {
+      idempotent: false
+    });
+
+    return updated;
+  },
+  async updateUserProfile({ userId, displayName }) {
+    const current = await queryRow(`
+      DECLARE $user_id AS Utf8;
+
+      SELECT id, email, password_hash, display_name, status, created_at, updated_at, last_login_at
+      FROM users
+      WHERE id = $user_id
+      LIMIT 1;
+    `, {
+      $user_id: TypedValues.utf8(userId)
+    });
+
+    const user = normalizeUserRow(current);
+    if (!user) return null;
+
+    const updated = {
+      ...user,
+      displayName,
       updatedAt: toTimestamp()
     };
 
@@ -1835,7 +1928,7 @@ const createYdbStorage = () => ({
 
     return archived;
   },
-  async listSnapshots({ teamId, projectId, kind }) {
+  async listSnapshots({ teamId, projectId = '', kind }) {
     const rows = await queryRows(`
       DECLARE $team_id AS Utf8;
       DECLARE $project_id AS Utf8;
@@ -1844,7 +1937,7 @@ const createYdbStorage = () => ({
       SELECT team_id, project_id, id, name, kind, state_json, created_by, created_at
       FROM project_snapshots
       WHERE team_id = $team_id
-        AND project_id = $project_id
+        AND ($project_id = "" OR project_id = $project_id)
         AND ($kind = "" OR kind = $kind)
       ORDER BY created_at DESC;
     `, {
@@ -2096,9 +2189,13 @@ const handleAdminUpdateTeam = async (event, origin) => withStorageErrors(origin,
   const teamId = sanitizeText(body.teamId, 200);
   const name = sanitizeText(body.name, 120);
   const slug = sanitizeTeamSlug(body.slug || name);
+  const status = sanitizeText(body.status, 32).toLowerCase();
 
   if (!teamId || !name || !slug) {
     return json(400, toError('teamId, name and slug are required'), origin);
+  }
+  if (status && !['active', 'inactive'].includes(status)) {
+    return json(400, toError('status must be active or inactive'), origin);
   }
 
   const teams = await storage.listTeams({ includeArchived: true });
@@ -2106,7 +2203,7 @@ const handleAdminUpdateTeam = async (event, origin) => withStorageErrors(origin,
     return json(409, toError('Team slug already exists', { slug }), origin);
   }
 
-  const updated = await storage.updateTeam({ teamId, name, slug });
+  const updated = await storage.updateTeam({ teamId, name, slug, status: status || undefined });
   if (!updated) {
     return json(404, toError('Team not found', { teamId }), origin);
   }
@@ -2115,6 +2212,53 @@ const handleAdminUpdateTeam = async (event, origin) => withStorageErrors(origin,
     ok: true,
     team: buildAdminTeam(updated)
   }, origin);
+});
+
+const handleAccountProfileUpdate = async (event, origin) => withStorageErrors(origin, async () => {
+  const session = await requireAuth(event);
+  if (!session) {
+    return json(401, toError('Unauthorized'), origin);
+  }
+
+  const body = parseBody(event);
+  const displayName = sanitizeDisplayName(body.displayName);
+  if (!displayName) {
+    return json(400, toError('displayName is required'), origin);
+  }
+
+  const updatedUser = await storage.updateUserProfile({ userId: session.sub, displayName });
+  if (!updatedUser) {
+    return json(404, toError('User not found', { userId: session.sub }), origin);
+  }
+
+  const currentTeam = await storage.getCurrentTeam({ teamId: session.teamId });
+  const accessPayload = createAccessPayload({
+    userId: updatedUser.id,
+    teamId: session.teamId,
+    role: session.role,
+    email: updatedUser.email,
+    displayName: updatedUser.displayName,
+    teamSlug: currentTeam?.team?.slug || session.teamSlug || '',
+    sessionId: session.sessionId
+  });
+
+  const token = signToken(accessPayload);
+
+  return json(200, {
+    ok: true,
+    user: {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      role: session.role,
+      displayName: updatedUser.displayName,
+      isSuperadmin: !!session.isSuperadmin
+    },
+    team: currentTeam?.team
+      ? buildPublicTeam(currentTeam.team)
+      : { id: session.teamId, slug: session.teamSlug || '', name: '' }
+  }, origin, {
+    'Set-Cookie': buildSessionCookie(token, config.sessionTtlSeconds)
+  });
 });
 
 const handleAdminArchiveTeam = async (event, origin) => withStorageErrors(origin, async () => {
@@ -2246,7 +2390,7 @@ const handleAdminUpdateUserRole = async (event, origin) => withStorageErrors(ori
     return json(400, toError('role must be editor or lead'), origin);
   }
   if (userId === session.sub) {
-    return json(400, toError('Cannot change the current superadmin role'), origin);
+    return json(400, toError('Cannot change the current admin role'), origin);
   }
 
   const targetUser = await storage.getUserById({ userId });
@@ -2254,7 +2398,7 @@ const handleAdminUpdateUserRole = async (event, origin) => withStorageErrors(ori
     return json(404, toError('User not found', { userId }), origin);
   }
   if (isSuperAdminEmail(targetUser.email)) {
-    return json(403, toError('Cannot change a superadmin role'), origin);
+    return json(403, toError('Cannot change an admin role'), origin);
   }
 
   const members = await storage.listTeamMembers({ teamId, includeInactive: true });
@@ -2336,7 +2480,7 @@ const handleAdminRemoveUser = async (event, origin) => withStorageErrors(origin,
     return json(400, toError('teamId and userId are required'), origin);
   }
   if (userId === session.sub) {
-    return json(400, toError('Cannot remove the current superadmin account'), origin);
+    return json(400, toError('Cannot remove the current admin account'), origin);
   }
 
   const targetUser = await storage.getUserById({ userId });
@@ -2344,7 +2488,7 @@ const handleAdminRemoveUser = async (event, origin) => withStorageErrors(origin,
     return json(404, toError('User not found', { userId }), origin);
   }
   if (isSuperAdminEmail(targetUser.email)) {
-    return json(403, toError('Cannot remove a superadmin account'), origin);
+    return json(403, toError('Cannot remove an admin account'), origin);
   }
 
   const removed = await storage.removeUserFromTeam({ teamId, userId });
@@ -2355,6 +2499,84 @@ const handleAdminRemoveUser = async (event, origin) => withStorageErrors(origin,
   return json(200, {
     ok: true,
     removed: true
+  }, origin);
+});
+
+const handleAdminGetTeamDefaults = async (event, origin) => withStorageErrors(origin, async () => {
+  const session = await requireAuth(event);
+  if (!session) {
+    return json(401, toError('Unauthorized'), origin);
+  }
+  if (!requireSuperAdmin(session)) {
+    return json(403, toError('Forbidden'), origin);
+  }
+
+  const params = event?.queryStringParameters || {};
+  const teamId = sanitizeText(params.teamId, 200);
+  if (!teamId) {
+    return json(400, toError('teamId is required'), origin);
+  }
+
+  const team = await storage.getTeamById({ teamId });
+  if (!team) {
+    return json(404, toError('Team not found', { teamId }), origin);
+  }
+
+  const defaults = await storage.getTeamDefaults({ teamId });
+  return json(200, {
+    ok: true,
+    teamId,
+    team: buildAdminTeam(team),
+    defaults: defaults
+      ? {
+        version: defaults.version,
+        defaults: cloneJson(defaults.defaults || {}),
+        mediaSources: cloneJson(defaults.mediaSources || {}),
+        updatedAt: defaults.updatedAt
+      }
+      : null
+  }, origin);
+});
+
+const handleAdminSaveTeamDefaults = async (event, origin) => withStorageErrors(origin, async () => {
+  const session = await requireAuth(event);
+  if (!session) {
+    return json(401, toError('Unauthorized'), origin);
+  }
+  if (!requireSuperAdmin(session)) {
+    return json(403, toError('Forbidden'), origin);
+  }
+
+  const body = parseBody(event);
+  const teamId = sanitizeText(body.teamId, 200);
+  const defaults = sanitizeState(body.defaults) || {};
+  const mediaSources = sanitizeState(body.mediaSources) || {};
+
+  if (!teamId) {
+    return json(400, toError('teamId is required'), origin);
+  }
+
+  const team = await storage.getTeamById({ teamId });
+  if (!team) {
+    return json(404, toError('Team not found', { teamId }), origin);
+  }
+
+  const saved = await storage.saveTeamDefaults({
+    teamId,
+    createdBy: session.sub,
+    defaults,
+    mediaSources
+  });
+
+  return json(200, {
+    ok: true,
+    teamId,
+    defaults: {
+      version: saved.version,
+      defaults: cloneJson(saved.defaults),
+      mediaSources: cloneJson(saved.mediaSources),
+      updatedAt: saved.updatedAt
+    }
   }, origin);
 });
 
@@ -2369,7 +2591,8 @@ const handleLogin = async (event, origin) => withStorageErrors(origin, async () 
   }
 
   const loginContext = await storage.findLoginContext({ email, teamSlug });
-  if (!loginContext || !verifyPassword(password, loginContext.user.passwordHash)) {
+  const passwordMatches = !!(loginContext && verifyPassword(password, loginContext.user.passwordHash));
+  if (!loginContext || !passwordMatches) {
     return json(401, toError('Invalid credentials'), origin);
   }
 
@@ -2654,13 +2877,15 @@ const handleListSnapshots = async (event, origin) => withStorageErrors(origin, a
   const params = event?.queryStringParameters || {};
   const projectId = sanitizeText(params.projectId, 200);
   const kind = params.kind === 'template' ? 'template' : params.kind === 'snapshot' ? 'snapshot' : '';
-  if (!projectId) {
+  if (!projectId && !kind) {
     return json(400, toError('projectId is required'), origin);
   }
 
-  const project = await storage.getProject({ teamId: session.teamId, projectId });
-  if (!project) {
-    return json(404, toError('Project not found', { projectId }), origin);
+  if (projectId) {
+    const project = await storage.getProject({ teamId: session.teamId, projectId });
+    if (!project) {
+      return json(404, toError('Project not found', { projectId }), origin);
+    }
   }
 
   const snapshots = await storage.listSnapshots({
@@ -2668,10 +2893,11 @@ const handleListSnapshots = async (event, origin) => withStorageErrors(origin, a
     projectId,
     kind
   });
+  const snapshotsWithAuthors = await enrichSnapshotsWithAuthors(snapshots);
 
   return json(200, {
     ok: true,
-    snapshots: snapshots.map(buildPublicSnapshot)
+    snapshots: snapshotsWithAuthors.map(buildPublicSnapshot)
   }, origin);
 });
 
@@ -2707,10 +2933,11 @@ const handleSaveSnapshot = async (event, origin) => withStorageErrors(origin, as
     kind,
     state: snapshotState
   });
+  const [snapshotWithAuthor] = await enrichSnapshotsWithAuthors([snapshot]);
 
   return json(200, {
     ok: true,
-    snapshot: buildPublicSnapshot(snapshot)
+    snapshot: buildPublicSnapshot(snapshotWithAuthor)
   }, origin);
 });
 
@@ -2763,8 +2990,14 @@ export const handler = async (event) => {
     if (method === 'GET' && path.endsWith('/admin/users')) {
       return handleAdminListUsers(event, origin);
     }
+    if (method === 'GET' && path.endsWith('/admin/team-defaults')) {
+      return handleAdminGetTeamDefaults(event, origin);
+    }
     if (method === 'POST' && path.endsWith('/admin/users')) {
       return handleAdminCreateUser(event, origin);
+    }
+    if (method === 'POST' && path.endsWith('/admin/team-defaults')) {
+      return handleAdminSaveTeamDefaults(event, origin);
     }
     if (method === 'POST' && path.endsWith('/admin/users/reset-password')) {
       return handleAdminResetUserPassword(event, origin);
@@ -2786,6 +3019,9 @@ export const handler = async (event) => {
     }
     if (method === 'GET' && path.endsWith('/auth/me')) {
       return handleMe(event, origin);
+    }
+    if (method === 'POST' && path.endsWith('/account/profile')) {
+      return handleAccountProfileUpdate(event, origin);
     }
     if (method === 'GET' && path.endsWith('/teams/current')) {
       return handleCurrentTeam(event, origin);

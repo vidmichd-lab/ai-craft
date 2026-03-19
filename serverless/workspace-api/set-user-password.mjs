@@ -10,7 +10,7 @@ const getEnv = (name, fallback = '') => {
 
 const hashPassword = (password, salt = randomBytes(16).toString('hex')) => {
   const hash = scryptSync(password, salt, 64).toString('hex');
-  return `${salt}:${hash}`;
+  return `scrypt$${salt}$${hash}`;
 };
 
 const ydbEndpoint = getEnv('YDB_ENDPOINT', '');

@@ -161,49 +161,6 @@ const showPasswordPrompt = () => {
 };
 
 /**
- * Обновляет фавиконку в HTML
- */
-const updateFavicon = (faviconUrl) => {
-  let link = document.querySelector("link[rel~='icon']");
-  if (!link) {
-    link = document.createElement('link');
-    link.rel = 'icon';
-    document.getElementsByTagName('head')[0].appendChild(link);
-  }
-  
-  if (faviconUrl && faviconUrl !== 'fav/favicon.png') {
-    link.href = faviconUrl;
-    link.type = faviconUrl.startsWith('data:image/svg') ? 'image/svg+xml' : (faviconUrl.startsWith('data:image/png') ? 'image/png' : '');
-    localStorage.setItem('favicon', faviconUrl);
-  } else {
-    link.href = 'fav/favicon.png';
-    link.type = 'image/png';
-    if (!faviconUrl || faviconUrl === 'fav/favicon.png') {
-      localStorage.removeItem('favicon');
-    }
-  }
-};
-
-/**
- * Обрабатывает загрузку фавиконки
- */
-const handleFaviconUpload = async (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
-      // Сохраняем в localStorage и state
-      localStorage.setItem('favicon', dataUrl);
-      setKey('favicon', dataUrl);
-      updateFavicon(dataUrl);
-      resolve(dataUrl);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
-
-/**
  * Обновляет превью для значений по умолчанию
  */
 const updateDefaultsPreview = () => {
@@ -249,35 +206,6 @@ const updateDefaultsPreview = () => {
       kvPreviewPlaceholder.style.display = 'none';
       if (kvClearBtn) {
         kvClearBtn.style.display = 'none';
-      }
-    }
-  }
-  
-  // Обновляем превью фавиконки (источник: state, localStorage или текущий <link rel="icon">)
-  const faviconPreviewImg = document.getElementById('logoAssetsDefaultFaviconPreviewImg');
-  const faviconPreviewPlaceholder = document.getElementById('logoAssetsDefaultFaviconPreviewPlaceholder');
-  const faviconClearBtn = document.getElementById('logoAssetsDefaultFaviconClear');
-  if (faviconPreviewImg && faviconPreviewPlaceholder) {
-    let favicon = state.favicon || localStorage.getItem('favicon') || '';
-    if (!favicon) {
-      const link = document.querySelector("link[rel~='icon']");
-      if (link && link.href && link.href !== '' && !link.href.endsWith('fav/favicon.png')) {
-        favicon = link.href;
-      }
-    }
-    if (favicon) {
-      faviconPreviewImg.src = favicon;
-      faviconPreviewImg.style.display = 'block';
-      faviconPreviewPlaceholder.style.display = 'none';
-      if (faviconClearBtn) {
-        faviconClearBtn.style.display = 'block';
-      }
-    } else {
-      faviconPreviewImg.src = '';
-      faviconPreviewImg.style.display = 'none';
-      faviconPreviewPlaceholder.style.display = 'flex';
-      if (faviconClearBtn) {
-        faviconClearBtn.style.display = 'none';
       }
     }
   }
@@ -516,25 +444,6 @@ const openLogoAssetsAdmin = async () => {
               </div>
             </div>
             
-            <div class="form-group">
-              <label style="font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: ${textPrimary};">
-                <span class="material-icons" style="font-size: 20px; color: ${textSecondary};">favorite</span>
-                ${t('admin.logoAssets.defaults.favicon')}
-              </label>
-              <div id="logoAssetsDefaultFaviconPreview" class="preview-container" style="width: 64px; height: 64px; border-radius: 8px; overflow: hidden;">
-                <img id="logoAssetsDefaultFaviconPreviewImg" src="" class="preview-img" style="width: 100%; height: 100%; object-fit: contain; display: none;">
-                <span id="logoAssetsDefaultFaviconPreviewPlaceholder" class="preview-placeholder" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">${t('common.none')}</span>
-              </div>
-              <div class="input-group" style="display: flex; gap: 8px; margin-top: 8px;">
-                <button class="btn btn-full" id="logoAssetsDefaultFaviconUpload" style="flex: 1;">
-                  ${t('admin.logoAssets.defaults.upload')}
-                </button>
-                <button class="btn btn-danger" id="logoAssetsDefaultFaviconClear" style="display: none;" title="${t('admin.logoAssets.defaults.reset')}">
-                  ${t('admin.logoAssets.defaults.reset')}
-                </button>
-                <input type="file" id="logoAssetsDefaultFaviconUploadFile" accept="image/*,.svg,.ico" style="display: none;">
-              </div>
-            </div>
           </div>
         </div>
         
@@ -1180,38 +1089,6 @@ const setupHandlers = () => {
     });
   }
   
-  // Загрузка фавиконки
-  const faviconUploadBtn = document.getElementById('logoAssetsDefaultFaviconUpload');
-  const faviconUploadFile = document.getElementById('logoAssetsDefaultFaviconUploadFile');
-  if (faviconUploadBtn && faviconUploadFile) {
-    faviconUploadBtn.addEventListener('click', () => {
-      faviconUploadFile.click();
-    });
-    faviconUploadFile.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        const file = e.target.files[0];
-        await handleFaviconUpload(file);
-        updateDefaultsPreview();
-      }
-    });
-  }
-  
-  // Очистка фавиконки
-  const faviconClearBtn = document.getElementById('logoAssetsDefaultFaviconClear');
-  if (faviconClearBtn) {
-    faviconClearBtn.addEventListener('click', () => {
-      localStorage.removeItem('favicon');
-      setKey('favicon', '');
-      updateFavicon('fav/favicon.png');
-      // Обновляем тип для PNG
-      let link = document.querySelector("link[rel~='icon']");
-      if (link) {
-        link.type = 'image/png';
-      }
-      updateDefaultsPreview();
-      faviconClearBtn.style.display = 'none';
-    });
-  }
 };
 
 /**

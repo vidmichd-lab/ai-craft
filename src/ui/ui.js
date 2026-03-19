@@ -115,7 +115,13 @@ import {
   togglePlatformSizes,
   initializeSizeManager
 } from './components/sizeManager.js';
-import { showSizesAdmin } from './components/sizesAdmin.js';
+import {
+  applyWorkspaceTeamDefaultsLocally,
+  getSelectedWorkspaceDepartmentId,
+  getWorkspaceLayoutDepartmentEntriesFromLocalBundle,
+  resolveWorkspaceDepartmentBundleLocally,
+  setSelectedWorkspaceDepartmentId
+} from '../utils/workspaceTeamDefaults.js';
 let savedSettings = null;
 let activeRsyaCropKey = '1600';
 let activeRsyaVisualSlot = 0;
@@ -134,6 +140,23 @@ let selectedLogoFolder2 = null;
 let selectedLogoFolder3 = null;
 let rsyaFitResizeBound = false;
 
+let sizesAdminModulePromise = null;
+let logoAssetsAdminModulePromise = null;
+
+const getSizesAdminModule = async () => {
+  if (!sizesAdminModulePromise) {
+    sizesAdminModulePromise = import('./components/sizesAdmin.js');
+  }
+  return sizesAdminModulePromise;
+};
+
+const getLogoAssetsAdminModule = async () => {
+  if (!logoAssetsAdminModulePromise) {
+    logoAssetsAdminModulePromise = import('./components/logoAssetsAdmin.js');
+  }
+  return logoAssetsAdminModulePromise;
+};
+
 // Функции для работы со шрифтами теперь импортируются из ./components/fontSelector.js
 
 const normalizeKVAssetPath = (value) => {
@@ -150,6 +173,64 @@ const updateChipGroup = (group, value) => {
   document.querySelectorAll(`[data-group="${group}"]`).forEach((chip) => {
     chip.classList.toggle('active', chip.dataset.value === value);
   });
+};
+
+const getLegacyDepartmentEntries = () => ([
+  { id: 'reskill', name: 'Reskill', slug: 'reskill', isGeneral: false },
+  { id: 'pro', name: 'PRO', slug: 'pro', isGeneral: false },
+  { id: 'kz', name: 'KZ', slug: 'kz', isGeneral: false }
+]);
+
+const getLayoutDepartmentEntries = () => {
+  const entries = getWorkspaceLayoutDepartmentEntriesFromLocalBundle();
+  return entries.length ? entries : getLegacyDepartmentEntries();
+};
+
+const inferLegacyDepartmentId = (state = getState()) => {
+  if (state.proMode) return 'pro';
+  if ((state.logoLanguage || 'ru') === 'kz') return 'kz';
+  return 'reskill';
+};
+
+const resolveActiveDepartmentId = (state = getState()) => {
+  const entries = getLayoutDepartmentEntries();
+  const currentId = String(state.departmentId || '').trim() || getSelectedWorkspaceDepartmentId();
+  if (currentId && entries.some((entry) => entry.id === currentId)) {
+    return currentId;
+  }
+  return entries[0]?.id || inferLegacyDepartmentId(state);
+};
+
+const renderWorkspaceDepartmentTags = () => {
+  const root = document.getElementById('workspaceDepartmentTags');
+  const wrapper = root?.closest('.workspace-layout-departments');
+  if (!root || !wrapper) return;
+
+  const entries = getLayoutDepartmentEntries();
+  const activeDepartmentId = resolveActiveDepartmentId();
+  wrapper.style.display = entries.length ? 'flex' : 'none';
+
+  root.innerHTML = '';
+  entries.forEach((entry) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `workspace-layout-department-tag${entry.id === activeDepartmentId ? ' is-active' : ''}`;
+    button.dataset.departmentId = entry.id;
+    button.textContent = entry.name;
+    root.appendChild(button);
+  });
+
+  if (!root.dataset.workspaceBound) {
+    root.dataset.workspaceBound = '1';
+    root.addEventListener('click', async (event) => {
+      if (!(event.target instanceof Element)) return;
+      const button = event.target.closest('[data-department-id]');
+      if (!(button instanceof HTMLButtonElement)) return;
+      const departmentId = String(button.dataset.departmentId || '').trim();
+      if (!departmentId) return;
+      await selectWorkspaceDepartment(departmentId);
+    });
+  }
 };
 
 const syncChips = (state) => {
@@ -2080,6 +2161,24 @@ const setVariantModeState = (mode) => {
   }
 };
 
+const applyResolvedDepartmentState = async (resolvedDepartment) => {
+  if (!resolvedDepartment?.defaults) return;
+
+  setSelectedWorkspaceDepartmentId(resolvedDepartment.department?.id || '');
+  const appliedDefaults = applyWorkspaceTeamDefaultsLocally(resolvedDepartment.defaults, resolvedDepartment.mediaSources || {});
+  applySavedSettings({
+    ...(appliedDefaults || resolvedDepartment.defaults),
+    departmentId: resolvedDepartment.department?.id || ''
+  });
+  ensurePresetSelection();
+  syncFormFields();
+  renderPresetSizes();
+  updatePreviewSizeSelect();
+  refreshMediaPreviews();
+  renderWorkspaceDepartmentTags();
+  renderer.render();
+};
+
 export const selectProjectMode = async (mode) => {
   const targetMode = mode === 'rsya' ? 'rsya' : 'layouts';
   const currentState = getState();
@@ -2102,9 +2201,17 @@ export const selectProjectMode = async (mode) => {
 };
 
 export const selectVariantMode = async (mode) => {
+  const resolvedDepartment = resolveWorkspaceDepartmentBundleLocally(mode);
+  if (resolvedDepartment) {
+    await applyResolvedDepartmentState(resolvedDepartment);
+    return;
+  }
+
   const targetMode = ['reskill', 'pro', 'kz'].includes(mode) ? mode : 'reskill';
   updateVariantModeTags(targetMode);
   setVariantModeState(targetMode);
+  setKey('departmentId', targetMode);
+  setSelectedWorkspaceDepartmentId(targetMode);
   if (targetMode === 'pro') {
     await selectProMode(true);
   } else {
@@ -2116,6 +2223,16 @@ export const selectVariantMode = async (mode) => {
     }
   }
   renderer.render();
+};
+
+export const selectWorkspaceDepartment = async (departmentId) => {
+  const resolvedDepartment = resolveWorkspaceDepartmentBundleLocally(departmentId);
+  if (resolvedDepartment) {
+    await applyResolvedDepartmentState(resolvedDepartment);
+    return;
+  }
+
+  await selectVariantMode(departmentId);
 };
 
 const updateProModeToggle = (enabled) => {
@@ -2412,6 +2529,7 @@ export const initializeProModeToggle = async () => {
   const projectMode = state.projectMode || 'rsya';
   const variantMode = state.variantMode || (state.proMode ? 'pro' : (state.logoLanguage === 'kz' ? 'kz' : 'reskill'));
 
+  renderWorkspaceDepartmentTags();
   updateProjectModeTags(projectMode);
   updateVariantModeTags(variantMode);
   updateProjectModeUI();
@@ -2988,9 +3106,15 @@ export {
   deselectAllSizesAction,
   togglePlatformSizes
 } from './components/sizeManager.js';
-export { showSizesAdmin } from './components/sizesAdmin.js';
-// Реэкспорт showLogoAssetsAdmin - должен быть после всех импортов
-export { showLogoAssetsAdmin } from './components/logoAssetsAdmin.js';
+export const showSizesAdmin = async (...args) => {
+  const module = await getSizesAdminModule();
+  return module.showSizesAdmin(...args);
+};
+
+export const showLogoAssetsAdmin = async (...args) => {
+  const module = await getLogoAssetsAdminModule();
+  return module.showLogoAssetsAdmin(...args);
+};
 
 export const togglePlatform = (platform) => {
   togglePlatformSizes(platform);
@@ -4339,6 +4463,7 @@ export const initializeStateSubscribers = () => {
   
   subscribe(async (state) => {
     syncFormFields();
+    renderWorkspaceDepartmentTags();
     
     // Сохраняем brandName в localStorage при изменении
     if (state.brandName && state.brandName !== lastBrandName) {
@@ -4459,6 +4584,7 @@ export const initializeStateSubscribers = () => {
   lastBrandName = initialState.brandName || null;
   renderTitleSubtitlePairs();
   renderKVPairs();
+  renderWorkspaceDepartmentTags();
 };
 
 // Функция полного обновления всех ассетов (логотипы и KV)

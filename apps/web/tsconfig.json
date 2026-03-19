@@ -1,0 +1,22 @@
+{
+  "extends": "../../packages/config-typescript/nextjs.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@ai-craft/editor-model": ["../../packages/editor-model/src/index.ts"],
+      "@ai-craft/editor-renderer": ["../../packages/editor-renderer/src/index.ts"],
+      "@ai-craft/workspace-sdk": ["../../packages/workspace-sdk/src/index.ts"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

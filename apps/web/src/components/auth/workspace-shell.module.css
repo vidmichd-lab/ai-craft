@@ -1,0 +1,519 @@
+.page {
+  min-height: 100vh;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(34, 34, 34, 0.7), transparent 45%),
+    #050505;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: rgba(22, 22, 22, 0.88);
+  backdrop-filter: blur(20px);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eyebrow {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.heading {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.subheading {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.actionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.contentStack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.editorGrid {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.editorPreviewWrap {
+  min-width: 0;
+}
+
+.previewStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.canvasGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.legacyFrameWrap {
+  min-height: 900px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #050505;
+}
+
+.legacyFrame {
+  width: 100%;
+  min-height: 900px;
+  border: 0;
+  display: block;
+  background: #050505;
+}
+
+.canvasCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 20px;
+  background: #101010;
+}
+
+.canvasMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.canvasViewport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #050505;
+  overflow: auto;
+}
+
+.previewCanvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.editorPreview {
+  position: relative;
+  min-height: 560px;
+  overflow: hidden;
+  border-radius: 28px;
+  background: #1e1e1e;
+}
+
+.editorPreviewContent {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 32px;
+}
+
+.editorBrand {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.editorTitle {
+  max-width: 540px;
+  font-size: clamp(34px, 4vw, 56px);
+  font-weight: 700;
+  line-height: 0.98;
+}
+
+.editorSubtitle {
+  max-width: 520px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.panel {
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: #161616;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.subPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 18px;
+  background: #101010;
+}
+
+.controlGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sectionLabel {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sectionTitle {
+  margin: 8px 0 0;
+  font-size: 24px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 13px;
+}
+
+.input {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: #0d0d0d;
+  color: #fff;
+}
+
+.textarea {
+  min-height: 108px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: #0d0d0d;
+  color: #fff;
+  resize: vertical;
+  font: inherit;
+}
+
+.button {
+  width: fit-content;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: #0d0d0d;
+  color: #fff;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.56;
+  cursor: default;
+}
+
+.dangerButton {
+  background: rgba(96, 28, 28, 0.45);
+  border-color: rgba(255, 120, 120, 0.18);
+}
+
+.metaList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metaItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #101010;
+  font-size: 14px;
+}
+
+.metaName {
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.notice,
+.error {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.notice {
+  background: rgba(66, 184, 131, 0.14);
+  color: #b1f2d1;
+}
+
+.error {
+  background: rgba(232, 64, 51, 0.14);
+  color: #ffb4ad;
+}
+
+.teamCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.teamName {
+  margin: 0;
+  font-size: 28px;
+}
+
+.teamSlug {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 14px;
+}
+
+.memberList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.memberItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 16px;
+  background: #101010;
+}
+
+.memberIdentity {
+  min-width: 0;
+}
+
+.memberName {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.memberEmail {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 13px;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+}
+
+.memberActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.templateGrid,
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.templateCard,
+.mediaCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #101010;
+}
+
+.templatePreview {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.templatePreviewImage,
+.mediaThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.templateOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.55));
+}
+
+.templateContent {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px;
+}
+
+.templateLogo {
+  width: 72px;
+  max-height: 24px;
+  object-fit: contain;
+}
+
+.templateLabel {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.templateTitle {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.06;
+}
+
+.templateSubtitle {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.mediaThumbWrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  aspect-ratio: 4 / 3;
+  background: #0b0b0b;
+}
+
+.groupTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.groupTab {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: #0f0f0f;
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+}
+
+.groupTabActive {
+  background: #ffffff;
+  color: #111111;
+}
+
+.empty {
+  padding: 18px;
+  border-radius: 16px;
+  background: #101010;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+@media (max-width: 960px) {
+  .grid,
+  .editorGrid,
+  .canvasGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .controlGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .memberItem {
+    grid-template-columns: 1fr;
+  }
+
+  .memberActions {
+    justify-content: flex-start;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

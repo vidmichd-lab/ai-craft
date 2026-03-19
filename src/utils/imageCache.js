@@ -272,9 +272,9 @@ export const loadImage = async (url, options = {}) => {
       return result;
     } catch (error) {
       console.error('Ошибка загрузки изображения:', url, error);
-      // Удаляем из loadingPromises перед выбросом ошибки
-      loadingPromises.delete(url);
       throw error;
+    } finally {
+      loadingPromises.delete(url);
     }
   })();
 
@@ -370,4 +370,3 @@ if (typeof window !== 'undefined') {
   // Очищаем старый кеш при загрузке (старше 30 дней)
   clearOldCache().catch(() => {});
 }
-
