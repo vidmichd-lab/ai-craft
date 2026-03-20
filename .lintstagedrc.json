@@ -1,5 +1,5 @@
 {
   "apps/web/**/*.{js,mjs,ts,tsx}": [
-    "eslint --fix --max-warnings=0"
+    "npm --workspace @ai-craft/web exec eslint -- --fix --max-warnings=0 --no-warn-ignored"
   ]
 }
