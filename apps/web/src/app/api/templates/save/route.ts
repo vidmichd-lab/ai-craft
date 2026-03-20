@@ -1,17 +1,26 @@
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { cookies } from 'next/headers';
+import { createStoredTemplateState, normalizeStoredTemplateState } from '@ai-craft/editor-model';
 import { saveWorkspaceSnapshot } from '@/server/workspace-api/client';
 import { ensureTemplateProject } from '@/server/workspace-api/templates';
+import { createRequestContext } from '@/server/http/request-context';
+import { jsonResponse, toRouteErrorResponse } from '@/server/http/response';
 
 const payloadSchema = z.object({
   name: z.string().trim().min(1),
-  state: z.record(z.string(), z.unknown())
+  document: z.record(z.string(), z.unknown()).optional(),
+  state: z.record(z.string(), z.unknown()).optional()
+}).refine((payload) => Boolean(payload.document || payload.state), {
+  message: 'Template payload is required'
 });
 
 export async function POST(request: Request) {
+  const context = createRequestContext(request);
   try {
     const payload = payloadSchema.parse(await request.json());
+    const state = payload.document
+      ? createStoredTemplateState(payload.name, payload.document)
+      : normalizeStoredTemplateState(payload.state || {}, payload.name);
     const cookieStore = await cookies();
     const cookie = cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ');
     const displayName = cookieStore.get('workspace_display_name')?.value || '';
@@ -21,16 +30,12 @@ export async function POST(request: Request) {
         projectId: project.id,
         name: payload.name,
         kind: 'template',
-        state: payload.state
+        state
       },
       cookie
     );
-    return NextResponse.json(result.data);
+    return jsonResponse(result.data, context);
   } catch (error) {
-    const status = (error as Error & { status?: number }).status || 400;
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Template save failed' },
-      { status }
-    );
+    return toRouteErrorResponse(error, 'Template save failed', context);
   }
 }

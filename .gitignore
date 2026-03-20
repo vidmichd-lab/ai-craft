@@ -11,9 +11,17 @@
 
 # Dependencies
 node_modules/
+**/node_modules/
+apps/*/package-lock.json
 
 # Build
 dist/
+dist-types/
+.next/
+**/.next/
+.turbo/
+output/
+*.tsbuildinfo
 *.pyc
 __pycache__/
 
@@ -34,3 +42,12 @@ config.json
 # Browser test artifacts
 playwright-report/
 test-results/
+coverage/
+
+# Python virtualenvs
+.venv/
+*.venv/
+.kv-webp-venv/
+
+# Local packaged artifacts
+*.zip

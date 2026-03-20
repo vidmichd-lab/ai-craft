@@ -81,9 +81,9 @@
           <div class="mode-groups">
             <div class="toggle-switch mode-toggle mode-toggle-primary" id="projectModeToggle" data-value="rsya" data-options="2">
               <div class="toggle-switch-slider"></div>
-              <div class="toggle-switch-track">
-                <div class="toggle-switch-option active" data-value="rsya">РСЯ</div>
-                <div class="toggle-switch-option" data-value="layouts">Перформанс</div>
+              <div class="toggle-switch-track ui-tabs">
+                <div class="toggle-switch-option ui-tab active is-active" data-value="rsya">РСЯ</div>
+                <div class="toggle-switch-option ui-tab" data-value="layouts">Перформанс</div>
               </div>
             </div>
           </div>
@@ -94,22 +94,22 @@
     <div class="main">
       <!-- Icons Panel -->
       <div class="tabs-panel">
-        <div class="tab active" data-section="layout">
+        <div class="tab ui-navigation-button ui-navigation-row active" data-section="layout">
           <span data-i18n="tab.layout">Макет</span>
         </div>
-        <div class="tab" data-section="logo">
+        <div class="tab ui-navigation-button ui-navigation-row" data-section="logo">
           <span data-i18n="tab.logo">Логотип</span>
         </div>
-        <div class="tab" data-section="title">
+        <div class="tab ui-navigation-button ui-navigation-row" data-section="title">
           <span data-i18n="tab.title">Заголовок</span>
         </div>
-        <div class="tab" data-section="subtitle">
+        <div class="tab ui-navigation-button ui-navigation-row" data-section="subtitle">
           <span data-i18n="tab.subtitle">Подзаголовок</span>
         </div>
-        <div class="tab" data-section="legal">
+        <div class="tab ui-navigation-button ui-navigation-row" data-section="legal">
           <span data-i18n="tab.legal">Лигал</span>
         </div>
-        <div class="tab" data-section="kv">
+        <div class="tab ui-navigation-button ui-navigation-row" data-section="kv">
           <span data-i18n="tab.kv">Визуал</span>
         </div>
         <div class="theme-text-muted" style="margin-top: auto; padding: 16px; text-align: center; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
@@ -125,7 +125,7 @@
             <div class="form-group">
               <div class="workspace-layout-departments">
                 <div class="workspace-layout-departments-label">Отдел</div>
-                <div id="workspaceDepartmentTags" class="workspace-layout-department-tags"></div>
+                <div id="workspaceDepartmentTags" class="workspace-layout-department-tags ui-button-group"></div>
               </div>
             </div>
             <div class="form-group">
@@ -912,6 +912,27 @@
                 <div class="slider-value">
                   <span>40%</span>
                   <span id="rsyaKVScaleValue">200%</span>
+                  <span>300%</span>
+                </div>
+                <label style="margin-top: 12px;">Визуал 1</label>
+                <input type="range" id="rsyaKVScale1" min="40" max="300" step="1" value="100" data-state-key="rsyaKVScale1">
+                <div class="slider-value">
+                  <span>40%</span>
+                  <span id="rsyaKVScale1Value">100%</span>
+                  <span>300%</span>
+                </div>
+                <label style="margin-top: 12px;">Визуал 2</label>
+                <input type="range" id="rsyaKVScale2" min="40" max="300" step="1" value="100" data-state-key="rsyaKVScale2">
+                <div class="slider-value">
+                  <span>40%</span>
+                  <span id="rsyaKVScale2Value">100%</span>
+                  <span>300%</span>
+                </div>
+                <label style="margin-top: 12px;">Визуал 3</label>
+                <input type="range" id="rsyaKVScale3" min="40" max="300" step="1" value="100" data-state-key="rsyaKVScale3">
+                <div class="slider-value">
+                  <span>40%</span>
+                  <span id="rsyaKVScale3Value">100%</span>
                   <span>300%</span>
                 </div>
                 <label style="margin-top: 12px;">Расстояние между</label>

@@ -392,7 +392,7 @@ get_cache_control() {
     fi
 
     case "$file" in
-        src/*|styles.css)
+        src/*|packages/*|styles.css)
             echo "public, max-age=31536000, immutable"
             return
             ;;
@@ -512,6 +512,16 @@ fi
 FORCE_UPLOAD_FILES=""
 if [ -d "src" ]; then
     FORCE_CHECK_FILES=$(find src -type f \( -name "*.js" -o -name "*.css" \) 2>/dev/null || true)
+fi
+if [ -d "packages" ]; then
+    PACKAGE_FORCE_CHECK_FILES=$(find packages -type f \( -name "*.js" -o -name "*.css" \) 2>/dev/null || true)
+    if [ -n "$PACKAGE_FORCE_CHECK_FILES" ]; then
+        if [ -n "$FORCE_CHECK_FILES" ]; then
+            FORCE_CHECK_FILES="${FORCE_CHECK_FILES}"$'\n'"${PACKAGE_FORCE_CHECK_FILES}"
+        else
+            FORCE_CHECK_FILES="$PACKAGE_FORCE_CHECK_FILES"
+        fi
+    fi
 fi
 if [ -n "$FORCE_CHECK_FILES" ]; then
     echo "  Проверка JS/CSS файлов на изменения..."

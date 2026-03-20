@@ -2,6 +2,8 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { getProjectDocumentPreview, normalizeStoredTemplateState } from '@ai-craft/editor-model';
+import { Banner, Button, SectionHeader } from '@ai-craft/ui';
 import styles from './workspace-shell.module.css';
 
 type TemplateItem = {
@@ -17,22 +19,6 @@ export type TemplatesLibraryItem = TemplateItem;
 type Props = {
   onApplyTemplate?: (template: TemplateItem) => void;
   refreshKey?: number;
-};
-
-const getPreview = (snapshot: Record<string, unknown> = {}) => {
-  const pairs = Array.isArray(snapshot.titleSubtitlePairs) ? snapshot.titleSubtitlePairs : [];
-  const activeIndex = Number.isInteger(snapshot.activePairIndex) ? Number(snapshot.activePairIndex) : 0;
-  const activePair = (pairs[activeIndex] || pairs[0] || {}) as Record<string, unknown>;
-
-  return {
-    title: String(activePair.title || snapshot.title || snapshot.brandName || 'AI-Craft'),
-    subtitle: String(activePair.subtitle || snapshot.subtitle || ''),
-    backgroundColor: String(activePair.bgColor || snapshot.bgColor || '#111111'),
-    backgroundImage: String(
-      activePair.bgImageSelected || snapshot.bgImageSelected || snapshot.bgImage || snapshot.kvSelected || ''
-    ),
-    logo: String(snapshot.logoSelected || '')
-  };
 };
 
 export function TemplatesLibrary({ onApplyTemplate, refreshKey = 0 }: Props) {
@@ -73,17 +59,19 @@ export function TemplatesLibrary({ onApplyTemplate, refreshKey = 0 }: Props) {
   return (
     <section className={styles.panel}>
       <div className={styles.stack}>
-        <div>
-          <div className={styles.sectionLabel}>Templates</div>
-          <h2 className={styles.sectionTitle}>Библиотека шаблонов</h2>
-        </div>
+        <SectionHeader eyebrow="Templates" title="Библиотека шаблонов" />
         {loading ? <div className={styles.empty}>Загружаем шаблоны...</div> : null}
-        {error ? <div className={styles.error}>{error}</div> : null}
+        {error ? (
+          <Banner className={styles.error} tone="error">
+            {error}
+          </Banner>
+        ) : null}
         {!loading && !error ? (
           templates.length ? (
             <div className={styles.templateGrid}>
               {templates.map((template) => {
-                const preview = getPreview(template.state);
+                const structuredTemplate = normalizeStoredTemplateState(template.state, template.name);
+                const preview = getProjectDocumentPreview(structuredTemplate.definition.document);
                 return (
                   <article className={styles.templateCard} key={template.id}>
                     <div className={styles.templatePreview} style={{ background: preview.backgroundColor }}>
@@ -118,11 +106,12 @@ export function TemplatesLibrary({ onApplyTemplate, refreshKey = 0 }: Props) {
                       <div className={styles.memberName}>{template.name}</div>
                       <div className={styles.memberEmail}>Автор: {template.authorName || 'Неизвестно'}</div>
                       <div className={styles.memberEmail}>Доступ: вся команда</div>
+                      <div className={styles.memberEmail}>Recipe: {structuredTemplate.definition.recipe}</div>
                       <div className={styles.memberEmail}>{new Date(template.createdAt).toLocaleString('ru-RU')}</div>
                       {onApplyTemplate ? (
-                        <button className={styles.button} type="button" onClick={() => onApplyTemplate(template)}>
+                        <Button type="button" onClick={() => onApplyTemplate(template)}>
                           Применить в редактор
-                        </button>
+                        </Button>
                       ) : null}
                     </div>
                   </article>

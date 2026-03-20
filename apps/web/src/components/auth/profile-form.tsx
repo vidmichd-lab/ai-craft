@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Banner, Button, Field, Input, MetaItem, MetaList, MutedText, SectionHeader } from '@ai-craft/ui';
 import styles from './workspace-shell.module.css';
 
 type Props = {
@@ -52,34 +53,38 @@ export function ProfileForm({ initialDisplayName, email, roleLabel }: Props) {
 
   return (
     <form className={styles.stack} onSubmit={handleSubmit}>
-      <div>
-        <div className={styles.sectionLabel}>Аккаунт</div>
-        <h2 className={styles.sectionTitle}>Мои настройки</h2>
-      </div>
-      <label className={styles.field}>
-        <span className={styles.fieldLabel}>Имя</span>
-        <input
+      <SectionHeader eyebrow="Аккаунт" title="Мои настройки" />
+      <Field className={styles.field} label="Имя">
+        <Input
           className={styles.input}
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
           placeholder="Как вас показывать в системе"
         />
-      </label>
-      <div className={styles.metaList}>
-        <div className={styles.metaItem}>
-          <span className={styles.metaName}>Почта</span>
+      </Field>
+      <MetaList className={styles.metaList}>
+        <MetaItem className={styles.metaItem}>
+          <MutedText className={styles.metaName}>Почта</MutedText>
           <span>{email}</span>
-        </div>
-        <div className={styles.metaItem}>
-          <span className={styles.metaName}>Роль</span>
+        </MetaItem>
+        <MetaItem className={styles.metaItem}>
+          <MutedText className={styles.metaName}>Роль</MutedText>
           <span>{roleLabel}</span>
-        </div>
-      </div>
-      {notice ? <div className={styles.notice}>{notice}</div> : null}
-      {error ? <div className={styles.error}>{error}</div> : null}
-      <button className={styles.button} type="submit" disabled={pending || !displayName.trim()}>
+        </MetaItem>
+      </MetaList>
+      {notice ? (
+        <Banner className={styles.notice} tone="notice">
+          {notice}
+        </Banner>
+      ) : null}
+      {error ? (
+        <Banner className={styles.error} tone="error">
+          {error}
+        </Banner>
+      ) : null}
+      <Button type="submit" disabled={pending || !displayName.trim()}>
         {pending ? 'Сохраняем...' : 'Сохранить'}
-      </button>
+      </Button>
     </form>
   );
 }

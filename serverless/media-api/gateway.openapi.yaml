@@ -23,6 +23,26 @@ paths:
       responses:
         '200':
           description: Presigned upload URL
+  /media/folder:
+    post:
+      operationId: createMediaFolder
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+      responses:
+        '200':
+          description: Folder placeholder created
+  /media/folder/rename:
+    post:
+      operationId: renameMediaFolder
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: ${function_tag}
+      responses:
+        '200':
+          description: Folder renamed
   /media/object:
     delete:
       operationId: deleteMediaObject

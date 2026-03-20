@@ -1,6 +1,46 @@
 import { expect, test } from '@playwright/test';
 
+test.describe.configure({ timeout: 60000 });
+
+const stabilizeWorkspaceBoot = async (page) => {
+  await page.addInitScript(() => {
+    window.requestIdleCallback = (callback) => setTimeout(() => callback({
+      didTimeout: false,
+      timeRemaining: () => 50
+    }), 0);
+    window.cancelIdleCallback = (handle) => clearTimeout(handle);
+  });
+};
+
+const loginThroughWorkspaceAuth = async (page, email, password) => {
+  await expect(page.locator('.app')).toBeVisible();
+  await expect(page.locator('#workspaceAccountBtn')).toBeVisible();
+  await expect(page.locator('#workspaceAccountBtn')).toContainText('Войти');
+
+  if (!await page.locator('#workspaceAuthForm').isVisible().catch(() => false)) {
+    await page.click('#workspaceAccountBtn');
+  }
+
+  await page.waitForFunction(() => Boolean(document.getElementById('workspaceAuthForm')), null, {
+    timeout: 15000
+  });
+  await expect(page.locator('#workspaceAuthForm')).toBeVisible();
+  await expect(page.locator('#workspaceAuthOverlay')).toBeVisible();
+  await page.fill('#workspaceAuthEmail', email);
+  await page.fill('#workspaceAuthPassword', password);
+  await expect(page.locator('#workspaceAuthForm button[type="submit"]')).toBeEnabled();
+  await page.click('#workspaceAuthForm button[type="submit"]');
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('workspaceAuthOverlay')).display === 'none', null, {
+    timeout: 15000
+  });
+  await page.waitForFunction(() => document.getElementById('workspaceAccountBtn')?.getAttribute('aria-label') === 'Настройки пользователя', null, {
+    timeout: 15000
+  });
+};
+
 test('workspace flow allows login, draft save and template save', async ({ page }) => {
+  await stabilizeWorkspaceBoot(page);
+
   const state = {
     loggedIn: false,
     user: {
@@ -10,6 +50,13 @@ test('workspace flow allows login, draft save and template save', async ({ page 
       displayName: 'Workspace Admin'
     },
     team: {
+      id: 'team-demo',
+      slug: 'demo',
+      name: 'Demo Team',
+      status: 'active',
+      settings: {}
+    },
+    currentTeam: {
       id: 'team-demo',
       slug: 'demo',
       name: 'Demo Team',
@@ -266,13 +313,7 @@ test('workspace flow allows login, draft save and template save', async ({ page 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
 
-  await expect(page.locator('#workspaceControls')).toBeHidden();
-  await expect(page.locator('#workspaceStatus')).toContainText('Нужен вход');
-  await expect(page.locator('#workspaceAuthOverlay')).toBeVisible();
-
-  await page.fill('#workspaceAuthEmail', 'admin@example.com');
-  await page.fill('#workspaceAuthPassword', 'change-me-now');
-  await page.click('#workspaceAuthForm button[type="submit"]');
+  await loginThroughWorkspaceAuth(page, 'admin@example.com', 'change-me-now');
 
   await expect(page.locator('#workspaceControls')).toBeVisible();
   await expect(page.locator('#workspaceStatus')).toContainText('Demo Team');
@@ -289,13 +330,23 @@ test('workspace flow allows login, draft save and template save', async ({ page 
   await page.click('#workspaceModalCloseBtn');
   await page.click('#workspaceTemplateBtn');
   await page.fill('#workspaceTemplateComposerForm input[name="templateName"]', 'Launch Template');
-  await page.click('#workspaceTemplateComposerForm button[type="submit"]');
-  await expect(page.locator('#workspaceModalBody')).toContainText('Автор: Workspace Admin');
-  await expect(page.locator('#workspaceModalBody')).toContainText('Доступ: вся команда');
-  await expect(page.locator('#workspaceModalBody')).toContainText('Launch Template');
+  await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/snapshots') && response.request().method() === 'POST' && response.ok()),
+    page.click('#workspaceTemplateComposerForm button[type="submit"]')
+  ]);
+  await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/snapshots?') && response.request().method() === 'GET'),
+    page.click('[data-workspace-action="refresh-projects"]')
+  ]);
+  await expect(page.locator('#workspaceModalBody')).not.toContainText('Загружаем шаблоны...', { timeout: 10000 });
+  await expect(page.locator('#workspaceModalBody')).toContainText('Launch Template', { timeout: 10000 });
+  await expect(page.locator('#workspaceModalBody')).toContainText('Автор: Workspace Admin', { timeout: 10000 });
+  await expect(page.locator('#workspaceModalBody')).toContainText('Доступ: вся команда', { timeout: 10000 });
 });
 
 test('superadmin can create a team and a user with generated password', async ({ page }) => {
+  await stabilizeWorkspaceBoot(page);
+
   const state = {
     loggedIn: false,
     user: {
@@ -592,10 +643,7 @@ test('superadmin can create a team and a user with generated password', async ({
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
 
-  await page.fill('#workspaceAuthEmail', 'vidmichd@ya.ru');
-  await page.fill('#workspaceAuthPassword', 'change-me-now');
-  await expect(page.locator('#workspaceAuthForm button[type="submit"]')).toBeEnabled();
-  await page.click('#workspaceAuthForm button[type="submit"]');
+  await loginThroughWorkspaceAuth(page, 'vidmichd@ya.ru', 'change-me-now');
 
   await expect(page.locator('#workspaceModalBody')).toContainText('admin');
   await page.click('#workspaceModalCloseBtn');
@@ -626,6 +674,8 @@ test('superadmin can create a team and a user with generated password', async ({
 });
 
 test('lead can access team defaults controls after workspace login', async ({ page }) => {
+  await stabilizeWorkspaceBoot(page);
+
   const state = {
     loggedIn: false,
     user: {
@@ -799,9 +849,7 @@ test('lead can access team defaults controls after workspace login', async ({ pa
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
 
-  await page.fill('#workspaceAuthEmail', 'lead@example.com');
-  await page.fill('#workspaceAuthPassword', 'change-me-now');
-  await page.click('#workspaceAuthForm button[type="submit"]');
+  await loginThroughWorkspaceAuth(page, 'lead@example.com', 'change-me-now');
 
   await page.click('#workspaceModalCloseBtn');
   await page.click('#workspaceTeamBtn');

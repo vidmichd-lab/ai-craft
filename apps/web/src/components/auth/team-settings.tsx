@@ -2,7 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useMemo, useState } from 'react';
-import { formatWorkspaceRole, listDepartmentEntries, type WorkspaceDepartmentEntry } from '@ai-craft/workspace-sdk';
+import { Banner, Button, cx, Field, Input, SectionHeader, Select } from '@ai-craft/ui';
+import { formatWorkspaceRoleLabel } from '@ai-craft/workspace-domain';
+import { listDepartmentEntries, type WorkspaceDepartmentEntry } from '@ai-craft/workspace-sdk';
 import styles from './workspace-shell.module.css';
 import type {
   WorkspaceCurrentTeamResponse,
@@ -123,37 +125,39 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
 
   return (
     <div className={styles.stack}>
-      {notice ? <div className={styles.notice}>{notice}</div> : null}
-      {error ? <div className={styles.error}>{error}</div> : null}
+      {notice ? (
+        <Banner className={styles.notice} tone="notice">
+          {notice}
+        </Banner>
+      ) : null}
+      {error ? (
+        <Banner className={styles.error} tone="error">
+          {error}
+        </Banner>
+      ) : null}
 
       <section className={styles.panel}>
         <div className={styles.stack}>
-          <div>
-            <div className={styles.sectionLabel}>Команда</div>
-            <h2 className={styles.sectionTitle}>Настройки команды</h2>
-          </div>
+          <SectionHeader eyebrow="Команда" title="Настройки команды" />
           <form className={styles.stack} onSubmit={handleSaveTeam}>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Название</span>
-              <input
+            <Field className={styles.field} label="Название">
+              <Input
                 className={styles.input}
                 value={teamName}
                 onChange={(event) => setTeamName(event.target.value)}
                 disabled={!canManageMembers}
               />
-            </label>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Slug</span>
-              <input
+            </Field>
+            <Field className={styles.field} label="Slug">
+              <Input
                 className={styles.input}
                 value={teamSlug}
                 onChange={(event) => setTeamSlug(event.target.value)}
                 disabled={!canManageMembers}
               />
-            </label>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Статус</span>
-              <select
+            </Field>
+            <Field className={styles.field} label="Статус">
+              <Select
                 className={styles.input}
                 value={teamStatus}
                 onChange={(event) => setTeamStatus(event.target.value as 'active' | 'inactive')}
@@ -161,12 +165,12 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
               >
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
-              </select>
-            </label>
+              </Select>
+            </Field>
             {canManageMembers ? (
-              <button className={styles.button} type="submit" disabled={pendingKey === 'team'}>
+              <Button type="submit" disabled={pendingKey === 'team'}>
                 {pendingKey === 'team' ? 'Сохраняем...' : 'Сохранить команду'}
-              </button>
+              </Button>
             ) : null}
           </form>
         </div>
@@ -174,10 +178,7 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
 
       <section className={styles.panel}>
         <div className={styles.stack}>
-          <div>
-            <div className={styles.sectionLabel}>Отделы</div>
-            <h2 className={styles.sectionTitle}>Структура команды</h2>
-          </div>
+          <SectionHeader eyebrow="Отделы" title="Структура команды" />
           <div className={styles.memberList}>
             {departments.map((department: WorkspaceDepartmentEntry) => (
               <article className={styles.memberItem} key={department.id}>
@@ -189,8 +190,7 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                   </div>
                 </div>
                 <div className={styles.memberActions}>
-                  <button
-                    className={styles.button}
+                  <Button
                     type="button"
                     onClick={() => {
                       setEditingDepartmentId(department.id);
@@ -199,10 +199,11 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                     }}
                   >
                     Изменить
-                  </button>
+                  </Button>
                   {!department.isGeneral ? (
-                    <button
-                      className={`${styles.button} ${styles.dangerButton}`}
+                    <Button
+                      className={cx(styles.button, styles.dangerButton)}
+                      variant="danger"
                       type="button"
                       disabled={pendingKey === `department-remove-${department.id}`}
                       onClick={() => {
@@ -218,43 +219,41 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                       }}
                     >
                       Удалить
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </article>
             ))}
           </div>
           <form className={styles.stack} onSubmit={handleDepartmentSubmit}>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Название отдела</span>
-              <input
+            <Field className={styles.field} label="Название отдела">
+              <Input
                 className={styles.input}
                 value={departmentName}
                 onChange={(event) => setDepartmentName(event.target.value)}
                 placeholder="Например, PRO"
               />
-            </label>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Slug</span>
-              <input
+            </Field>
+            <Field className={styles.field} label="Slug">
+              <Input
                 className={styles.input}
                 value={departmentSlug}
                 onChange={(event) => setDepartmentSlug(event.target.value)}
                 placeholder="pro"
               />
-            </label>
+            </Field>
             <div className={styles.actionsRow}>
-              <button className={styles.button} type="submit" disabled={pendingKey === 'department' || !departmentName.trim() || !departmentSlug.trim()}>
+              <Button type="submit" disabled={pendingKey === 'department' || !departmentName.trim() || !departmentSlug.trim()}>
                 {pendingKey === 'department'
                   ? 'Сохраняем...'
                   : editingDepartmentId
                     ? 'Сохранить отдел'
                     : 'Добавить отдел'}
-              </button>
+              </Button>
               {editingDepartmentId ? (
-                <button className={styles.button} type="button" onClick={resetDepartmentForm}>
+                <Button type="button" onClick={resetDepartmentForm}>
                   Отмена
-                </button>
+                </Button>
               ) : null}
             </div>
           </form>
@@ -263,45 +262,39 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
 
       <section className={styles.panel}>
         <div className={styles.stack}>
-          <div>
-            <div className={styles.sectionLabel}>Участники</div>
-            <h2 className={styles.sectionTitle}>Members management</h2>
-          </div>
+          <SectionHeader eyebrow="Участники" title="Команда и доступы" />
           {canManageMembers ? (
             <form className={styles.stack} onSubmit={handleCreateMember}>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Имя</span>
-                <input
+              <Field className={styles.field} label="Имя">
+                <Input
                   className={styles.input}
                   value={memberName}
                   onChange={(event) => setMemberName(event.target.value)}
                   placeholder="Имя пользователя"
                 />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Email</span>
-                <input
+              </Field>
+              <Field className={styles.field} label="Email">
+                <Input
                   className={styles.input}
                   type="email"
                   value={memberEmail}
                   onChange={(event) => setMemberEmail(event.target.value)}
                   placeholder="user@example.com"
                 />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Роль</span>
-                <select
+              </Field>
+              <Field className={styles.field} label="Роль">
+                <Select
                   className={styles.input}
                   value={memberRole}
                   onChange={(event) => setMemberRole(event.target.value as 'editor' | 'lead')}
                 >
                   <option value="editor">editor</option>
                   <option value="lead">lead</option>
-                </select>
-              </label>
-              <button className={styles.button} type="submit" disabled={pendingKey === 'member-create' || !memberEmail.trim() || !memberName.trim()}>
+                </Select>
+              </Field>
+              <Button type="submit" disabled={pendingKey === 'member-create' || !memberEmail.trim() || !memberName.trim()}>
                 {pendingKey === 'member-create' ? 'Создаем...' : 'Добавить пользователя'}
-              </button>
+              </Button>
             </form>
           ) : null}
 
@@ -313,11 +306,10 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                     <div className={styles.memberName}>{member.displayName || member.email}</div>
                     <div className={styles.memberEmail}>{member.email}</div>
                   </div>
-                  <div className={styles.badge}>{formatWorkspaceRole(member.role)}</div>
+                  <div className={styles.badge}>{formatWorkspaceRoleLabel(member.role)}</div>
                   <div className={styles.memberActions}>
                     {canManageMembers && (member.role === 'editor' || member.role === 'lead') ? (
-                      <button
-                        className={styles.button}
+                      <Button
                         type="button"
                         disabled={pendingKey === `role-${member.id}`}
                         onClick={() => {
@@ -336,11 +328,10 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                         }}
                       >
                         {member.role === 'lead' ? 'Сделать editor' : 'Сделать lead'}
-                      </button>
+                      </Button>
                     ) : null}
                     {canManageMembers ? (
-                      <button
-                        className={styles.button}
+                      <Button
                         type="button"
                         disabled={pendingKey === `reset-${member.id}`}
                         onClick={() => {
@@ -356,11 +347,12 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                         }}
                       >
                         Новый пароль
-                      </button>
+                      </Button>
                     ) : null}
                     {canManageMembers ? (
-                      <button
+                      <Button
                         className={`${styles.button} ${styles.dangerButton}`}
+                        variant="danger"
                         type="button"
                         disabled={pendingKey === `remove-${member.id}`}
                         onClick={() => {
@@ -376,7 +368,7 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                         }}
                       >
                         Удалить
-                      </button>
+                      </Button>
                     ) : null}
                   </div>
                 </article>

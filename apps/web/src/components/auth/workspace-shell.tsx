@@ -2,7 +2,11 @@ import styles from './workspace-shell.module.css';
 import { LogoutButton } from './logout-button';
 import { ProfileForm } from './profile-form';
 import { WorkspaceContent } from './workspace-content';
-import { formatWorkspaceRole } from '@ai-craft/workspace-sdk';
+import {
+  canManageWorkspaceMembers,
+  formatWorkspaceRoleLabel,
+  getWorkspaceActorName
+} from '@ai-craft/workspace-domain';
 import type {
   WorkspaceCurrentTeamResponse,
   WorkspaceMeResponse,
@@ -16,7 +20,9 @@ type Props = {
 };
 
 export function WorkspaceShell({ session, currentTeam, teamMembers }: Props) {
-  const roleLabel = formatWorkspaceRole(session.user.role, session.user.isSuperadmin);
+  const roleLabel = formatWorkspaceRoleLabel(session.user.role, session.user.isSuperadmin);
+  const actorName = getWorkspaceActorName(session.user);
+  const canManageMembers = canManageWorkspaceMembers(session.user);
 
   return (
     <main className={styles.page}>
@@ -26,7 +32,7 @@ export function WorkspaceShell({ session, currentTeam, teamMembers }: Props) {
             <div className={styles.eyebrow}>AI-Craft Workspace</div>
             <h1 className={styles.heading}>{currentTeam?.team.name || session.team.name}</h1>
             <div className={styles.subheading}>
-              {session.user.displayName || session.user.email} · {roleLabel}
+              {actorName} · {roleLabel}
             </div>
           </div>
           <div className={styles.headerActions}>
@@ -47,7 +53,7 @@ export function WorkspaceShell({ session, currentTeam, teamMembers }: Props) {
           <WorkspaceContent
             currentTeam={currentTeam}
             teamMembers={teamMembers}
-            canManageMembers={Boolean(session.user.isSuperadmin)}
+            canManageMembers={canManageMembers}
           />
         </section>
       </div>

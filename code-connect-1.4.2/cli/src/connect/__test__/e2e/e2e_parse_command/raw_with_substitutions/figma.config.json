@@ -1,0 +1,16 @@
+{
+  "codeConnect": {
+    "parser": "react",
+    "importPaths": {},
+    "paths": {},
+    "include": [
+      "*.{tsx, jsx}",
+      "*.figma.js",
+      "*.figma.template.js"
+    ],
+    "exclude": [],
+    "documentUrlSubstitutions": {
+      "https://figma.com/design/SOURCE-FILE": "https://figma.com/design/TARGET-FILE"
+    }
+  }
+}

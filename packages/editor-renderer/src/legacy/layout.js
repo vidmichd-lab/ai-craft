@@ -3,7 +3,6 @@
  */
 
 import { LAYOUT_CONSTANTS } from './constants.js';
-import { getState } from '../../../../src/state/store.js';
 
 /**
  * Определяет тип макета на основе размеров
@@ -32,9 +31,8 @@ export const getLayoutType = (width, height, layoutMode = 'auto') => {
 /**
  * Вычисляет множители размеров для разных элементов в зависимости от типа макета
  */
-export const calculateSizeMultipliers = (width, height, layoutType) => {
+export const calculateSizeMultipliers = (width, height, layoutType, state = {}) => {
   const { isUltraWide, isSuperWide } = layoutType;
-  const state = getState();
   const customMultipliers = state.formatMultipliers;
   
   // Функция для получения множителя (кастомный или дефолтный)

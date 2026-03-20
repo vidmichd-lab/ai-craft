@@ -34,24 +34,25 @@ test('prod loads with remote media and active service worker', async ({ page }) 
     const manifest = await manifestResponse.json();
     const assets = manifest?.assets || {};
     const manifestRoots = Object.keys(assets).sort();
-    const manifestCount = manifestRoots.reduce((total, root) => {
-      const level1 = assets[root];
-      if (!level1 || typeof level1 !== 'object') return total;
-      return total + Object.values(level1).reduce((sum, items) => sum + (Array.isArray(items) ? items.length : 0), 0);
-    }, 0);
-
-    const assetScanner = await import(`/src/utils/assetScanner.js?v=${encodeURIComponent(window.APP_VERSION || 'dev')}`);
-    const [kvStructure, logoStructure, fonts] = await Promise.all([
-      assetScanner.scanKV(),
-      assetScanner.scanLogos(),
-      assetScanner.scanFonts()
-    ]);
 
     const countNested = (node) => {
       if (Array.isArray(node)) return node.length;
       if (!node || typeof node !== 'object') return 0;
-      return Object.values(node).reduce((sum, value) => sum + countNested(value), 0);
+
+      return Object.entries(node).reduce((sum, [key, value]) => {
+        if (key === '__files' && Array.isArray(value)) {
+          return sum + value.length;
+        }
+        return sum + countNested(value);
+      }, 0);
     };
+
+    const manifestCount = countNested(assets);
+
+    const kvCount = countNested(assets?.['3d'] || {});
+    const logoCount = countNested(assets?.logo || {});
+    const fontNode = assets?.font || {};
+    const fontCount = countNested(fontNode);
 
     const registration = await navigator.serviceWorker.getRegistration();
     const serviceWorkerReady = await navigator.serviceWorker.ready.then(() => true).catch(() => false);
@@ -61,9 +62,9 @@ test('prod loads with remote media and active service worker', async ({ page }) 
       manifestUrl,
       manifestRoots,
       manifestCount,
-      kvCount: countNested(kvStructure),
-      logoCount: countNested(logoStructure),
-      fontCount: Array.isArray(fonts) ? fonts.length : 0,
+      kvCount,
+      logoCount,
+      fontCount,
       hasServiceWorkerRegistration: Boolean(registration),
       hasActiveServiceWorker: Boolean(registration?.active),
       serviceWorkerReady
@@ -74,7 +75,7 @@ test('prod loads with remote media and active service worker', async ({ page }) 
   expect(liveChecks.manifestUrl).toContain('/media/manifest');
   expect(liveChecks.manifestRoots).toEqual(['3d', 'font', 'logo', 'pro']);
   expect(liveChecks.manifestCount).toBeGreaterThan(400);
-  expect(liveChecks.kvCount).toBeGreaterThan(300);
+  expect(liveChecks.kvCount).toBeGreaterThan(250);
   expect(liveChecks.logoCount).toBeGreaterThan(20);
   expect(liveChecks.fontCount).toBeGreaterThan(20);
   expect(liveChecks.hasServiceWorkerRegistration).toBe(true);

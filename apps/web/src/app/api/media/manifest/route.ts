@@ -1,17 +1,15 @@
-import { NextResponse } from 'next/server';
 import { getMediaManifest } from '@/server/media-api/client';
 import { flattenMediaManifest } from '@/server/media-api/manifest';
+import { createRequestContext } from '@/server/http/request-context';
+import { jsonResponse, toRouteErrorResponse } from '@/server/http/response';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const context = createRequestContext(request);
   try {
     const manifest = await getMediaManifest();
     const groups = flattenMediaManifest(manifest);
-    return NextResponse.json({ ok: true, groups });
+    return jsonResponse({ ok: true, groups }, context);
   } catch (error) {
-    const status = (error as Error & { status?: number }).status || 400;
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Media manifest fetch failed' },
-      { status }
-    );
+    return toRouteErrorResponse(error, 'Media manifest fetch failed', context);
   }
 }

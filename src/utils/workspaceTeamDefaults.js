@@ -7,6 +7,13 @@ const WORKSPACE_DEFAULT_DEPARTMENT_ID = 'general';
 const WORKSPACE_DEPARTMENT_EDITOR_CONTEXT_KEY = 'workspace-department-editor-context';
 const WORKSPACE_TEAM_BUNDLE_STORAGE_KEY = 'workspace-team-bundle';
 const WORKSPACE_SELECTED_DEPARTMENT_STORAGE_KEY = 'workspace-selected-department';
+const WORKSPACE_SHARED_TEAM_DEFAULT_KEYS = [
+  'brandName',
+  'sizesConfig',
+  'formatMultipliers',
+  'logoSizeMultipliers',
+  'safeAreas'
+];
 
 const safeParse = (value, fallback = null) => {
   if (!value || typeof value !== 'string') return fallback;
@@ -136,6 +143,29 @@ const stripWorkspaceMeta = (defaultsPayload = {}) => {
   return next;
 };
 
+const pickSharedTeamDefaults = (defaultsPayload = {}) => {
+  const source = defaultsPayload && typeof defaultsPayload === 'object' ? defaultsPayload : {};
+  return WORKSPACE_SHARED_TEAM_DEFAULT_KEYS.reduce((acc, key) => {
+    if (source[key] !== undefined) {
+      acc[key] = cloneJson(source[key]);
+    }
+    return acc;
+  }, {});
+};
+
+const stripSharedTeamDefaults = (defaultsPayload = {}) => {
+  const next = cloneJson(defaultsPayload || {});
+  WORKSPACE_SHARED_TEAM_DEFAULT_KEYS.forEach((key) => {
+    delete next[key];
+  });
+  return next;
+};
+
+const mergeSharedTeamDefaults = (baseDefaults = {}, targetDefaults = {}) => ({
+  ...cloneJson(targetDefaults || {}),
+  ...pickSharedTeamDefaults(baseDefaults)
+});
+
 const embedWorkspaceMeta = (defaultsPayload = {}, departments = normalizeDepartmentCollection()) => ({
   ...cloneJson(defaultsPayload || {}),
   [WORKSPACE_DEFAULTS_META_KEY]: {
@@ -182,7 +212,7 @@ export const buildWorkspaceDepartmentPayload = ({ defaultsPayload = {}, mediaSou
   return {
     department: { ...currentDepartment, isGeneral: false },
     departments,
-    defaults: deepMerge(baseDefaults, currentDepartment.defaults || {}),
+    defaults: mergeSharedTeamDefaults(baseDefaults, deepMerge(baseDefaults, currentDepartment.defaults || {})),
     mediaSources: deepMerge(baseMediaSources, currentDepartment.mediaSources || {})
   };
 };
@@ -208,10 +238,10 @@ export const readWorkspaceTeamBundleLocally = () => {
 
 export const getWorkspaceLayoutDepartmentEntries = (defaultsPayload = {}) => {
   const departments = getWorkspaceDepartments(defaultsPayload);
-  if (departments.items.length) {
-    return departments.items.map((item) => ({ ...item, isGeneral: false }));
-  }
-  return [{ ...departments.general, isGeneral: true }];
+  return [
+    { ...departments.general, isGeneral: true },
+    ...departments.items.map((item) => ({ ...item, isGeneral: false }))
+  ];
 };
 
 export const getWorkspaceLayoutDepartmentEntriesFromLocalBundle = () => {
@@ -325,6 +355,7 @@ export const syncWorkspaceTeamDefaults = async () => {
   const baseDefaults = editorContext.baseDefaults && typeof editorContext.baseDefaults === 'object' ? cloneJson(editorContext.baseDefaults) : {};
   const baseMediaSources = editorContext.baseMediaSources && typeof editorContext.baseMediaSources === 'object' ? cloneJson(editorContext.baseMediaSources) : {};
   const departmentId = editorContext.departmentId || WORKSPACE_DEFAULT_DEPARTMENT_ID;
+  const sharedDefaults = pickSharedTeamDefaults(payload.defaults);
 
   let nextBaseDefaults = baseDefaults;
   let nextBaseMediaSources = baseMediaSources;
@@ -334,13 +365,20 @@ export const syncWorkspaceTeamDefaults = async () => {
     nextBaseDefaults = cloneJson(payload.defaults);
     nextBaseMediaSources = cloneJson(payload.mediaSources);
   } else {
+    nextBaseDefaults = {
+      ...cloneJson(baseDefaults),
+      ...sharedDefaults
+    };
     nextDepartments = {
       ...departments,
       items: departments.items.map((item) => {
         if (item.id !== departmentId) return item;
         return {
           ...item,
-          defaults: buildOverridePatch(baseDefaults, payload.defaults) || {},
+          defaults: buildOverridePatch(
+            stripSharedTeamDefaults(baseDefaults),
+            stripSharedTeamDefaults(payload.defaults)
+          ) || {},
           mediaSources: buildOverridePatch(baseMediaSources, payload.mediaSources) || {}
         };
       })

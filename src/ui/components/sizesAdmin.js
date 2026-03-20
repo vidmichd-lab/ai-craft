@@ -11,8 +11,7 @@ import {
   resetSizesConfig,
   loadSizesConfig
 } from '../../utils/sizesConfig.js';
-import { exportFullConfig, importFullConfig } from '../../utils/fullConfig.js';
-import { updatePresetSizesFromConfig, getState, setKey, setState, batch, getDefaultValues, resetState } from '../../state/store.js';
+import { updatePresetSizesFromConfig, getState, setKey, setState, batch, getDefaultValues } from '../../state/store.js';
 import { renderPresetSizes, updatePreviewSizeSelect, updateSizesSummary } from './sizeManager.js';
 import { renderer } from '../../renderer.js';
 import { openLogoSelectModal, closeLogoSelectModal, selectPreloadedLogo } from './logoSelector.js';
@@ -20,7 +19,7 @@ import { openKVSelectModal, closeKVSelectModal, selectPreloadedKV } from './kvSe
 import { handleLogoUpload, handleKVUpload, handleBgUpload, handlePartnerLogoUpload } from '../ui.js';
 import { updateBgColor, applyPresetBgColor, openBGSelectModal } from './backgroundSelector.js';
 import { PRESET_BACKGROUND_COLORS, AVAILABLE_FONTS, DEFAULT_KV_PATH } from '../../constants.js';
-import { LAYOUT_CONSTANTS } from '../../renderer/constants.js';
+import { LAYOUT_CONSTANTS } from '../../../packages/editor-renderer/src/legacy/constants.js';
 import { autoSelectLogoByTextColor } from '../ui.js';
 import { getDom } from '../domCache.js';
 import { getPassword, checkPassword, setPassword, hasPassword } from '../../utils/passwordManager.js';
@@ -38,6 +37,33 @@ let isAdminOpen = false;
 let isAdminAuthenticated = false; // Флаг аутентификации
 // Сохраняем исходные значения для возможности отката
 let originalDefaults = null;
+
+const joinClassNames = (...values) => values.filter(Boolean).join(' ');
+
+const sizesAdminButtonClass = ({
+  primary = false,
+  danger = false,
+  small = false,
+  full = false,
+  nav = false
+} = {}) => joinClassNames(
+  small ? 'btn-small' : 'btn',
+  'ui-button',
+  small && 'ui-button-sm',
+  full && 'btn-full ui-button-full',
+  primary && 'btn-primary ui-button-inverted',
+  danger && 'btn-danger ui-button-danger',
+  nav && 'ui-navigation-button ui-navigation-row sizes-admin-nav-button'
+);
+
+const sizesAdminFieldButtonClass = ({
+  danger = false,
+  small = false,
+  full = false
+} = {}) => joinClassNames(
+  sizesAdminButtonClass({ danger, small, full }),
+  'sizes-admin-action-button'
+);
 
 const resolveWorkspaceTeamDefaultsAccess = () => {
   if (!isWorkspaceAccessControlled()) {
@@ -242,11 +268,11 @@ const renderValuesTab = () => {
         <div class="input-group" style="margin-bottom: var(--spacing-sm);">
           <input type="color" id="defaultBgColor" value="${values.bgColor || '#1e1e1e'}" style="flex: 0 0 60px;">
           <input type="text" id="defaultBgColorHex" class="theme-input" value="${values.bgColor || '#1e1e1e'}" placeholder="#1e1e1e">
-          <button class="btn btn-danger" id="defaultBgColorReset" style="display: ${values.bgColor !== originalDefaults.bgColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
+          <button class="${sizesAdminFieldButtonClass({ danger: true })}" id="defaultBgColorReset" style="display: ${values.bgColor !== originalDefaults.bgColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
         </div>
-        <button class="btn btn-full" id="defaultBgUpload"><span class="material-icons">upload</span>${t('admin.sizes.defaults.bgUpload')}</button>
+        <button class="${sizesAdminFieldButtonClass({ full: true })}" id="defaultBgUpload"><span class="material-icons">upload</span>${t('admin.sizes.defaults.bgUpload')}</button>
         <input type="file" id="defaultBgUploadFile" accept="image/*" style="display: none;">
-        <button class="btn btn-danger btn-full" id="defaultBgClear" style="margin-top: var(--spacing-sm); display: ${values.bgImage ? 'block' : 'none'};"><span class="material-icons">delete</span>${t('admin.sizes.defaults.bgDelete')}</button>
+        <button class="${sizesAdminFieldButtonClass({ danger: true, full: true })}" id="defaultBgClear" style="margin-top: var(--spacing-sm); display: ${values.bgImage ? 'block' : 'none'};"><span class="material-icons">delete</span>${t('admin.sizes.defaults.bgDelete')}</button>
       </div>
       
       <div class="form-group">
@@ -254,7 +280,7 @@ const renderValuesTab = () => {
         <div class="input-group">
           <input type="color" id="defaultTextColor" value="${values.titleColor || '#ffffff'}" style="flex: 0 0 60px;">
           <input type="text" id="defaultTextColorHex" class="theme-input" value="${values.titleColor || '#ffffff'}" placeholder="#ffffff">
-          <button class="btn btn-danger" id="defaultTextColorReset" style="display: ${values.titleColor !== originalDefaults.titleColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
+          <button class="${sizesAdminFieldButtonClass({ danger: true })}" id="defaultTextColorReset" style="display: ${values.titleColor !== originalDefaults.titleColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
         </div>
       </div>
       
@@ -680,11 +706,11 @@ const renderDefaultsTab = () => {
         <div class="input-group" style="margin-bottom: var(--spacing-sm);">
           <input type="color" id="defaultBgColor" value="${values.bgColor || '#1e1e1e'}" style="flex: 0 0 60px;">
           <input type="text" id="defaultBgColorHex" class="theme-input" value="${values.bgColor || '#1e1e1e'}" placeholder="#1e1e1e">
-          <button class="btn btn-danger" id="defaultBgColorReset" style="display: ${values.bgColor !== originalDefaults.bgColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
+          <button class="${sizesAdminFieldButtonClass({ danger: true })}" id="defaultBgColorReset" style="display: ${values.bgColor !== originalDefaults.bgColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
         </div>
-        <button class="btn btn-full" id="defaultBgUpload"><span class="material-icons">upload</span>${t('admin.sizes.defaults.bgUpload')}</button>
+        <button class="${sizesAdminFieldButtonClass({ full: true })}" id="defaultBgUpload"><span class="material-icons">upload</span>${t('admin.sizes.defaults.bgUpload')}</button>
         <input type="file" id="defaultBgUploadFile" accept="image/*" style="display: none;">
-        <button class="btn btn-danger btn-full" id="defaultBgClear" style="margin-top: var(--spacing-sm); display: ${values.bgImage ? 'block' : 'none'};"><span class="material-icons">delete</span>${t('admin.sizes.defaults.bgDelete')}</button>
+        <button class="${sizesAdminFieldButtonClass({ danger: true, full: true })}" id="defaultBgClear" style="margin-top: var(--spacing-sm); display: ${values.bgImage ? 'block' : 'none'};"><span class="material-icons">delete</span>${t('admin.sizes.defaults.bgDelete')}</button>
       </div>
       
       <div class="form-group">
@@ -692,7 +718,7 @@ const renderDefaultsTab = () => {
         <div class="input-group">
           <input type="color" id="defaultTextColor" value="${values.titleColor || '#ffffff'}" style="flex: 0 0 60px;">
           <input type="text" id="defaultTextColorHex" class="theme-input" value="${values.titleColor || '#ffffff'}" placeholder="#ffffff">
-          <button class="btn btn-danger" id="defaultTextColorReset" style="display: ${values.titleColor !== originalDefaults.titleColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
+          <button class="${sizesAdminFieldButtonClass({ danger: true })}" id="defaultTextColorReset" style="display: ${values.titleColor !== originalDefaults.titleColor ? 'block' : 'none'};" title="${t('admin.sizes.defaults.bgReset')}"><span class="material-icons">refresh</span></button>
         </div>
       </div>
       
@@ -1442,7 +1468,7 @@ const renderDefaultsTab = () => {
             </div>
             
             <div style="margin-bottom: 16px;">
-              <button class="btn btn-primary" id="adminAddBackground" style="display: flex; align-items: center; gap: 6px;">
+              <button class="${sizesAdminButtonClass({ primary: true })}" id="adminAddBackground" style="display: flex; align-items: center; gap: 6px;">
                 <span class="material-icons" style="font-size: 18px;">add</span>
                 Добавить фон
               </button>
@@ -1463,7 +1489,7 @@ const renderDefaultsTab = () => {
                         </div>
                       </div>
                     </div>
-                    <button class="btn btn-danger" data-remove-bg="${index}" style="padding: 8px;">
+                    <button class="${sizesAdminFieldButtonClass({ danger: true })}" data-remove-bg="${index}" style="padding: 8px;">
                       <span class="material-icons" style="font-size: 18px;">delete</span>
                     </button>
                   </div>
@@ -1475,16 +1501,16 @@ const renderDefaultsTab = () => {
                         <input type="color" class="admin-bg-color" data-bg-index="${index}" value="${bg.bgColor || '#1e1e1e'}" style="width: 60px; height: 40px; border: 1px solid ${borderColor}; border-radius: 8px; cursor: pointer;">
                         <input type="text" class="admin-bg-color-hex" data-bg-index="${index}" value="${bg.bgColor || '#1e1e1e'}" placeholder="#1e1e1e" style="flex: 1; padding: 8px; border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; color: ${textPrimary}; font-family: inherit; font-size: 14px;">
                       </div>
-                      <button class="btn" data-upload-bg="${index}" style="width: 100%; margin-bottom: 8px;">
+                      <button class="${sizesAdminFieldButtonClass({ full: true })}" data-upload-bg="${index}" style="width: 100%; margin-bottom: 8px;">
                         <span class="material-icons" style="font-size: 18px; margin-right: 4px;">upload</span>
                         Загрузить изображение
                       </button>
                       <input type="file" class="admin-bg-upload-file" data-bg-index="${index}" accept="image/*" style="display: none;">
-                      <button class="btn" data-select-bg="${index}" style="width: 100%; margin-bottom: 8px;">
+                      <button class="${sizesAdminFieldButtonClass({ full: true })}" data-select-bg="${index}" style="width: 100%; margin-bottom: 8px;">
                         <span class="material-icons" style="font-size: 18px; margin-right: 4px;">image</span>
                         Выбрать из библиотеки
                       </button>
-                      ${bg.bgImage ? `<button class="btn btn-danger" data-clear-bg="${index}" style="width: 100%;">
+                      ${bg.bgImage ? `<button class="${sizesAdminFieldButtonClass({ danger: true, full: true })}" data-clear-bg="${index}" style="width: 100%;">
                         <span class="material-icons" style="font-size: 18px; margin-right: 4px;">delete</span>
                         Удалить изображение
                       </button>` : ''}
@@ -1938,7 +1964,7 @@ const renderBackgroundsTab = () => {
     </div>
     
     <div style="margin-bottom: 16px;">
-      <button class="btn btn-primary" id="adminAddBackground" style="display: flex; align-items: center; gap: 6px;">
+      <button class="${sizesAdminButtonClass({ primary: true })}" id="adminAddBackground" style="display: flex; align-items: center; gap: 6px;">
         <span class="material-icons" style="font-size: 18px;">add</span>
         Добавить фон
       </button>
@@ -1959,7 +1985,7 @@ const renderBackgroundsTab = () => {
                 </div>
               </div>
             </div>
-            <button class="btn btn-danger" data-remove-bg="${index}" style="padding: 8px;">
+            <button class="${sizesAdminFieldButtonClass({ danger: true })}" data-remove-bg="${index}" style="padding: 8px;">
               <span class="material-icons" style="font-size: 18px;">delete</span>
             </button>
           </div>
@@ -1971,16 +1997,16 @@ const renderBackgroundsTab = () => {
                 <input type="color" class="admin-bg-color" data-bg-index="${index}" value="${bg.bgColor || '#1e1e1e'}" style="width: 60px; height: 40px; border: 1px solid ${borderColor}; border-radius: 8px; cursor: pointer;">
                 <input type="text" class="admin-bg-color-hex" data-bg-index="${index}" value="${bg.bgColor || '#1e1e1e'}" placeholder="#1e1e1e" style="flex: 1; padding: 8px; border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; color: ${textPrimary}; font-family: inherit; font-size: 14px;">
               </div>
-              <button class="btn" data-upload-bg="${index}" style="width: 100%; margin-bottom: 8px;">
+              <button class="${sizesAdminFieldButtonClass({ full: true })}" data-upload-bg="${index}" style="width: 100%; margin-bottom: 8px;">
                 <span class="material-icons" style="font-size: 18px; margin-right: 4px;">upload</span>
                 Загрузить изображение
               </button>
               <input type="file" class="admin-bg-upload-file" data-bg-index="${index}" accept="image/*" style="display: none;">
-              <button class="btn" data-select-bg="${index}" style="width: 100%; margin-bottom: 8px;">
+              <button class="${sizesAdminFieldButtonClass({ full: true })}" data-select-bg="${index}" style="width: 100%; margin-bottom: 8px;">
                 <span class="material-icons" style="font-size: 18px; margin-right: 4px;">image</span>
                 Выбрать из библиотеки
               </button>
-              ${bg.bgImage ? `<button class="btn btn-danger" data-clear-bg="${index}" style="width: 100%;">
+              ${bg.bgImage ? `<button class="${sizesAdminFieldButtonClass({ danger: true, full: true })}" data-clear-bg="${index}" style="width: 100%;">
                 <span class="material-icons" style="font-size: 18px; margin-right: 4px;">delete</span>
                 Удалить изображение
               </button>` : ''}
@@ -2127,8 +2153,8 @@ const showChangePasswordModal = () => {
         </label>
       </div>
       <div style="display: flex; gap: 8px; justify-content: flex-end;">
-        <button id="sizesChangePasswordCancel" class="btn" style="padding: 10px 20px; background: transparent; border: 1px solid ${borderColor}; border-radius: 8px; color: ${textPrimary}; cursor: pointer;">Отмена</button>
-        <button id="sizesChangePasswordSubmit" class="btn btn-primary" style="padding: 10px 20px; background: #2196F3; border: none; border-radius: 8px; color: white; cursor: pointer;">Сохранить</button>
+        <button id="sizesChangePasswordCancel" class="${sizesAdminButtonClass()}">Отмена</button>
+        <button id="sizesChangePasswordSubmit" class="${sizesAdminButtonClass({ primary: true })}">Сохранить</button>
       </div>
     </div>
   `;
@@ -2282,8 +2308,8 @@ const showPasswordPrompt = () => {
         <div id="adminPasswordError" style="margin-top: 8px; color: #f44336; font-size: 12px; display: none;">Неверный пароль</div>
       </div>
       <div style="display: flex; gap: 8px; justify-content: flex-end;">
-        <button id="adminPasswordCancel" class="btn" style="padding: 10px 20px; background: transparent; border: 1px solid ${borderColor}; border-radius: 8px; color: ${textPrimary}; cursor: pointer;">Отмена</button>
-        <button id="adminPasswordSubmit" class="btn btn-primary" style="padding: 10px 20px; background: #2196F3; border: none; border-radius: 8px; color: white; cursor: pointer;">Войти</button>
+        <button id="adminPasswordCancel" class="${sizesAdminButtonClass()}">Отмена</button>
+        <button id="adminPasswordSubmit" class="${sizesAdminButtonClass({ primary: true })}">Войти</button>
       </div>
     </div>
   `;
@@ -2430,24 +2456,38 @@ const openSizesAdmin = async () => {
             <p style="margin: 4px 0 0 0; font-size: 12px; color: ${textSecondary}; opacity: 0.8;">Управление форматами и значениями по умолчанию</p>
           </div>
         </div>
-        <button class="sizes-admin-close" id="sizesAdminClose" style="padding: 8px 16px; background: transparent; border: 1px solid ${borderColor}; border-radius: 8px; color: ${textPrimary}; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+        <button class="sizes-admin-close ui-button ui-button-sm" id="sizesAdminClose" style="padding: 8px 16px; background: transparent; border: 1px solid ${borderColor}; border-radius: 8px; color: ${textPrimary}; cursor: pointer; display: flex; align-items: center; gap: 8px;">
           <span class="material-icons" style="font-size: 20px;">close</span>
           <span>Закрыть</span>
         </button>
       </div>
       
-      <!-- Основной контент с аккордеоном -->
-      <div class="sizes-admin-body" style="flex: 1; overflow-y: auto; padding: 20px; min-height: 0;">
+      <!-- Основной контент -->
+      <div class="sizes-admin-body" style="flex: 1; min-height: 0; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 20px; padding: 20px; overflow: hidden;">
+        <aside class="sizes-admin-sidebar" style="display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; padding-right: 10px; border-right: 1px solid ${borderColor};">
+          <div style="padding-bottom: 8px; border-bottom: 1px solid ${borderColor}; margin-bottom: 4px;">
+            <div style="font-size: 12px; color: ${textSecondary}; text-transform: uppercase; letter-spacing: 0.08em;">Команда</div>
+          </div>
+          <button class="${sizesAdminButtonClass({ nav: true })}" type="button" data-scroll-target="adminSectionSizes" style="justify-content: flex-start;">Размеры</button>
+          <button class="${sizesAdminButtonClass({ nav: true })}" type="button" data-scroll-target="adminSectionMultipliers" style="justify-content: flex-start;">Умножение</button>
+          <button class="${sizesAdminButtonClass({ nav: true })}" type="button" data-scroll-target="adminSectionBrand" style="justify-content: flex-start;">Бренд</button>
+          <div style="padding-top: 16px; padding-bottom: 8px; border-bottom: 1px solid ${borderColor}; margin-bottom: 4px;">
+            <div style="font-size: 12px; color: ${textSecondary}; text-transform: uppercase; letter-spacing: 0.08em;">Отдел</div>
+          </div>
+          <button class="${sizesAdminButtonClass({ nav: true })}" type="button" data-scroll-target="adminSectionValues" style="justify-content: flex-start;">Значения</button>
+          <button class="${sizesAdminButtonClass({ nav: true })}" type="button" data-scroll-target="adminSectionBackgrounds" style="justify-content: flex-start;">Фоны</button>
+        </aside>
+        <div class="sizes-admin-main" style="min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 6px;">
         <!-- Раздел: Размеры -->
-        <div class="admin-accordion-section" data-section="sizes" style="margin-bottom: 16px; border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
-          <div class="admin-accordion-header" style="padding: 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};" data-accordion-toggle="sizes">
+        <div class="admin-accordion-section" data-section="sizes" id="adminSectionSizes" style="border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
+          <div class="admin-accordion-header" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="material-icons" style="font-size: 20px; color: ${textPrimary};">aspect_ratio</span>
               <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: ${textPrimary};">Размеры</h3>
             </div>
             <span class="material-icons admin-accordion-icon" style="font-size: 24px; color: ${textPrimary}; transition: transform 0.3s;">expand_more</span>
           </div>
-          <div class="admin-accordion-content" id="adminSectionSizes" style="padding: 20px; display: none;">
+          <div class="admin-accordion-content" style="padding: 20px; display: block;">
             <div style="margin-bottom: 16px; padding: 12px; background: rgba(33, 150, 243, 0.1); border-left: 3px solid #2196F3; border-radius: 4px;">
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                 <span class="material-icons" style="font-size: 18px; color: #2196F3;">info</span>
@@ -2460,18 +2500,8 @@ const openSizesAdmin = async () => {
               </div>
             </div>
             <div class="sizes-admin-toolbar" style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
-              <button class="btn btn-primary" id="sizesAdminAddPlatform" title="Добавить новую платформу для размеров">
+              <button class="${sizesAdminButtonClass({ primary: true })}" id="sizesAdminAddPlatform" title="Добавить новую платформу для размеров">
                 <span class="material-icons">add</span> Добавить платформу
-              </button>
-              <button class="btn" id="sizesAdminExport" title="Экспортировать настройки размеров в JSON файл">
-                <span class="material-icons">download</span> Экспорт JSON
-              </button>
-              <button class="btn" id="sizesAdminImport" title="Импортировать настройки размеров из JSON файла">
-                <span class="material-icons">upload</span> Импорт JSON
-              </button>
-              <input type="file" id="sizesAdminImportFile" accept=".json" style="display: none;">
-              <button class="btn btn-danger" id="sizesAdminReset" title="Сбросить все размеры к значениям по умолчанию">
-                <span class="material-icons">refresh</span> Сбросить к дефолту
               </button>
             </div>
             <div class="sizes-admin-platforms" id="sizesAdminPlatforms"></div>
@@ -2479,29 +2509,29 @@ const openSizesAdmin = async () => {
         </div>
         
         <!-- Раздел: Значения -->
-        <div class="admin-accordion-section" data-section="values" style="margin-bottom: 16px; border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
-          <div class="admin-accordion-header" style="padding: 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};" data-accordion-toggle="values">
+        <div class="admin-accordion-section" data-section="values" id="adminSectionValues" style="border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
+          <div class="admin-accordion-header" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="material-icons" style="font-size: 20px; color: ${textPrimary};">tune</span>
               <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: ${textPrimary};">Значения</h3>
             </div>
             <span class="material-icons admin-accordion-icon" style="font-size: 24px; color: ${textPrimary}; transition: transform 0.3s;">expand_more</span>
           </div>
-          <div class="admin-accordion-content" id="adminSectionValues" style="padding: 20px; display: none;">
+          <div class="admin-accordion-content" style="padding: 20px; display: block;">
             ${renderValuesTab()}
           </div>
         </div>
         
         <!-- Раздел: Название бренда -->
-        <div class="admin-accordion-section" data-section="brand" style="margin-bottom: 16px; border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
-          <div class="admin-accordion-header" style="padding: 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};" data-accordion-toggle="brand">
+        <div class="admin-accordion-section" data-section="brand" id="adminSectionBrand" style="border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
+          <div class="admin-accordion-header" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="material-icons" style="font-size: 20px; color: ${textPrimary};">label</span>
               <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: ${textPrimary};">Название бренда</h3>
             </div>
             <span class="material-icons admin-accordion-icon" style="font-size: 24px; color: ${textPrimary}; transition: transform 0.3s;">expand_more</span>
           </div>
-          <div class="admin-accordion-content" id="adminSectionBrand" style="padding: 20px; display: none;">
+          <div class="admin-accordion-content" style="padding: 20px; display: block;">
             <div class="admin-info-box" style="margin-bottom: 20px;">
               <div style="display: flex; align-items: flex-start; gap: var(--spacing-md);">
                 <span class="material-icons" style="font-size: var(--font-size-lg); color: #2196F3; flex-shrink: 0; margin-top: 2px;">info</span>
@@ -2542,15 +2572,15 @@ const openSizesAdmin = async () => {
         </div>
         
         <!-- Раздел: Умножение -->
-        <div class="admin-accordion-section" data-section="multipliers" style="margin-bottom: 16px; border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
-          <div class="admin-accordion-header" style="padding: 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};" data-accordion-toggle="multipliers">
+        <div class="admin-accordion-section" data-section="multipliers" id="adminSectionMultipliers" style="border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
+          <div class="admin-accordion-header" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="material-icons" style="font-size: 20px; color: ${textPrimary};">zoom_in</span>
               <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: ${textPrimary};">Умножение</h3>
             </div>
             <span class="material-icons admin-accordion-icon" style="font-size: 24px; color: ${textPrimary}; transition: transform 0.3s;">expand_more</span>
           </div>
-          <div class="admin-accordion-content" id="adminSectionMultipliers" style="padding: 20px; display: none;">
+          <div class="admin-accordion-content" style="padding: 20px; display: block;">
             ${(() => {
               try {
                 const content = renderMultipliersTab();
@@ -2565,15 +2595,15 @@ const openSizesAdmin = async () => {
         </div>
         
         <!-- Раздел: Фоны -->
-        <div class="admin-accordion-section" data-section="backgrounds" style="margin-bottom: 16px; border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
-          <div class="admin-accordion-header" style="padding: 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};" data-accordion-toggle="backgrounds">
+        <div class="admin-accordion-section" data-section="backgrounds" id="adminSectionBackgrounds" style="border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; overflow: hidden;">
+          <div class="admin-accordion-header" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; user-select: none; background: ${bgSecondary};">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="material-icons" style="font-size: 20px; color: ${textPrimary};">palette</span>
               <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: ${textPrimary};">Фоны</h3>
             </div>
             <span class="material-icons admin-accordion-icon" style="font-size: 24px; color: ${textPrimary}; transition: transform 0.3s;">expand_more</span>
           </div>
-          <div class="admin-accordion-content" id="adminSectionBackgrounds" style="padding: 20px; display: none;">
+          <div class="admin-accordion-content" style="padding: 20px; display: block;">
             ${(() => {
               try {
                 const content = renderBackgroundsTab();
@@ -2587,28 +2617,12 @@ const openSizesAdmin = async () => {
           </div>
         </div>
         
-        <!-- Раздел: Полный сброс -->
-        <div style="margin-top: 24px; padding: 20px; border: 2px solid #E84033; border-radius: 8px; background: rgba(232, 64, 51, 0.05);">
-          <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
-            <span class="material-icons" style="font-size: 24px; color: #E84033; flex-shrink: 0;">warning</span>
-            <div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: ${textPrimary};">Полный сброс всех настроек</h3>
-              <p style="margin: 0; font-size: 13px; color: ${textSecondary}; line-height: 1.5;">
-                Эта кнопка полностью сбросит все настройки, связанные с Практикумом: логотипы, фотографии, тексты, значения по умолчанию, размеры и другие настройки. Все будет возвращено к исходным значениям. Это действие нельзя отменить.
-              </p>
-            </div>
-          </div>
-          <button class="btn btn-danger" id="sizesAdminFullReset" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600;">
-            <span class="material-icons">delete_forever</span>
-            Полностью сбросить все настройки Практикума
-          </button>
-        </div>
       </div>
       
       <div class="sizes-admin-footer" style="padding: 16px 20px; border-top: 1px solid ${borderColor}; display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-shrink: 0; background: ${bgSecondary};">
         <div style="display: flex; gap: 8px; align-items: center;">
           ${!isWorkspaceAccessControlled() ? `
-            <button class="btn" id="sizesAdminChangePassword" style="
+            <button class="${sizesAdminButtonClass()}" id="sizesAdminChangePassword" style="
               padding: 8px 16px;
               background: transparent;
               border: 1px solid ${borderColor};
@@ -2623,17 +2637,10 @@ const openSizesAdmin = async () => {
               <span>Изменить пароль</span>
             </button>
           ` : ''}
-          <button class="btn" id="sizesAdminExportFull" title="Экспортировать полную конфигурацию (все настройки) для передачи другой команде">
-            <span class="material-icons">file_download</span> Экспорт полной конфигурации
-          </button>
-          <button class="btn" id="sizesAdminImportFull" title="Импортировать полную конфигурацию из файла">
-            <span class="material-icons">file_upload</span> Импорт полной конфигурации
-          </button>
-          <input type="file" id="sizesAdminImportFullFile" accept=".json" style="display: none;">
         </div>
         <div style="display: flex; gap: 8px;">
-          <button class="btn btn-primary" id="sizesAdminSave">Сохранить</button>
-          <button class="btn" id="sizesAdminCancel">Отмена</button>
+          <button class="${sizesAdminButtonClass({ primary: true })}" id="sizesAdminSave">Сохранить</button>
+          <button class="${sizesAdminButtonClass()}" id="sizesAdminCancel">Отмена</button>
         </div>
       </div>
       </div>
@@ -2671,10 +2678,9 @@ const openSizesAdmin = async () => {
     renderAdminPlatforms(sizes);
     console.log('Платформы отрендерены');
     
-    // Проверяем, что все разделы созданы
+    // Проверяем, что ключевые разделы созданы
     const multipliersSection = adminModal.querySelector('#adminSectionMultipliers');
     const backgroundsSection = adminModal.querySelector('#adminSectionBackgrounds');
-    const filesSection = adminModal.querySelector('#adminSectionFiles');
     
     console.log('Проверка разделов:', {
       multipliers: {
@@ -2686,11 +2692,6 @@ const openSizesAdmin = async () => {
         exists: !!backgroundsSection,
         hasContent: backgroundsSection ? backgroundsSection.innerHTML.length > 0 : false,
         contentLength: backgroundsSection ? backgroundsSection.innerHTML.length : 0
-      },
-      files: {
-        exists: !!filesSection,
-        hasContent: filesSection ? filesSection.innerHTML.length > 0 : false,
-        contentLength: filesSection ? filesSection.innerHTML.length : 0
       }
     });
     
@@ -2705,13 +2706,6 @@ const openSizesAdmin = async () => {
     setupDefaultsHandlers(); // Включает setupBackgroundsHandlers()
     setupMultipliersHandlers();
     setupTabHandlers();
-    
-    // Устанавливаем активный стиль для первого пункта меню
-    const firstMenuItem = adminModal.querySelector('.sizes-admin-menu-item[data-section="sizes"]');
-    if (firstMenuItem) {
-      const bgSecondary = getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary') || '#141414';
-      firstMenuItem.style.background = bgSecondary;
-    }
     
     console.log('Обработчики событий установлены');
   } catch (error) {
@@ -2996,7 +2990,7 @@ const renderAdminPlatforms = (sizes) => {
           <span class="material-icons" style="color: ${textSecondary}; font-size: 20px;">category</span>
           <input type="text" class="sizes-admin-platform-name" value="${platform}" data-original="${platform}" style="flex: 1; font-weight: 600; font-size: 16px;">
           <span style="color: ${textSecondary}; font-size: 12px;">${sizes[platform].length} ${sizes[platform].length === 1 ? 'размер' : sizes[platform].length < 5 ? 'размера' : 'размеров'}</span>
-          <button class="btn-small btn-danger" data-action="remove-platform" data-platform="${platform}" title="Удалить платформу">
+          <button class="${sizesAdminButtonClass({ small: true, danger: true })}" data-action="remove-platform" data-platform="${platform}" title="Удалить платформу">
             <span class="material-icons">delete</span>
           </button>
         </div>
@@ -3046,7 +3040,7 @@ const renderAdminPlatforms = (sizes) => {
                   <input type="checkbox" ${size.checked ? 'checked' : ''} class="sizes-admin-size-checked" data-platform="${platform}" data-index="${index}" style="cursor: pointer;">
                   <span style="color: ${textSecondary}; font-size: 12px;">Выбрано</span>
                 </label>
-                <button class="btn-small btn-danger" data-action="remove-size" data-platform="${platform}" data-index="${index}" title="Удалить размер" style="padding: 6px;">
+                <button class="${sizesAdminButtonClass({ small: true, danger: true })}" data-action="remove-size" data-platform="${platform}" data-index="${index}" title="Удалить размер" style="padding: 6px;">
                   <span class="material-icons" style="font-size: 18px;">close</span>
                 </button>
               </div>
@@ -3068,7 +3062,7 @@ const renderAdminPlatforms = (sizes) => {
                     <input type="number" class="sizes-admin-safe-area-height" value="${safeArea ? safeArea.height : ''}" min="1" placeholder="${hasDefault ? (defaultSafeAreas[platform][sizeKey]?.height || 'default') : 'default'}" data-platform="${platform}" data-size-key="${sizeKey}" style="width: 90px; padding: 4px 6px; border: 1px solid ${borderColor}; border-radius: 4px; background: ${bgPrimary}; color: ${textPrimary}; font-size: 12px;">
                   </div>
                   ${hasUserValue ? `
-                  <button class="btn-small" data-action="clear-safe-area" data-platform="${platform}" data-size-key="${sizeKey}" title="Вернуть к умолчанию" style="padding: 4px 8px; font-size: 11px;">
+                  <button class="${sizesAdminButtonClass({ small: true })}" data-action="clear-safe-area" data-platform="${platform}" data-size-key="${sizeKey}" title="Вернуть к умолчанию" style="padding: 4px 8px; font-size: 11px;">
                     <span class="material-icons" style="font-size: 14px;">refresh</span>
                   </button>
                   ` : ''}
@@ -3096,7 +3090,7 @@ const renderAdminPlatforms = (sizes) => {
                   <label style="color: ${textSecondary}; font-size: 11px; min-width: 80px;">Множитель логотипа:</label>
                   <input type="number" class="sizes-admin-logo-size-multiplier" value="${state.logoSizeMultipliers?.[platform]?.[sizeKey] ?? ''}" step="0.1" min="0.1" max="10" placeholder="По умолчанию" data-platform="${platform}" data-size-key="${sizeKey}" style="width: 120px; padding: 4px 6px; border: 1px solid ${borderColor}; border-radius: 4px; background: ${bgPrimary}; color: ${textPrimary}; font-size: 12px;">
                   ${state.logoSizeMultipliers?.[platform]?.[sizeKey] ? `
-                  <button class="btn-small" data-action="clear-logo-size-multiplier" data-platform="${platform}" data-size-key="${sizeKey}" title="Вернуть к умолчанию" style="padding: 4px 8px; font-size: 11px;">
+                  <button class="${sizesAdminButtonClass({ small: true })}" data-action="clear-logo-size-multiplier" data-platform="${platform}" data-size-key="${sizeKey}" title="Вернуть к умолчанию" style="padding: 4px 8px; font-size: 11px;">
                     <span class="material-icons" style="font-size: 14px;">refresh</span>
                   </button>
                   ` : ''}
@@ -3117,7 +3111,7 @@ const renderAdminPlatforms = (sizes) => {
     
     html += `
         </div>
-        <button class="btn-small" data-action="add-size" data-platform="${platform}" style="margin-top: 12px; width: 100%;">
+        <button class="${sizesAdminButtonClass({ small: true })}" data-action="add-size" data-platform="${platform}" style="margin-top: 12px; width: 100%;">
           <span class="material-icons">add</span> Добавить размер
         </button>
       </div>
@@ -3627,8 +3621,8 @@ const setupAdminHandlers = (initialSizes) => {
             <div id="sizesVerifyPasswordError" style="margin-top: 8px; color: #f44336; font-size: 12px; display: none;">Неверный пароль</div>
           </div>
           <div style="display: flex; gap: 8px; justify-content: flex-end;">
-            <button id="sizesVerifyPasswordCancel" class="btn" style="padding: 10px 20px; background: transparent; border: 1px solid ${borderColor}; border-radius: 8px; color: ${textPrimary}; cursor: pointer;">Отмена</button>
-            <button id="sizesVerifyPasswordSubmit" class="btn btn-primary" style="padding: 10px 20px; background: #2196F3; border: none; border-radius: 8px; color: white; cursor: pointer;">Продолжить</button>
+            <button id="sizesVerifyPasswordCancel" class="${sizesAdminButtonClass()}">Отмена</button>
+            <button id="sizesVerifyPasswordSubmit" class="${sizesAdminButtonClass({ primary: true })}">Продолжить</button>
           </div>
         </div>
       `;
@@ -3881,171 +3875,49 @@ const setupAdminHandlers = (initialSizes) => {
     alert('Все настройки успешно сохранены!');
   });
   
-  // Экспорт
-  document.getElementById('sizesAdminExport').addEventListener('click', () => {
-    exportSizesConfig();
-  });
-  
-  // Импорт
-  document.getElementById('sizesAdminImport').addEventListener('click', () => {
-    document.getElementById('sizesAdminImportFile').click();
-  });
-  
-  document.getElementById('sizesAdminImportFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    try {
-      const imported = await importSizesConfig(file);
-      currentSizes = imported;
-      renderAdminPlatforms(currentSizes);
-      setupAdminHandlers(currentSizes);
-      alert('Размеры успешно импортированы!');
-    } catch (error) {
-      alert(`Ошибка импорта: ${error.message}`);
-    }
-    e.target.value = '';
-  });
-  
-  // Сброс
-  document.getElementById('sizesAdminReset').addEventListener('click', () => {
-    if (confirm('Сбросить все размеры к дефолтным? Это действие нельзя отменить.')) {
-      const defaults = resetSizesConfig();
-      currentSizes = defaults;
-      renderAdminPlatforms(currentSizes);
-      setupAdminHandlers(currentSizes);
-    }
-  });
-  
-  // Экспорт полной конфигурации
-  document.getElementById('sizesAdminExportFull').addEventListener('click', () => {
-    try {
-      const success = exportFullConfig();
-      if (success) {
-        alert('Полная конфигурация успешно экспортирована! Файл содержит все настройки: размеры, значения по умолчанию, множители и фоны. Вы можете передать этот файл другой команде.');
-      } else {
-        alert('Ошибка при экспорте конфигурации. Проверьте консоль для подробностей.');
+  const exportBtn = document.getElementById('sizesAdminExport');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      exportSizesConfig();
+    });
+  }
+
+  const importBtn = document.getElementById('sizesAdminImport');
+  const importFileInput = document.getElementById('sizesAdminImportFile');
+  if (importBtn && importFileInput) {
+    importBtn.addEventListener('click', () => {
+      importFileInput.click();
+    });
+
+    importFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const imported = await importSizesConfig(file);
+        currentSizes = imported;
+        renderAdminPlatforms(currentSizes);
+        setupAdminHandlers(currentSizes);
+        alert('Размеры успешно импортированы!');
+      } catch (error) {
+        alert(`Ошибка импорта: ${error.message}`);
       }
-    } catch (error) {
-      console.error('Ошибка экспорта полной конфигурации:', error);
-      alert(`Ошибка экспорта: ${error.message}`);
-    }
-  });
-  
-  // Импорт полной конфигурации
-  document.getElementById('sizesAdminImportFull').addEventListener('click', () => {
-    document.getElementById('sizesAdminImportFullFile').click();
-  });
-  
-  document.getElementById('sizesAdminImportFullFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    if (!confirm('Импорт полной конфигурации заменит все текущие настройки. Продолжить?')) {
       e.target.value = '';
-      return;
-    }
-    
-    try {
-      const imported = await importFullConfig(file);
-      
-      // Обновляем размеры в админке
-      const sizes = getPresetSizes();
-      currentSizes = sizes;
-      renderAdminPlatforms(currentSizes);
-      setupAdminHandlers(currentSizes);
-      
-      // Обновляем размеры в store
-      updatePresetSizesFromConfig();
-      
-      // Применяем значения по умолчанию, если они есть
-      if (imported.defaultValues) {
-        batch(() => {
-          Object.keys(imported.defaultValues).forEach(key => {
-            setKey(key, imported.defaultValues[key]);
-          });
-        });
+    });
+  }
+
+  const resetBtn = document.getElementById('sizesAdminReset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('Сбросить все размеры к дефолтным? Это действие нельзя отменить.')) {
+        const defaults = resetSizesConfig();
+        currentSizes = defaults;
+        renderAdminPlatforms(currentSizes);
+        setupAdminHandlers(currentSizes);
       }
-      
-      // Обновляем тему, если она была импортирована
-      if (imported.theme) {
-        const html = document.documentElement;
-        if (imported.theme === 'light') {
-          html.setAttribute('data-theme', 'light');
-        } else {
-          html.removeAttribute('data-theme');
-        }
-        localStorage.setItem('theme', imported.theme);
-      }
-      
-      // Обновляем название бренда, если оно было импортировано
-      if (imported.brandName) {
-        setKey('brandName', imported.brandName);
-        document.title = 'AI-Craft';
-      }
-      
-      // Перезагружаем страницу для применения всех изменений
-      if (confirm('Конфигурация успешно импортирована! Для полного применения изменений рекомендуется перезагрузить страницу. Перезагрузить сейчас?')) {
-        window.location.reload();
-      } else {
-        alert('Конфигурация импортирована. Некоторые изменения могут потребовать перезагрузки страницы.');
-      }
-    } catch (error) {
-      console.error('Ошибка импорта полной конфигурации:', error);
-      alert(`Ошибка импорта: ${error.message}`);
-    }
-    e.target.value = '';
-  });
-  
-  // Полный сброс всех настроек
-  document.getElementById('sizesAdminFullReset').addEventListener('click', () => {
-    // Первое подтверждение
-    if (!confirm('⚠️ ВНИМАНИЕ! Вы собираетесь полностью сбросить ВСЕ настройки, связанные с Практикумом:\n\n' +
-                 '• Все логотипы и фотографии\n' +
-                 '• Все тексты (заголовки, подзаголовки, юридический текст)\n' +
-                 '• Все значения по умолчанию\n' +
-                 '• Все размеры и платформы\n' +
-                 '• Все настройки админки\n\n' +
-                 'Это действие НЕЛЬЗЯ отменить!\n\n' +
-                 'Продолжить?')) {
-      return;
-    }
-    
-    // Второе подтверждение
-    if (!confirm('⚠️ ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ!\n\n' +
-                 'Вы точно уверены, что хотите полностью сбросить все настройки?\n\n' +
-                 'Все ваши настройки будут безвозвратно удалены и возвращены к исходным значениям.\n\n' +
-                 'Нажмите OK для подтверждения или Отмена для отмены.')) {
-      return;
-    }
-    
-    try {
-      // Очищаем все данные из localStorage
-      localStorage.removeItem('sizes-config');
-      localStorage.removeItem(getScopedStorageKey('default-values'));
-      localStorage.removeItem('format-multipliers');
-      localStorage.removeItem('adminBackgrounds');
-      localStorage.removeItem('brandName');
-      
-      // Сбрасываем размеры к дефолтным
-      resetSizesConfig();
-      
-      // Сбрасываем state к дефолтным
-      resetState();
-      
-      // Обновляем размеры в store
-      updatePresetSizesFromConfig();
-      
-      console.log('✓ Все настройки сброшены');
-      
-      // Перезагружаем страницу для полного применения сброса
-      alert('Все настройки успешно сброшены! Страница будет перезагружена.');
-      window.location.reload();
-    } catch (error) {
-      console.error('Ошибка при полном сбросе:', error);
-      alert(`Ошибка при сбросе настроек: ${error.message}`);
-    }
-  });
+    });
+  }
+
 };
 
 /**
@@ -4870,7 +4742,7 @@ const setupBackgroundsHandlers = () => {
                 </div>
               </div>
             </div>
-            <button class="btn btn-danger" data-remove-bg="${index}" style="padding: 8px;">
+            <button class="${sizesAdminFieldButtonClass({ danger: true })}" data-remove-bg="${index}" style="padding: 8px;">
               <span class="material-icons" style="font-size: 18px;">delete</span>
             </button>
           </div>
@@ -4882,16 +4754,16 @@ const setupBackgroundsHandlers = () => {
                 <input type="color" class="admin-bg-color" data-bg-index="${index}" value="${bg.bgColor || '#1e1e1e'}" style="width: 60px; height: 40px; border: 1px solid ${borderColor}; border-radius: 8px; cursor: pointer;">
                 <input type="text" class="admin-bg-color-hex" data-bg-index="${index}" value="${bg.bgColor || '#1e1e1e'}" placeholder="#1e1e1e" style="flex: 1; padding: 8px; border: 1px solid ${borderColor}; border-radius: 8px; background: ${bgPrimary}; color: ${textPrimary}; font-family: inherit; font-size: 14px;">
               </div>
-              <button class="btn" data-upload-bg="${index}" style="width: 100%; margin-bottom: 8px;">
+              <button class="${sizesAdminFieldButtonClass({ full: true })}" data-upload-bg="${index}" style="width: 100%; margin-bottom: 8px;">
                 <span class="material-icons" style="font-size: 18px; margin-right: 4px;">upload</span>
                 Загрузить изображение
               </button>
               <input type="file" class="admin-bg-upload-file" data-bg-index="${index}" accept="image/*" style="display: none;">
-              <button class="btn" data-select-bg="${index}" style="width: 100%; margin-bottom: 8px;">
+              <button class="${sizesAdminFieldButtonClass({ full: true })}" data-select-bg="${index}" style="width: 100%; margin-bottom: 8px;">
                 <span class="material-icons" style="font-size: 18px; margin-right: 4px;">image</span>
                 Выбрать из библиотеки
               </button>
-              ${bg.bgImage ? `<button class="btn btn-danger" data-clear-bg="${index}" style="width: 100%;">
+              ${bg.bgImage ? `<button class="${sizesAdminFieldButtonClass({ danger: true, full: true })}" data-clear-bg="${index}" style="width: 100%;">
                 <span class="material-icons" style="font-size: 18px; margin-right: 4px;">delete</span>
                 Удалить изображение
               </button>` : ''}
@@ -4923,7 +4795,7 @@ const setupBackgroundsHandlers = () => {
   if (addBackgroundBtn) {
     addBackgroundBtn.addEventListener('click', () => {
       const backgrounds = getBackgrounds();
-      backgrounds.push({
+      backgrounds.unshift({
         bgColor: '#1e1e1e',
         bgImage: null,
         textColor: '#ffffff',
@@ -5012,7 +4884,7 @@ const setupBackgroundsHandlers = () => {
           const colorInput = adminModal.querySelector(`.admin-bg-color[data-bg-index="${index}"]`);
           if (colorInput) colorInput.value = e.target.value;
           saveBackgrounds(backgrounds);
-          refreshBackgroundsList();
+          window.refreshBackgroundsList();
           // Обновляем рендер справа при изменении цвета
           renderer.render();
         }
@@ -5024,7 +4896,7 @@ const setupBackgroundsHandlers = () => {
           const hexInput = adminModal.querySelector(`.admin-text-color-hex[data-bg-index="${index}"]`);
           if (hexInput) hexInput.value = e.target.value;
           saveBackgrounds(backgrounds);
-          refreshBackgroundsList();
+          window.refreshBackgroundsList();
         }
       } else if (e.target.classList.contains('admin-text-color-hex')) {
         const index = parseInt(e.target.dataset.bgIndex);
@@ -5034,7 +4906,7 @@ const setupBackgroundsHandlers = () => {
           const colorInput = adminModal.querySelector(`.admin-text-color[data-bg-index="${index}"]`);
           if (colorInput) colorInput.value = e.target.value;
           saveBackgrounds(backgrounds);
-          refreshBackgroundsList();
+          window.refreshBackgroundsList();
         }
       } else if (e.target.classList.contains('admin-logo-folder')) {
         const index = parseInt(e.target.dataset.bgIndex);
@@ -5147,10 +5019,60 @@ const setupBackgroundsHandlers = () => {
  */
 const setupTabHandlers = () => {
   const accordionHeaders = adminModal.querySelectorAll('.admin-accordion-header');
+  const scrollButtons = Array.from(adminModal.querySelectorAll('[data-scroll-target]'));
+  const setActiveScrollButton = (targetId) => {
+    scrollButtons.forEach((button) => {
+      button.classList.toggle('is-active', button.getAttribute('data-scroll-target') === targetId);
+    });
+  };
+  const expandAccordionSection = (sectionName, section, content, icon) => {
+    if (!content) return;
+
+    content.style.display = 'block';
+    if (icon) icon.style.transform = 'rotate(180deg)';
+
+    if (sectionName === 'multipliers' || sectionName === 'backgrounds' || sectionName === 'files') {
+      try {
+        let newContent = '';
+        if (sectionName === 'multipliers') {
+          newContent = renderMultipliersTab();
+        } else if (sectionName === 'backgrounds') {
+          newContent = renderBackgroundsTab();
+        } else if (sectionName === 'files') {
+          newContent = renderFileManager();
+        }
+
+        if (newContent) {
+          content.innerHTML = newContent;
+
+          if (sectionName === 'backgrounds') {
+            requestAnimationFrame(() => {
+              if (typeof window.refreshBackgroundsList === 'function') {
+                window.refreshBackgroundsList();
+              }
+              setupBackgroundsHandlers();
+            });
+          } else if (sectionName === 'files') {
+            requestAnimationFrame(() => {
+              initFileManager();
+            });
+          } else if (sectionName === 'multipliers') {
+            requestAnimationFrame(() => {
+              setupMultipliersHandlers();
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка при перерендеринге раздела:', error);
+        content.innerHTML = `<div style="padding: 20px; color: red;">Ошибка загрузки: ${error.message}</div>`;
+      }
+    }
+  };
   
   accordionHeaders.forEach(header => {
     header.addEventListener('click', () => {
       const sectionName = header.dataset.accordionToggle;
+      if (!sectionName) return;
       const section = adminModal.querySelector(`.admin-accordion-section[data-section="${sectionName}"]`);
       const content = section?.querySelector('.admin-accordion-content');
       const icon = header.querySelector('.admin-accordion-icon');
@@ -5164,50 +5086,32 @@ const setupTabHandlers = () => {
         content.style.display = 'none';
         if (icon) icon.style.transform = 'rotate(0deg)';
       } else {
-        content.style.display = 'block';
-        if (icon) icon.style.transform = 'rotate(180deg)';
-        
-        // Перерендериваем контент для динамических разделов при первом открытии
-        if (sectionName === 'multipliers' || sectionName === 'backgrounds' || sectionName === 'files') {
-          try {
-            let newContent = '';
-            if (sectionName === 'multipliers') {
-              newContent = renderMultipliersTab();
-            } else if (sectionName === 'backgrounds') {
-              newContent = renderBackgroundsTab();
-            } else if (sectionName === 'files') {
-              newContent = renderFileManager();
-            }
-            
-            if (newContent) {
-              content.innerHTML = newContent;
-              
-              // Переинициализируем обработчики для динамического контента
-              if (sectionName === 'backgrounds') {
-                requestAnimationFrame(() => {
-                  if (typeof window.refreshBackgroundsList === 'function') {
-                    window.refreshBackgroundsList();
-                  }
-                  setupBackgroundsHandlers();
-                });
-              } else if (sectionName === 'files') {
-                requestAnimationFrame(() => {
-                  initFileManager();
-                });
-              } else if (sectionName === 'multipliers') {
-                requestAnimationFrame(() => {
-                  setupMultipliersHandlers();
-                });
-              }
-            }
-          } catch (error) {
-            console.error('Ошибка при перерендеринге раздела:', error);
-            content.innerHTML = `<div style="padding: 20px; color: red;">Ошибка загрузки: ${error.message}</div>`;
-          }
-        }
+        expandAccordionSection(sectionName, section, content, icon);
       }
     });
   });
+
+  scrollButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const targetId = button.getAttribute('data-scroll-target');
+      const target = targetId ? adminModal.querySelector(`#${targetId}`) : null;
+      if (!target) return;
+      const section = target.closest('.admin-accordion-section');
+      const content = section?.querySelector('.admin-accordion-content');
+      const icon = section?.querySelector('.admin-accordion-icon');
+      const sectionName = section?.dataset.section;
+      if (sectionName && content && content.style.display === 'none') {
+        expandAccordionSection(sectionName, section, content, icon);
+      }
+      setActiveScrollButton(targetId);
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  const firstScrollTarget = scrollButtons[0]?.getAttribute('data-scroll-target');
+  if (firstScrollTarget) {
+    setActiveScrollButton(firstScrollTarget);
+  }
   
   // По умолчанию все секции закрыты
   
@@ -5233,9 +5137,4 @@ const setupTabHandlers = () => {
     });
   });
   
-  // Старый код для совместимости (если где-то еще используется)
-  const menuItems = adminModal.querySelectorAll('.sizes-admin-menu-item');
-  if (menuItems.length > 0) {
-    console.warn('Найдены старые элементы меню, но они больше не используются');
-  }
 };

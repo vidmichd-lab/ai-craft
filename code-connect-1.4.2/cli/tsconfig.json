@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig-base.json",
+  "compilerOptions": {
+    "module": "node16", // TODO: figure out why tests fail with node20
+    "jsx": "react-jsx",
+    "target": "ES2021",
+    "lib": ["ES2021"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["jest"],
+
+    // TODO: fix violations and remove
+    "noUnusedLocals": false,
+    "noImplicitReturns": false,
+    "noImplicitOverride": false,
+    "noUnusedParameters": false,
+    "noUncheckedIndexedAccess": false,
+    "isolatedDeclarations": false,
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/__test__",
+    "src/components",
+    "scripts"
+  ]
+}

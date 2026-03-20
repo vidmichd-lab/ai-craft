@@ -16,6 +16,32 @@ npm install
 npm run dev
 ```
 
+### Figma Code Connect
+
+Code Connect настроен для `apps/web`, чтобы привязывать React-компоненты из `src/components` к вашей Figma design library и видеть код прямо в Dev Mode.
+
+```bash
+cd /Users/vidmich/Desktop/prac
+export FIGMA_ACCESS_TOKEN="<your-figma-pat>"
+npm run figma:web:connect
+```
+
+Во время interactive setup используйте:
+
+- top-level directory: `./src/components`
+- Figma file URL: ссылку на файл библиотеки с root components
+- output directory: `./src/figma`
+
+После генерации файлов опубликуйте их:
+
+```bash
+cd /Users/vidmich/Desktop/prac
+export FIGMA_ACCESS_TOKEN="<your-figma-pat>"
+npm run figma:web:publish
+```
+
+Подробный runbook лежит в [../../docs/figma-code-connect.md](../../docs/figma-code-connect.md).
+
 ## Первые принципы архитектуры
 
 - `src/app` — маршруты и layout на App Router.

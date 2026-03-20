@@ -313,6 +313,9 @@ const createInitialState = () => {
     rsyaLayout: d('rsyaLayout', 'center'), // center | left
     rsyaVisualCount: dn('rsyaVisualCount', 1, { min: 1, max: 3 }),
     rsyaKVScale: dn('rsyaKVScale', 200, { min: 40, max: 300 }),
+    rsyaKVScale1: dn('rsyaKVScale1', 100, { min: 40, max: 300 }),
+    rsyaKVScale2: dn('rsyaKVScale2', 100, { min: 40, max: 300 }),
+    rsyaKVScale3: dn('rsyaKVScale3', 100, { min: 40, max: 300 }),
     rsyaKVGap: dn('rsyaKVGap', 8, { min: -200, max: 300 }),
     rsyaKVOffsetX: dn('rsyaKVOffsetX', 0, { min: -500, max: 500 }),
     rsyaKVOffsetY: dn('rsyaKVOffsetY', 0, { min: -500, max: 500 }),
@@ -1126,6 +1129,9 @@ export const applySavedSettings = (snapshot) => {
     ['maxFileSizeValue', current.maxFileSizeValue, { min: 1, max: 100000 }],
     ['rsyaVisualCount', current.rsyaVisualCount || 1, { min: 1, max: 3 }],
     ['rsyaKVScale', current.rsyaKVScale || 200, { min: 40, max: 300 }],
+    ['rsyaKVScale1', current.rsyaKVScale1 || 100, { min: 40, max: 300 }],
+    ['rsyaKVScale2', current.rsyaKVScale2 || 100, { min: 40, max: 300 }],
+    ['rsyaKVScale3', current.rsyaKVScale3 || 100, { min: 40, max: 300 }],
     ['rsyaKVGap', current.rsyaKVGap || 8, { min: -200, max: 300 }],
     ['rsyaKVOffsetX', current.rsyaKVOffsetX || 0, { min: -500, max: 500 }],
     ['rsyaKVOffsetY', current.rsyaKVOffsetY || 0, { min: -500, max: 500 }]

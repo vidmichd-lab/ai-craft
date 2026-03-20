@@ -1,13 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { LegacyPreview } from './legacy-preview';
+import {
+  patchEditorDocument,
+  type DeepPartial,
+  type EditorDocument
+} from '@ai-craft/editor-model';
+import { Banner, Button, Input, SectionHeader, Select, TextArea } from '@ai-craft/ui';
+import { EditorPreview } from './editor-preview';
 import styles from './workspace-shell.module.css';
-import type { EditorSnapshot } from './editor-types';
 
 type Props = {
-  state: EditorSnapshot;
-  onChange: (next: EditorSnapshot) => void;
+  state: EditorDocument;
+  onChange: (next: EditorDocument) => void;
   onTemplateSaved?: () => void;
 };
 
@@ -17,23 +22,26 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
-  const update = (patch: Partial<EditorSnapshot>) => {
-    const next = { ...state, ...patch };
-    const pair = {
-      title: next.title,
-      subtitle: next.subtitle,
-      bgColor: next.bgColor,
-      bgImageSelected: next.bgImageSelected,
-      kvSelected: next.kvSelected
-    };
-    next.titleSubtitlePairs = [pair];
-    next.activePairIndex = 0;
-    onChange(next);
+  const update = (patch: DeepPartial<EditorDocument>) => {
+    onChange(patchEditorDocument(state, patch));
   };
 
-  const updateNumber = (key: keyof EditorSnapshot, fallback = 0) => (value: string) => {
+  const updateLayoutNumber = (key: keyof EditorDocument['layout'], fallback = 0) => (value: string) => {
     const numeric = Number(value);
-    update({ [key]: Number.isFinite(numeric) ? numeric : fallback } as Partial<EditorSnapshot>);
+    update({
+      layout: {
+        [key]: Number.isFinite(numeric) ? numeric : fallback
+      } as DeepPartial<EditorDocument['layout']>
+    });
+  };
+
+  const updateTypographyNumber = (key: keyof EditorDocument['typography'], fallback = 0) => (value: string) => {
+    const numeric = Number(value);
+    update({
+      typography: {
+        [key]: Number.isFinite(numeric) ? numeric : fallback
+      } as DeepPartial<EditorDocument['typography']>
+    });
   };
 
   const handleSaveTemplate = async () => {
@@ -51,7 +59,7 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
         },
         body: JSON.stringify({
           name: templateName.trim(),
-          state
+          document: state
         })
       });
       const payload = (await response.json().catch(() => null)) as { error?: string; snapshot?: { name?: string } } | null;
@@ -71,12 +79,17 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
   return (
     <section className={styles.panel}>
       <div className={styles.stack}>
-        <div>
-          <div className={styles.sectionLabel}>Editor</div>
-          <h2 className={styles.sectionTitle}>Workspace editor shell</h2>
-        </div>
-        {notice ? <div className={styles.notice}>{notice}</div> : null}
-        {error ? <div className={styles.error}>{error}</div> : null}
+        <SectionHeader eyebrow="Editor" title="Workspace editor shell" />
+        {notice ? (
+          <Banner className={styles.notice} tone="notice">
+            {notice}
+          </Banner>
+        ) : null}
+        {error ? (
+          <Banner className={styles.error} tone="error">
+            {error}
+          </Banner>
+        ) : null}
         <div className={styles.editorGrid}>
           <div className={styles.stack}>
             <section className={styles.subPanel}>
@@ -84,61 +97,118 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
               <div className={styles.controlGrid}>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Режим проекта</span>
-                  <select
+                  <Select
                     className={styles.input}
-                    value={state.projectMode}
-                    onChange={(event) => update({ projectMode: event.target.value as EditorSnapshot['projectMode'] })}
+                    value={state.layout.projectMode}
+                    onChange={(event) => update({ layout: { projectMode: event.target.value as EditorDocument['layout']['projectMode'] } })}
                   >
                     <option value="rsya">Перформанс</option>
                     <option value="layouts">Макеты</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Бренд</span>
-                  <input className={styles.input} value={state.brandName} onChange={(event) => update({ brandName: event.target.value })} />
+                  <Input
+                    className={styles.input}
+                    value={state.brand.name}
+                    onChange={(event) => update({ brand: { name: event.target.value }, theme: { name: event.target.value } })}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Layout recipe</span>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.variant}
+                    onChange={(event) => update({ layout: { variant: event.target.value as EditorDocument['layout']['variant'] } })}
+                  >
+                    <option value="hero-left">Hero left</option>
+                    <option value="hero-centered">Hero centered</option>
+                    <option value="split">Split</option>
+                  </Select>
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Density</span>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.density}
+                    onChange={(event) => update({ layout: { density: event.target.value as EditorDocument['layout']['density'] } })}
+                  >
+                    <option value="default">Default</option>
+                    <option value="compact">Compact</option>
+                  </Select>
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Отступ от края, %</span>
-                  <input className={styles.input} type="number" min="0" max="30" value={state.paddingPercent} onChange={(event) => updateNumber('paddingPercent', 5)(event.target.value)} />
+                  <Input
+                    className={styles.input}
+                    type="number"
+                    min="0"
+                    max="30"
+                    value={state.layout.paddingPercent}
+                    onChange={(event) => updateLayoutNumber('paddingPercent', 5)(event.target.value)}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Позиция лого</span>
-                  <select className={styles.input} value={String(state.logoPos || 'left')} onChange={(event) => update({ logoPos: event.target.value })}>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.logoPosition}
+                    onChange={(event) => update({ layout: { logoPosition: event.target.value as EditorDocument['layout']['logoPosition'] } })}
+                  >
                     <option value="left">Слева</option>
                     <option value="center">По центру</option>
                     <option value="right">Справа</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Позиция KV</span>
-                  <select className={styles.input} value={String(state.kvPosition || 'center')} onChange={(event) => update({ kvPosition: event.target.value })}>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.kvPosition}
+                    onChange={(event) => update({ layout: { kvPosition: event.target.value as EditorDocument['layout']['kvPosition'] } })}
+                  >
                     <option value="left">Слева</option>
                     <option value="center">По центру</option>
                     <option value="right">Справа</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Тип макета</span>
-                  <select className={styles.input} value={String(state.layoutMode || 'auto')} onChange={(event) => update({ layoutMode: event.target.value })}>
+                  <span className={styles.fieldLabel}>Тип surface</span>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.surfaceMode}
+                    onChange={(event) => update({ layout: { surfaceMode: event.target.value as EditorDocument['layout']['surfaceMode'] } })}
+                  >
                     <option value="auto">Auto</option>
                     <option value="horizontal">Horizontal</option>
                     <option value="vertical">Vertical</option>
-                  </select>
+                  </Select>
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Выравнивание</span>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.alignment}
+                    onChange={(event) => update({ layout: { alignment: event.target.value as EditorDocument['layout']['alignment'] } })}
+                  >
+                    <option value="left">Слева</option>
+                    <option value="center">По центру</option>
+                  </Select>
                 </label>
               </div>
               <div className={styles.actionsRow}>
-                <button className={styles.button} type="button" onClick={() => update({ showLogo: !state.showLogo })}>
-                  {state.showLogo ? 'Скрыть лого' : 'Показать лого'}
-                </button>
-                <button className={styles.button} type="button" onClick={() => update({ showKV: !state.showKV })}>
-                  {state.showKV ? 'Скрыть KV' : 'Показать KV'}
-                </button>
-                <button className={styles.button} type="button" onClick={() => update({ showSubtitle: !state.showSubtitle })}>
-                  {state.showSubtitle ? 'Скрыть саб' : 'Показать саб'}
-                </button>
-                <button className={styles.button} type="button" onClick={() => update({ showLegal: !state.showLegal })}>
-                  {state.showLegal ? 'Скрыть legal' : 'Показать legal'}
-                </button>
+                <Button type="button" onClick={() => update({ layout: { showLogo: !state.layout.showLogo } })}>
+                  {state.layout.showLogo ? 'Скрыть лого' : 'Показать лого'}
+                </Button>
+                <Button type="button" onClick={() => update({ layout: { showKV: !state.layout.showKV } })}>
+                  {state.layout.showKV ? 'Скрыть KV' : 'Показать KV'}
+                </Button>
+                <Button type="button" onClick={() => update({ layout: { showSubtitle: !state.layout.showSubtitle } })}>
+                  {state.layout.showSubtitle ? 'Скрыть саб' : 'Показать саб'}
+                </Button>
+                <Button type="button" onClick={() => update({ legal: { enabled: !state.legal.enabled } })}>
+                  {state.legal.enabled ? 'Скрыть legal' : 'Показать legal'}
+                </Button>
               </div>
             </section>
 
@@ -146,44 +216,81 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
               <div className={styles.sectionLabel}>Copy</div>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Заголовок</span>
-                <textarea className={styles.textarea} value={state.title} onChange={(event) => update({ title: event.target.value })} />
+                <TextArea
+                  className={styles.textarea}
+                  value={state.content.headline}
+                  onChange={(event) => update({ content: { headline: event.target.value } })}
+                />
               </label>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Подзаголовок</span>
-                <textarea className={styles.textarea} value={state.subtitle} onChange={(event) => update({ subtitle: event.target.value })} />
+                <TextArea
+                  className={styles.textarea}
+                  value={state.content.subheadline}
+                  onChange={(event) => update({ content: { subheadline: event.target.value } })}
+                />
               </label>
               <div className={styles.controlGrid}>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Цвет заголовка</span>
-                  <input className={styles.input} value={String(state.titleColor || '#ffffff')} onChange={(event) => update({ titleColor: event.target.value })} />
+                  <Input
+                    className={styles.input}
+                    value={state.theme.colors.headline}
+                    onChange={(event) => update({ theme: { colors: { headline: event.target.value } } })}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Цвет подзаголовка</span>
-                  <input className={styles.input} value={String(state.subtitleColor || '#e0e0e0')} onChange={(event) => update({ subtitleColor: event.target.value })} />
+                  <Input
+                    className={styles.input}
+                    value={state.theme.colors.subheadline}
+                    onChange={(event) => update({ theme: { colors: { subheadline: event.target.value } } })}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Размер заголовка</span>
-                  <input className={styles.input} type="number" min="1" max="40" value={Number(state.titleSize || 8)} onChange={(event) => updateNumber('titleSize', 8)(event.target.value)} />
+                  <Input
+                    className={styles.input}
+                    type="number"
+                    min="1"
+                    max="40"
+                    value={state.typography.titleSize}
+                    onChange={(event) => updateTypographyNumber('titleSize', 8)(event.target.value)}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Размер подзаголовка</span>
-                  <input className={styles.input} type="number" min="1" max="30" value={Number(state.subtitleSize || 4)} onChange={(event) => updateNumber('subtitleSize', 4)(event.target.value)} />
+                  <Input
+                    className={styles.input}
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={state.typography.subtitleSize}
+                    onChange={(event) => updateTypographyNumber('subtitleSize', 4)(event.target.value)}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Выравнивание заголовка</span>
-                  <select className={styles.input} value={String(state.titleAlign || 'left')} onChange={(event) => update({ titleAlign: event.target.value })}>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.alignment}
+                    onChange={(event) => update({ layout: { alignment: event.target.value as EditorDocument['layout']['alignment'] } })}
+                  >
                     <option value="left">Слева</option>
                     <option value="center">По центру</option>
-                    <option value="right">Справа</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Позиция текста</span>
-                  <select className={styles.input} value={String(state.titleVPos || 'top')} onChange={(event) => update({ titleVPos: event.target.value })}>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.textPositionY}
+                    onChange={(event) => update({ layout: { textPositionY: event.target.value as EditorDocument['layout']['textPositionY'] } })}
+                  >
                     <option value="top">Верх</option>
                     <option value="center">Центр</option>
                     <option value="bottom">Низ</option>
-                  </select>
+                  </Select>
                 </label>
               </div>
             </section>
@@ -193,53 +300,98 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
               <div className={styles.controlGrid}>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Цвет фона</span>
-                  <input className={styles.input} value={state.bgColor} onChange={(event) => update({ bgColor: event.target.value })} />
+                  <Input
+                    className={styles.input}
+                    value={state.theme.colors.background}
+                    onChange={(event) => update({ theme: { colors: { background: event.target.value } } })}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Размер фона, %</span>
-                  <input className={styles.input} type="number" min="10" max="500" value={Number(state.bgImageSize || 100)} onChange={(event) => updateNumber('bgImageSize', 100)(event.target.value)} />
+                  <Input
+                    className={styles.input}
+                    type="number"
+                    min="10"
+                    max="500"
+                    value={state.layout.backgroundScalePercent}
+                    onChange={(event) => updateLayoutNumber('backgroundScalePercent', 100)(event.target.value)}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Позиция фона X</span>
-                  <select className={styles.input} value={String(state.bgPosition || 'center')} onChange={(event) => update({ bgPosition: event.target.value })}>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.backgroundPositionX}
+                    onChange={(event) => update({ layout: { backgroundPositionX: event.target.value as EditorDocument['layout']['backgroundPositionX'] } })}
+                  >
                     <option value="left">Слева</option>
                     <option value="center">По центру</option>
                     <option value="right">Справа</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Позиция фона Y</span>
-                  <select className={styles.input} value={String(state.bgVPosition || 'center')} onChange={(event) => update({ bgVPosition: event.target.value })}>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.backgroundPositionY}
+                    onChange={(event) => update({ layout: { backgroundPositionY: event.target.value as EditorDocument['layout']['backgroundPositionY'] } })}
+                  >
                     <option value="top">Верх</option>
                     <option value="center">Центр</option>
                     <option value="bottom">Низ</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Режим фона</span>
-                  <select className={styles.input} value={String(state.bgSize || 'cover')} onChange={(event) => update({ bgSize: event.target.value })}>
+                  <Select
+                    className={styles.input}
+                    value={state.layout.backgroundFit}
+                    onChange={(event) => update({ layout: { backgroundFit: event.target.value as EditorDocument['layout']['backgroundFit'] } })}
+                  >
                     <option value="cover">Cover</option>
                     <option value="contain">Contain</option>
                     <option value="fill">Fill</option>
                     <option value="tile">Tile</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Размер лого</span>
-                  <input className={styles.input} type="number" min="1" max="100" value={Number(state.logoSize || 40)} onChange={(event) => updateNumber('logoSize', 40)(event.target.value)} />
+                  <Input
+                    className={styles.input}
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={state.layout.logoSize}
+                    onChange={(event) => updateLayoutNumber('logoSize', 40)(event.target.value)}
+                  />
                 </label>
               </div>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Фоновое изображение</span>
-                <input className={styles.input} value={state.bgImageSelected} onChange={(event) => update({ bgImageSelected: event.target.value })} placeholder="URL изображения" />
+                <Input
+                  className={styles.input}
+                  value={state.assets.background || ''}
+                  onChange={(event) => update({ assets: { background: event.target.value } })}
+                  placeholder="URL изображения"
+                />
               </label>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Логотип</span>
-                <input className={styles.input} value={state.logoSelected} onChange={(event) => update({ logoSelected: event.target.value })} placeholder="URL логотипа" />
+                <Input
+                  className={styles.input}
+                  value={state.assets.logo || ''}
+                  onChange={(event) => update({ assets: { logo: event.target.value } })}
+                  placeholder="URL логотипа"
+                />
               </label>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>KV</span>
-                <input className={styles.input} value={state.kvSelected} onChange={(event) => update({ kvSelected: event.target.value })} placeholder="Путь или URL KV" />
+                <Input
+                  className={styles.input}
+                  value={state.assets.kv || ''}
+                  onChange={(event) => update({ assets: { kv: event.target.value } })}
+                  placeholder="Путь или URL KV"
+                />
               </label>
             </section>
 
@@ -248,45 +400,71 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
               <div className={styles.controlGrid}>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Возраст</span>
-                  <input className={styles.input} value={String(state.age || '18+')} onChange={(event) => update({ age: event.target.value })} />
+                  <Input
+                    className={styles.input}
+                    value={state.legal.ageMark}
+                    onChange={(event) => update({ legal: { ageMark: event.target.value } })}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Размер возраста</span>
-                  <input className={styles.input} type="number" min="1" max="20" value={Number(state.ageSize || 4)} onChange={(event) => updateNumber('ageSize', 4)(event.target.value)} />
+                  <Input
+                    className={styles.input}
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={state.typography.ageSize}
+                    onChange={(event) => updateTypographyNumber('ageSize', 4)(event.target.value)}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Размер legal</span>
-                  <input className={styles.input} type="number" min="1" max="20" value={Number(state.legalSize || 2)} onChange={(event) => updateNumber('legalSize', 2)(event.target.value)} />
+                  <Input
+                    className={styles.input}
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={state.typography.legalSize}
+                    onChange={(event) => updateTypographyNumber('legalSize', 2)(event.target.value)}
+                  />
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Цвет legal</span>
-                  <input className={styles.input} value={String(state.legalColor || '#ffffff')} onChange={(event) => update({ legalColor: event.target.value })} />
+                  <Input
+                    className={styles.input}
+                    value={state.legal.color}
+                    onChange={(event) => update({ legal: { color: event.target.value } })}
+                  />
                 </label>
               </div>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Legal</span>
-                <textarea className={styles.textarea} value={String(state.legal || '')} onChange={(event) => update({ legal: event.target.value })} />
+                <TextArea
+                  className={styles.textarea}
+                  value={state.legal.body}
+                  onChange={(event) => update({ legal: { body: event.target.value } })}
+                />
               </label>
             </section>
 
             <section className={styles.subPanel}>
               <div className={styles.sectionLabel}>Templates</div>
               <div className={styles.actionsRow}>
-                <input
+                <Input
                   className={styles.input}
                   value={templateName}
                   onChange={(event) => setTemplateName(event.target.value)}
                   placeholder="Название шаблона"
                 />
-                <button className={styles.button} type="button" onClick={handleSaveTemplate} disabled={pending || !templateName.trim()}>
+                <Button type="button" onClick={handleSaveTemplate} disabled={pending || !templateName.trim()}>
                   {pending ? 'Сохраняем...' : 'Сохранить как шаблон'}
-                </button>
+                </Button>
               </div>
             </section>
           </div>
 
           <div className={styles.editorPreviewWrap}>
-            <LegacyPreview state={state} />
+            <EditorPreview state={state} />
           </div>
         </div>
       </div>

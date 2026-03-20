@@ -1,10 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import {
+  applyProjectAsset,
+  createDefaultEditorDocument,
+  normalizeStoredTemplateState,
+  type EditorDocument
+} from '@ai-craft/editor-model';
 import { EditorShell } from './editor-shell';
-import { LegacyStudioFrame } from './legacy-studio-frame';
 import { MediaLibrary } from './media-library';
-import { normalizeEditorSnapshot, type EditorSnapshot } from './editor-types';
 import { TeamSettings } from './team-settings';
 import { TemplatesLibrary } from './templates-library';
 import styles from './workspace-shell.module.css';
@@ -20,12 +24,11 @@ type Props = {
 };
 
 export function WorkspaceContent({ currentTeam, teamMembers, canManageMembers }: Props) {
-  const [editorState, setEditorState] = useState<EditorSnapshot>(normalizeEditorSnapshot(null));
+  const [editorState, setEditorState] = useState<EditorDocument>(createDefaultEditorDocument());
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
 
   return (
     <div className={styles.contentStack}>
-      <LegacyStudioFrame />
       <EditorShell
         state={editorState}
         onChange={setEditorState}
@@ -38,19 +41,14 @@ export function WorkspaceContent({ currentTeam, teamMembers, canManageMembers }:
       />
       <TemplatesLibrary
         refreshKey={templatesRefreshKey}
-        onApplyTemplate={(template) => setEditorState(normalizeEditorSnapshot(template.state))}
+        onApplyTemplate={(template) => {
+          const structuredTemplate = normalizeStoredTemplateState(template.state, template.name);
+          setEditorState(structuredTemplate.definition.document);
+        }}
       />
       <MediaLibrary
         onUseAsset={(asset, target) => {
-          if (target === 'background') {
-            setEditorState((current) => normalizeEditorSnapshot({ ...current, bgImageSelected: asset.file }));
-            return;
-          }
-          if (target === 'kv') {
-            setEditorState((current) => normalizeEditorSnapshot({ ...current, kvSelected: asset.file }));
-            return;
-          }
-          setEditorState((current) => normalizeEditorSnapshot({ ...current, logoSelected: asset.file }));
+          setEditorState((current) => applyProjectAsset(current, target, asset.file));
         }}
       />
     </div>

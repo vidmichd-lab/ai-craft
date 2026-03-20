@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useMemo, useState } from 'react';
+import { Banner, Button, Input } from '@ai-craft/ui';
 import styles from './login-screen.module.css';
 
 export function LoginScreen() {
@@ -60,22 +61,24 @@ export function LoginScreen() {
             />
             <form className={styles.form} onSubmit={handleSubmit}>
               <div className={styles.field}>
-                <input
+                <Input
                   className={styles.input}
                   type="email"
                   placeholder="Почта"
                   autoComplete="username"
                   value={email}
+                  style={{ minHeight: 36, padding: '8px 12px', borderColor: 'transparent' }}
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </div>
               <div className={styles.field}>
-                <input
+                <Input
                   className={`${styles.input} ${styles.passwordInput}`}
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Пароль"
                   autoComplete="current-password"
                   value={password}
+                  style={{ minHeight: 36, padding: '8px 12px', borderColor: 'transparent' }}
                   onChange={(event) => setPassword(event.target.value)}
                 />
                 <button
@@ -87,10 +90,20 @@ export function LoginScreen() {
                   {showPassword ? '◉' : '◌'}
                 </button>
               </div>
-              {error ? <div className={styles.error}>{error}</div> : null}
-              <button className={styles.submit} type="submit" disabled={!canSubmit || pending}>
+              {error ? (
+                <Banner className={styles.error} tone="error">
+                  {error}
+                </Banner>
+              ) : null}
+              <Button
+                className={styles.submit}
+                size="sm"
+                type="submit"
+                disabled={!canSubmit || pending}
+                style={{ borderColor: 'rgba(255, 255, 255, 0.04)' }}
+              >
                 {pending ? 'Входим...' : 'Войти'}
-              </button>
+              </Button>
             </form>
           </div>
           <div className={styles.footer}>

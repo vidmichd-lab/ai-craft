@@ -176,7 +176,7 @@ export const renderToCanvas = (canvas, width, height, state) => {
 
   // Вычисляем множители размеров - используем размеры охранной области
   let logoSizePercent = state.logoSize;
-  const multipliers = calculateSizeMultipliers(effectiveWidth, effectiveHeight, layoutType);
+  const multipliers = calculateSizeMultipliers(effectiveWidth, effectiveHeight, layoutType, state);
   const { logoSizeMultiplier, titleSizeMultiplier, subtitleSizeMultiplier, legalMultiplier, ageMultiplier } = multipliers;
   
   // Определяем, является ли формат квадратным - используем размеры охранной области
@@ -1662,8 +1662,20 @@ export const renderToCanvas = (canvas, width, height, state) => {
           const gapRaw = Number.isFinite(Number(state.rsyaKVGap)) ? Number(state.rsyaKVGap) : 8;
           const offsetX = Number(state.rsyaKVOffsetX) || 0;
           const offsetY = Number(state.rsyaKVOffsetY) || 0;
-          let slotSize = Math.max(24, Math.min(kvPlannedMeta.kvW, kvPlannedMeta.kvH) * (scalePercent / 100));
-          const minGap = -slotSize + 4;
+          const baseSlotSize = Math.max(24, Math.min(kvPlannedMeta.kvW, kvPlannedMeta.kvH) * (scalePercent / 100));
+          const visibleSlotsSource = visuals.slice(0, visualCount);
+          const visibleSlots = (visibleSlotsSource.length ? visibleSlotsSource : [state.kv]).map((img, index) => {
+            const slotScaleKey = `rsyaKVScale${index + 1}`;
+            const slotScalePercent = Math.max(40, Math.min(300, Number(state[slotScaleKey]) || 100));
+            return {
+              img,
+              index,
+              slotScalePercent,
+              slotSize: Math.max(24, baseSlotSize * (slotScalePercent / 100))
+            };
+          });
+          const maxSlotSize = Math.max(...visibleSlots.map((slot) => slot.slotSize));
+          const minGap = -maxSlotSize + 4;
           const gap = Math.max(minGap, Math.min(300, gapRaw));
           const rsyaTextBottom = Math.max(
             titleBounds ? (titleBounds.y + titleBounds.height) : 0,
@@ -1673,34 +1685,46 @@ export const renderToCanvas = (canvas, width, height, state) => {
           const rsyaSafeTop = rsyaTextBottom + rsyaSafeGap;
           const rsyaSafeBottom = (useSafeArea ? (verticalPadding + effectiveHeight) : height) - paddingPx;
 
-          const totalW = visualCount * slotSize + (visualCount - 1) * gap;
+          const totalW = visibleSlots.reduce((sum, slot) => sum + slot.slotSize, 0) + (visualCount - 1) * gap;
           const startX = isRsyaLeftLayout
             ? (kvPlannedMeta.kvX + offsetX)
             : (kvPlannedMeta.kvX + (kvPlannedMeta.kvW - totalW) / 2 + offsetX);
-          let startY = kvPlannedMeta.kvY + (kvPlannedMeta.kvH - slotSize) / 2 + offsetY;
+          let startY = kvPlannedMeta.kvY + (kvPlannedMeta.kvH - maxSlotSize) / 2 + offsetY;
 
           if (isRsyaMode && !isRsyaLeftLayout) {
             startY = Math.max(startY, rsyaSafeTop + offsetY);
-            const maxStartY = rsyaSafeBottom - slotSize;
+            const maxStartY = rsyaSafeBottom - maxSlotSize;
             if (Number.isFinite(maxStartY) && maxStartY >= rsyaSafeTop) {
               startY = Math.min(startY, maxStartY);
             }
           }
 
-          for (let i = 0; i < visualCount; i++) {
-            const img = visuals[i] || state.kv;
-            if (!img) continue;
-            const x = startX + i * (slotSize + gap);
-            const y = startY;
-            drawImageCover(ctx, img, x, y, slotSize, slotSize);
-          }
+          const slotMetas = [];
+          let cursorX = startX;
+          visibleSlots.forEach((slot) => {
+            const img = slot.img || state.kv;
+            if (!img) return;
+            const x = cursorX;
+            const y = startY + (maxSlotSize - slot.slotSize) / 2;
+            drawImageCover(ctx, img, x, y, slot.slotSize, slot.slotSize);
+            slotMetas.push({
+              slotIndex: slot.index,
+              kvX: x,
+              kvY: y,
+              kvW: slot.slotSize,
+              kvH: slot.slotSize,
+              kvScale: slot.slotScalePercent / 100
+            });
+            cursorX += slot.slotSize + gap;
+          });
 
           kvRenderMeta = {
             ...kvPlannedMeta,
             kvX: startX,
             kvY: startY,
             kvW: totalW,
-            kvH: slotSize
+            kvH: maxSlotSize,
+            slotMetas
           };
         } else {
           ctx.drawImage(state.kv, kvPlannedMeta.kvX, kvPlannedMeta.kvY, kvPlannedMeta.kvW, kvPlannedMeta.kvH);

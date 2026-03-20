@@ -1,18 +1,14 @@
-import { NextResponse } from 'next/server';
 import { logoutWorkspace } from '@/server/workspace-api/client';
+import { createRequestContext } from '@/server/http/request-context';
+import { jsonWithCookies, toRouteErrorResponse } from '@/server/http/response';
 
 export async function POST(request: Request) {
+  const context = createRequestContext(request);
   try {
     const cookie = request.headers.get('cookie') || '';
     const result = await logoutWorkspace(cookie);
-    const response = NextResponse.json(result.data);
-    result.setCookies.forEach((value) => response.headers.append('set-cookie', value));
-    return response;
+    return jsonWithCookies(result.data, result.setCookies, context);
   } catch (error) {
-    const status = (error as Error & { status?: number }).status || 400;
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Logout failed' },
-      { status }
-    );
+    return toRouteErrorResponse(error, 'Logout failed', context);
   }
 }

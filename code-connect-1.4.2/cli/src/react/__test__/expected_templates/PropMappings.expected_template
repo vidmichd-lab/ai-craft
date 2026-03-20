@@ -1,0 +1,46 @@
+const figma = require('figma')
+
+const variant = figma.currentLayer.__properties__.enum('👥 Variant', {
+"Primary": 'primary',
+"Destructive": 'destructive',
+"Inverse": 'inverse',
+"Success": 'success',
+"FigJam": 'FigJam',
+"Secondary": 'secondary',
+"Secondary Destruct": 'destructive-secondary'})
+const size = figma.currentLayer.__properties__.enum('👥 Size', {
+"Default": 'hug-contents',
+"Large": undefined,
+"Wide": 'fit-parent'})
+const state = figma.currentLayer.__properties__.enum('🐣 State', {
+"Default": 'Default',
+"Active": 'Active',
+"Focused": 'Focused'})
+const disabled = figma.currentLayer.__properties__.boolean('🎛️ Disabled')
+const iconLead = figma.currentLayer.__properties__.boolean('🎛️ Icon Lead', {
+"true": 'icon',
+"false": undefined})
+const label = figma.currentLayer.__properties__.string('🎛️ Label')
+const __props = {}
+if (variant && variant.type !== 'ERROR') {
+  __props["variant"] = variant
+}
+if (size && size.type !== 'ERROR') {
+  __props["size"] = size
+}
+if (state && state.type !== 'ERROR') {
+  __props["state"] = state
+}
+if (disabled && disabled.type !== 'ERROR') {
+  __props["disabled"] = disabled
+}
+if (iconLead && iconLead.type !== 'ERROR') {
+  __props["iconLead"] = iconLead
+}
+if (label && label.type !== 'ERROR') {
+  __props["label"] = label
+}
+
+export default { ...figma.tsx`<Button${_fcc_renderReactProp('variant', variant)} onClick={() => { }}${_fcc_renderReactProp('width', size)}${_fcc_renderReactProp('disabled', disabled)}${_fcc_renderReactProp('iconLead', iconLead)}>
+      ${_fcc_renderReactChildren(label)}
+    </Button>`, metadata: { __props } }

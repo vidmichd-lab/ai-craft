@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../config-typescript/base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./dist-types",
+    "rootDir": "./src"
+  },
+  "include": [
+    "src/index.ts",
+    "src/default-render-state.json",
+    "src/legacy/render-to-canvas.d.ts",
+    "src/legacy/runtime-config.d.ts"
+  ]
+}

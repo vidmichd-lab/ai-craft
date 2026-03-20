@@ -20,7 +20,9 @@ const copyTargets = [
   'fav',
   'font',
   'logo',
-  'src'
+  'src',
+  'packages/editor-renderer/src',
+  'packages/ui/src'
 ];
 
 const ensureDir = async (targetPath) => {

@@ -146,8 +146,7 @@ import {
   initializeBackgroundUI,
   initializeSizeManager
 } from './ui/ui.js';
-import { renderer } from './renderer.js';
-import { clearTextMeasurementCache } from './renderer/text.js';
+import { clearTextMeasurementCache, renderer } from './renderer.js';
 import { setKey, getState, ensurePresetSelection, getCheckedSizes, updatePresetSizesFromConfig, getDefaultValues } from './state/store.js';
 import { exportPNG, exportJPG } from './exporter.js';
 import { scanFonts } from './utils/assetScanner.js';
@@ -157,6 +156,7 @@ import { loadConfigFromFile } from './utils/fullConfig.js';
 import { openGuideModal, closeGuideModal } from './ui/ui.js';
 import { setLanguage, getLanguage, updateUI, t } from './utils/i18n.js';
 import { initPanelResizers } from './utils/panelResizer.js';
+import { applyUiLibraryContract, watchUiLibraryContract } from './ui/uiLibraryBridge.js';
 
 let renderDebounceTimer = null;
 const DEBOUNCED_RENDER_KEYS = new Set(['title', 'subtitle', 'legal', 'age']);
@@ -317,7 +317,7 @@ async function hardResetCache() {
     await Promise.all(registrations.map(r => r.unregister()));
   }
 
-  window.location.reload(true);
+  window.location.reload();
 }
 
 const exposeGlobals = () => {
@@ -741,6 +741,8 @@ const initialize = async () => {
     console.log('Кешируем DOM элементы...');
     const dom = cacheDom();
     console.log('DOM элементы закешированы');
+    applyUiLibraryContract(document);
+    watchUiLibraryContract(document.body);
     
     // Проверяем наличие canvas элементов
     if (!dom.previewCanvasNarrow || !dom.previewCanvasWide || !dom.previewCanvasSquare) {
@@ -838,6 +840,7 @@ const initialize = async () => {
     syncFormFields();
     refreshMediaPreviews();
     updatePartnerLogoUI();
+    applyUiLibraryContract(document);
     console.log('Инициализируем обработчики событий...');
     initializeEventDelegation(dom);
     console.log('✓ Локальные обработчики событий инициализированы');
@@ -1070,6 +1073,10 @@ if (!window.__DISABLE_SW__ && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     // Регистрируем с задержкой, чтобы не блокировать основную загрузку
     setTimeout(() => {
+      const serviceWorkerUrl = new URL('../sw.js', import.meta.url);
+      serviceWorkerUrl.searchParams.set('v', window.APP_VERSION || 'dev');
+      const serviceWorkerScope = new URL('./', serviceWorkerUrl);
+
       let isRefreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (isRefreshing) return;
@@ -1077,7 +1084,10 @@ if (!window.__DISABLE_SW__ && 'serviceWorker' in navigator) {
         window.location.reload();
       });
 
-      navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(window.APP_VERSION || 'dev')}`, { updateViaCache: 'none' })
+      navigator.serviceWorker.register(serviceWorkerUrl.toString(), {
+        scope: serviceWorkerScope.pathname,
+        updateViaCache: 'none'
+      })
         .then((registration) => {
           console.log('Service Worker зарегистрирован:', registration.scope);
           

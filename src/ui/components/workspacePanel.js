@@ -37,7 +37,8 @@ import {
   saveAdminWorkspaceTeamDefaults,
   updateWorkspaceAccount,
   updateAdminWorkspaceUserRole,
-  updateAdminWorkspaceTeam
+  updateAdminWorkspaceTeam,
+  updateWorkspaceProject
 } from '../../utils/workspaceApi.js';
 import {
   applyWorkspaceTeamDefaultsLocally,
@@ -178,14 +179,6 @@ const saveLocalDraftSnapshot = (teamSlug = '', snapshot = null) => {
   }
 };
 
-const hasWorkspaceSessionHint = () => {
-  try {
-    return localStorage.getItem(SESSION_HINT_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
-
 const setWorkspaceSessionHint = (value) => {
   try {
     if (value) {
@@ -225,6 +218,62 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
+
+const renderUiInputField = ({
+  label = '',
+  name = '',
+  type = 'text',
+  value = '',
+  placeholder = '',
+  required = false,
+  readonly = false,
+  disabled = false,
+  autocomplete = '',
+  className = ''
+} = {}) => `
+  <label class="ui-field-block ${escapeHtml(className)}">
+    ${label ? `<span class="ui-field-head"><span class="ui-field-label-lg">${escapeHtml(label)}</span></span>` : ''}
+    <span class="ui-control-shell${readonly ? ' is-readonly' : ''}">
+      <input
+        class="ui-input workspace-settings-input"
+        name="${escapeHtml(name)}"
+        type="${escapeHtml(type)}"
+        value="${escapeHtml(value)}"
+        placeholder="${escapeHtml(placeholder)}"
+        ${required ? 'required' : ''}
+        ${readonly ? 'readonly' : ''}
+        ${disabled ? 'disabled' : ''}
+        ${autocomplete ? `autocomplete="${escapeHtml(autocomplete)}"` : ''}
+      >
+    </span>
+  </label>
+`;
+
+const renderUiSelectField = ({
+  label = '',
+  name = '',
+  options = [],
+  className = '',
+  disabled = false
+} = {}) => `
+  <label class="ui-field-block ${escapeHtml(className)}">
+    ${label ? `<span class="ui-field-head"><span class="ui-field-label-lg">${escapeHtml(label)}</span></span>` : ''}
+    <span class="ui-control-shell ui-control-shell-select">
+      <select class="ui-select workspace-settings-input" name="${escapeHtml(name)}" ${disabled ? 'disabled' : ''}>
+        ${options.join('')}
+      </select>
+      <span class="ui-control-icon ui-control-icon-end" aria-hidden="true">
+        <span class="material-icons">expand_more</span>
+      </span>
+    </span>
+  </label>
+`;
+
+const renderUiReadonlyField = (label, value) => renderUiInputField({
+  label,
+  value: value || '—',
+  readonly: true
+});
 
 const getCurrentTheme = () => document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
 
@@ -695,7 +744,11 @@ const renderWorkspaceSummary = () => {
     if (!workspaceState.enabled) return 'Workspace off';
     if (!workspaceState.ready) return 'Workspace...';
     if (workspaceState.projectActionPending) return workspaceState.projectActionPending;
+    if (workspaceState.projectModalNotice) return workspaceState.projectModalNotice;
     if (!workspaceState.user || !workspaceState.team) return 'Нужен вход';
+    if (workspaceState.currentProject?.name && String(workspaceState.currentProject.description || '').trim() !== 'system-template-project') {
+      return `${workspaceState.team.name} / ${workspaceState.currentProject.name}`;
+    }
     return `${workspaceState.team.name} / личный черновик`;
   })();
 
@@ -872,13 +925,8 @@ const bindSettingsModalForms = () => {
 };
 
 const syncWorkspaceAppVisibility = () => {
-  document.body.classList.toggle('workspace-auth-active', Boolean(isWorkspaceApiEnabled() && workspaceState.authScreenVisible && !workspaceState.user));
-  const shouldKeepBootLock = Boolean(isWorkspaceApiEnabled() && workspaceState.authScreenVisible && !workspaceState.user);
-  if (shouldKeepBootLock) {
-    document.documentElement.setAttribute('data-workspace-boot', 'pending');
-  } else {
-    document.documentElement.setAttribute('data-workspace-boot', 'ready');
-  }
+  document.body.classList.remove('workspace-auth-active');
+  document.documentElement.setAttribute('data-workspace-boot', 'ready');
 };
 
 const openAuthScreen = () => {
@@ -972,21 +1020,100 @@ const ensureTemplateProject = async () => {
   return project;
 };
 
+const isSystemTemplateProject = (project = workspaceState.currentProject) => String(project?.description || '').trim() === 'system-template-project';
+
+const buildWorkspaceProjectName = (snapshot = {}) => {
+  const activeIndex = Number.isInteger(snapshot?.activePairIndex) ? snapshot.activePairIndex : 0;
+  const activePair = Array.isArray(snapshot?.titleSubtitlePairs)
+    ? snapshot.titleSubtitlePairs[activeIndex] || snapshot.titleSubtitlePairs[0]
+    : null;
+  const candidate = String(
+    activePair?.title
+    || activePair?.subtitle
+    || snapshot?.title
+    || snapshot?.brandName
+    || (!isSystemTemplateProject(workspaceState.currentProject) ? workspaceState.currentProject?.name : '')
+    || 'Личный проект'
+  ).trim();
+  return candidate.slice(0, 80) || 'Личный проект';
+};
+
+const buildWorkspaceSnapshotName = (timestamp = new Date()) => `Ручное сохранение ${timestamp.toLocaleString('ru-RU')}`;
+
 const saveCurrentProject = async () => {
   if (!workspaceState.user) {
     openAuthScreen();
     return;
   }
+
   const snapshot = getCurrentStateSnapshot();
-  setProjectActionPending('Сохраняем черновик...');
-  saveLocalDraftSnapshot(workspaceState.team?.slug, {
+  const localDraft = {
     savedAt: new Date().toISOString(),
     state: snapshot
-  });
+  };
+
+  setProjectActionPending('Сохраняем в workspace...');
   workspaceState.projectModalError = '';
-  workspaceState.projectModalNotice = 'Черновик сохранен в браузере.';
-  setProjectActionPending('');
-  rerenderProjectsModal();
+  workspaceState.projectModalNotice = '';
+  saveLocalDraftSnapshot(workspaceState.team?.slug, {
+    ...localDraft
+  });
+
+  try {
+    let project = workspaceState.currentProject;
+    if (!project?.id || isSystemTemplateProject(project)) {
+      const created = await createWorkspaceProject({
+        name: buildWorkspaceProjectName(snapshot),
+        description: '',
+        state: snapshot
+      });
+      project = created?.project || null;
+      if (!project?.id) {
+        throw new Error('Workspace не вернул проект после сохранения.');
+      }
+    } else {
+      const updated = await updateWorkspaceProject({
+        projectId: project.id,
+        name: String(project.name || '').trim() || buildWorkspaceProjectName(snapshot),
+        description: isSystemTemplateProject(project) ? '' : String(project.description || '').trim(),
+        state: snapshot
+      });
+      project = updated?.project || {
+        ...project,
+        state: snapshot
+      };
+    }
+
+    try {
+      await saveWorkspaceSnapshot({
+        projectId: project.id,
+        name: buildWorkspaceSnapshotName(),
+        kind: 'snapshot',
+        state: snapshot
+      });
+    } catch (error) {
+      console.warn('Не удалось записать snapshot проекта, основной save уже выполнен:', error);
+    }
+
+    workspaceState.currentProject = {
+      ...project,
+      state: snapshot
+    };
+    workspaceState.projects = [
+      workspaceState.currentProject,
+      ...workspaceState.projects.filter((item) => item.id !== project.id)
+    ];
+    setPersistedProjectId(workspaceState.team?.slug, project.id);
+    saveLocalDraftSnapshot(workspaceState.team?.slug, null);
+    workspaceState.projectModalNotice = `Сохранено в workspace${project.name ? `: ${project.name}` : ''}.`;
+    renderWorkspaceSummary();
+  } catch (error) {
+    console.warn('Workspace save failed; local draft kept:', error);
+    workspaceState.projectModalNotice = 'Сервер недоступен. Черновик сохранен только в браузере.';
+  } finally {
+    setProjectActionPending('');
+    rerenderProjectsModal();
+  }
 };
 
 const saveTemplateInteractively = async (templateName = '') => {
@@ -1072,15 +1199,15 @@ const renderTemplateComposer = () => {
     <div class="workspace-project-composer">
       <div class="workspace-project-composer-head">
         <div class="workspace-settings-surface-title">Сохранить как шаблон</div>
-        <button class="btn btn-small" type="button" data-workspace-action="cancel-project-composer">Отмена</button>
+        <button class="btn btn-small ui-button ui-button-sm" type="button" data-workspace-action="cancel-project-composer">Отмена</button>
       </div>
       <form id="workspaceTemplateComposerForm" class="workspace-settings-form" novalidate>
-        <label class="workspace-settings-field">
-          <span class="workspace-settings-field-label">Название шаблона</span>
-          <input class="workspace-settings-input" name="templateName" type="text" value="${escapeHtml(composer.templateName)}" placeholder="Например, Базовый KV" required>
+        <label class="workspace-settings-field ui-field">
+          <span class="workspace-settings-field-label ui-field-label">Название шаблона</span>
+          <input class="workspace-settings-input ui-input" name="templateName" type="text" value="${escapeHtml(composer.templateName)}" placeholder="Например, Базовый KV" required>
         </label>
         <div class="workspace-settings-form-actions">
-          <button class="btn primary" type="submit" ${workspaceState.projectActionPending ? 'disabled' : ''}>Сохранить шаблон</button>
+          <button class="btn primary ui-button ui-button-inverted" type="submit" ${workspaceState.projectActionPending ? 'disabled' : ''}>Сохранить шаблон</button>
         </div>
       </form>
     </div>
@@ -1101,7 +1228,7 @@ const renderProjectsModal = () => {
             <div class="workspace-project-card-meta">Доступ: вся команда</div>
             <div class="workspace-project-card-meta">${new Date(template.createdAt).toLocaleString('ru-RU')}</div>
             <div class="workspace-project-card-actions">
-              <button class="btn btn-small" data-workspace-action="apply-template" data-template-id="${escapeHtml(template.id)}">Применить</button>
+              <button class="btn btn-small ui-button ui-button-sm" data-workspace-action="apply-template" data-template-id="${escapeHtml(template.id)}">Применить</button>
             </div>
           </div>
         </article>
@@ -1113,11 +1240,11 @@ const renderProjectsModal = () => {
       <div class="workspace-projects-header">
         <div>
           <div class="workspace-settings-view-title">Шаблоны</div>
-          <div class="workspace-settings-view-subtitle">Личный черновик остается у тебя, а шаблоны становятся общей библиотекой команды.</div>
+          <div class="workspace-settings-view-subtitle">Текущий проект сохраняется в workspace, а шаблоны становятся общей библиотекой команды.</div>
         </div>
         <div class="workspace-toolbar">
-          <button class="btn primary" data-workspace-action="save-template" ${workspaceState.projectActionPending ? 'disabled' : ''}>Сохранить как шаблон</button>
-          <button class="btn" data-workspace-action="refresh-projects" ${workspaceState.templatesLoading || workspaceState.projectActionPending ? 'disabled' : ''}>Обновить</button>
+          <button class="btn primary ui-button ui-button-inverted" data-workspace-action="save-template" ${workspaceState.projectActionPending ? 'disabled' : ''}>Сохранить как шаблон</button>
+          <button class="btn ui-button" data-workspace-action="refresh-projects" ${workspaceState.templatesLoading || workspaceState.projectActionPending ? 'disabled' : ''}>Обновить</button>
         </div>
       </div>
       ${renderProjectsFeedback()}
@@ -1131,9 +1258,9 @@ const renderProjectsModal = () => {
         <aside class="workspace-projects-side">
           <div class="workspace-project-composer workspace-project-composer-current">
             <div class="workspace-project-composer-head">
-              <div class="workspace-settings-surface-title">Личный черновик</div>
+              <div class="workspace-settings-surface-title">Текущий проект</div>
             </div>
-            ${renderProjectPreview(currentSnapshot, 'Текущий макет')}
+            ${renderProjectPreview(currentSnapshot, 'Текущая версия')}
           </div>
           ${renderTemplateComposer()}
         </aside>
@@ -1252,12 +1379,7 @@ const refreshWorkspaceTeamMembers = async () => {
   }
 };
 
-const renderSettingsReadonlyField = (label, value) => `
-  <label class="workspace-settings-field">
-    <span class="workspace-settings-field-label">${escapeHtml(label)}</span>
-    <input class="workspace-settings-input" type="text" value="${escapeHtml(value || '—')}" readonly>
-  </label>
-`;
+const renderSettingsReadonlyField = (label, value) => renderUiReadonlyField(label, value);
 
 const renderSettingsFeedback = () => {
   if (workspaceState.adminError) {
@@ -1273,7 +1395,7 @@ const renderSettingsSecret = () => {
   if (!workspaceState.adminSecret) return '';
 
   return `
-    <div class="workspace-secret-card">
+    <div class="workspace-secret-card ui-surface ui-stack">
       <div class="workspace-section-title">Сгенерированный пароль</div>
       <div class="workspace-secret-line">${escapeHtml(workspaceState.adminSecret.email)}</div>
       <code class="workspace-secret-value">${escapeHtml(workspaceState.adminSecret.password)}</code>
@@ -1295,21 +1417,21 @@ const renderSettingsTeamMembersList = (members, { allowRoleActions = false } = {
   }
 
   return members.map((user) => `
-    <div class="workspace-settings-list-item">
+    <div class="workspace-settings-list-item ui-meta-item">
       <div class="workspace-settings-list-main">
         <div class="workspace-settings-list-title">${escapeHtml(user.displayName || user.email)}</div>
         <div class="workspace-settings-list-meta">${escapeHtml(user.email)}</div>
       </div>
       <div class="workspace-settings-list-side">
-        <span class="workspace-settings-role-pill">${escapeHtml(user.isSuperadmin ? 'admin' : user.role)}</span>
+        <span class="workspace-settings-role-pill ui-tag ui-tag-neutral ui-tag-secondary">${escapeHtml(user.isSuperadmin ? 'admin' : user.role)}</span>
         ${allowRoleActions && !user.isSuperadmin && (user.role === 'editor' || user.role === 'lead')
-          ? `<button class="btn btn-small" data-workspace-action="set-admin-user-role" data-user-id="${escapeHtml(user.id)}" data-role="${user.role === 'lead' ? 'editor' : 'lead'}">${user.role === 'lead' ? 'Сделать editor' : 'Сделать lead'}</button>`
+          ? `<button class="btn btn-small ui-button ui-button-sm" data-workspace-action="set-admin-user-role" data-user-id="${escapeHtml(user.id)}" data-role="${user.role === 'lead' ? 'editor' : 'lead'}">${user.role === 'lead' ? 'Сделать editor' : 'Сделать lead'}</button>`
           : ''}
         ${allowRoleActions
-          ? `<button class="btn btn-small" data-workspace-action="reset-admin-user-password" data-user-id="${escapeHtml(user.id)}">Новый пароль</button>`
+          ? `<button class="btn btn-small ui-button ui-button-sm" data-workspace-action="reset-admin-user-password" data-user-id="${escapeHtml(user.id)}">Новый пароль</button>`
           : ''}
         ${allowRoleActions && !user.isSuperadmin
-          ? `<button class="btn btn-small btn-danger" data-workspace-action="remove-admin-user" data-user-id="${escapeHtml(user.id)}">Удалить</button>`
+          ? `<button class="btn btn-small btn-danger ui-button ui-button-sm ui-button-danger" data-workspace-action="remove-admin-user" data-user-id="${escapeHtml(user.id)}">Удалить</button>`
           : ''}
       </div>
     </div>
@@ -1329,7 +1451,7 @@ const renderAdminTeamsSidebar = () => {
     ? workspaceState.adminTeams.map((team) => `
       <button
         type="button"
-        class="workspace-settings-nav-item ${team.id === activeTeamId ? 'is-active' : ''}"
+        class="workspace-settings-nav-item ui-navigation-button ui-navigation-row ${team.id === activeTeamId ? 'is-active' : ''}"
         data-workspace-action="select-admin-team"
         data-team-id="${escapeHtml(team.id)}"
       >
@@ -1344,8 +1466,8 @@ const renderAdminTeamsSidebar = () => {
       ${teamsHtml}
     </div>
     <div class="workspace-settings-sidebar-footer">
-      <button class="btn primary btn-full workspace-admin-sidebar-create" type="button" data-workspace-action="start-admin-team-create">Создать новую</button>
-      <button class="btn btn-full" data-workspace-action="logout">Выйти</button>
+      <button class="btn primary btn-full ui-button ui-button-inverted ui-button-full workspace-admin-sidebar-create" type="button" data-workspace-action="start-admin-team-create">Создать новую</button>
+      <button class="btn btn-full ui-button ui-button-full" data-workspace-action="logout">Выйти</button>
     </div>
   `;
 };
@@ -1359,36 +1481,35 @@ const renderSettingsAccountView = () => {
           <div class="workspace-settings-view-title">Пользователь</div>
           <div class="workspace-settings-view-subtitle">Личные данные и настройки интерфейса для твоего аккаунта.</div>
         </div>
-        <span class="workspace-settings-role-pill">${escapeHtml(formatWorkspaceRoleLabel())}</span>
+        <span class="workspace-settings-role-pill ui-tag ui-tag-neutral ui-tag-secondary">${escapeHtml(formatWorkspaceRoleLabel())}</span>
       </div>
-      <div class="workspace-settings-surface">
+      <div class="workspace-settings-surface ui-surface">
         <form id="workspaceAccountProfileForm" class="workspace-settings-form" novalidate>
           <div class="workspace-settings-grid workspace-settings-grid-single">
-            <label class="workspace-settings-field">
-              <span class="workspace-settings-field-label">Имя</span>
-              <input class="workspace-settings-input" name="displayName" type="text" value="${escapeHtml(workspaceState.user?.displayName || '')}" placeholder="Твое имя">
-            </label>
+            ${renderUiInputField({ label: 'Имя', name: 'displayName', value: workspaceState.user?.displayName || '', placeholder: 'Твое имя' })}
             ${renderSettingsReadonlyField('Почта', workspaceState.user?.email || '')}
             ${!isWorkspaceSuperadmin() ? renderSettingsReadonlyField('Команда', workspaceState.team?.name || '') : ''}
             ${renderSettingsReadonlyField('Роль', formatWorkspaceRoleLabel())}
-            <label class="workspace-settings-field">
-              <span class="workspace-settings-field-label">Язык</span>
-              <select class="workspace-settings-input" name="language">
-                <option value="ru" ${preferences.language === 'ru' ? 'selected' : ''}>RU</option>
-                <option value="en" ${preferences.language === 'en' ? 'selected' : ''}>EN</option>
-                <option value="tr" ${preferences.language === 'tr' ? 'selected' : ''}>TR</option>
-              </select>
-            </label>
-            <label class="workspace-settings-field">
-              <span class="workspace-settings-field-label">Тема</span>
-              <select class="workspace-settings-input" name="theme">
-                <option value="dark" ${preferences.theme === 'dark' ? 'selected' : ''}>Темная</option>
-                <option value="light" ${preferences.theme === 'light' ? 'selected' : ''}>Светлая</option>
-              </select>
-            </label>
+            ${renderUiSelectField({
+              label: 'Язык',
+              name: 'language',
+              options: [
+                `<option value="ru" ${preferences.language === 'ru' ? 'selected' : ''}>RU</option>`,
+                `<option value="en" ${preferences.language === 'en' ? 'selected' : ''}>EN</option>`,
+                `<option value="tr" ${preferences.language === 'tr' ? 'selected' : ''}>TR</option>`
+              ]
+            })}
+            ${renderUiSelectField({
+              label: 'Тема',
+              name: 'theme',
+              options: [
+                `<option value="dark" ${preferences.theme === 'dark' ? 'selected' : ''}>Темная</option>`,
+                `<option value="light" ${preferences.theme === 'light' ? 'selected' : ''}>Светлая</option>`
+              ]
+            })}
           </div>
           <div class="workspace-settings-form-actions">
-            <button class="btn primary" type="submit">Сохранить</button>
+            <button class="btn primary ui-button ui-button-inverted" type="submit">Сохранить</button>
           </div>
         </form>
       </div>
@@ -1400,15 +1521,15 @@ const renderTeamDefaultsSurface = () => {
   if (!canManageWorkspaceTeamDefaults()) return '';
 
   return `
-    <div class="workspace-settings-surface">
+    <div class="workspace-settings-surface ui-surface">
       <div class="workspace-settings-surface-header">
         <div>
           <div class="workspace-settings-surface-title">Все настройки workspace</div>
-          <div class="workspace-settings-view-subtitle">Открывает полный редактор командных defaults для макета и правил экспорта.</div>
+          <div class="workspace-settings-view-subtitle">Размеры, форматы, умножение и общие правила команды. Значения и фоны внутри редактора уже редактируются в контексте выбранного отдела.</div>
         </div>
       </div>
       <div class="workspace-settings-form-actions">
-        <button class="btn" type="button" data-workspace-action="open-team-defaults">Открыть редактор</button>
+        <button class="btn ui-button" type="button" data-workspace-action="open-team-defaults">Открыть настройки</button>
       </div>
     </div>
   `;
@@ -1418,7 +1539,7 @@ const renderTeamMediaSurface = () => {
   if (!canManageWorkspaceTeamDefaults()) return '';
 
   return `
-    <div class="workspace-settings-surface">
+    <div class="workspace-settings-surface ui-surface">
       <div class="workspace-settings-surface-header">
         <div>
           <div class="workspace-settings-surface-title">Медиа</div>
@@ -1447,7 +1568,7 @@ const renderDepartmentManagementSurface = () => {
     : 'Добавить отдел';
 
   return `
-    <div class="workspace-settings-surface">
+    <div class="workspace-settings-surface ui-surface">
       <div class="workspace-settings-surface-header">
         <div>
           <div class="workspace-settings-surface-title">Отделы</div>
@@ -1457,15 +1578,15 @@ const renderDepartmentManagementSurface = () => {
       <div class="workspace-settings-list">
         ${entries.map((department) => {
           return `
-            <div class="workspace-settings-list-item">
+            <div class="workspace-settings-list-item ui-meta-item">
               <div class="workspace-settings-list-main">
                 <div class="workspace-settings-list-title">${escapeHtml(department.name)}</div>
                 <div class="workspace-settings-list-meta">${escapeHtml(department.slug)}${department.isGeneral ? ' · базовый отдел' : ' · наследует Общий и переопределяет его'}</div>
               </div>
               <div class="workspace-settings-list-side">
-                <button class="btn btn-small" type="button" data-workspace-action="edit-department" data-department-id="${escapeHtml(department.id)}">Изменить</button>
-                <button class="btn btn-small" type="button" data-workspace-action="open-team-defaults" data-department-id="${escapeHtml(department.id)}">${department.isGeneral ? 'Редактировать базу' : 'Редактировать настройки'}</button>
-                ${!department.isGeneral ? `<button class="btn btn-small btn-danger" type="button" data-workspace-action="remove-department" data-department-id="${escapeHtml(department.id)}">Удалить</button>` : ''}
+                <button class="btn btn-small ui-button ui-button-sm" type="button" data-workspace-action="edit-department" data-department-id="${escapeHtml(department.id)}">Изменить</button>
+                <button class="btn btn-small ui-button ui-button-sm" type="button" data-workspace-action="open-team-defaults" data-department-id="${escapeHtml(department.id)}">${department.isGeneral ? 'Редактировать базу' : 'Редактировать настройки'}</button>
+                ${!department.isGeneral ? `<button class="btn btn-small btn-danger ui-button ui-button-sm ui-button-danger" type="button" data-workspace-action="remove-department" data-department-id="${escapeHtml(department.id)}">Удалить</button>` : ''}
               </div>
             </div>
           `;
@@ -1479,18 +1600,12 @@ const renderDepartmentManagementSurface = () => {
           <div class="workspace-settings-surface-title">${escapeHtml(draftModeLabel)}</div>
         </div>
         <div class="workspace-settings-grid workspace-settings-grid-single">
-          <label class="workspace-settings-field">
-            <span class="workspace-settings-field-label">Название отдела</span>
-            <input class="workspace-settings-input" name="name" type="text" value="${escapeHtml(draft.name || fallbackDepartment.name)}" placeholder="Например, Маркетинг" required>
-          </label>
-          <label class="workspace-settings-field">
-            <span class="workspace-settings-field-label">Slug</span>
-            <input class="workspace-settings-input" name="slug" type="text" value="${escapeHtml(draft.slug || fallbackDepartment.slug)}" placeholder="marketing" required>
-          </label>
+          ${renderUiInputField({ label: 'Название отдела', name: 'name', value: draft.name || fallbackDepartment.name, placeholder: 'Например, Маркетинг', required: true })}
+          ${renderUiInputField({ label: 'Slug', name: 'slug', value: draft.slug || fallbackDepartment.slug, placeholder: 'marketing', required: true })}
         </div>
         <div class="workspace-settings-form-actions">
-          <button class="btn primary" type="submit">${draft.mode === 'edit' ? 'Сохранить отдел' : 'Добавить отдел'}</button>
-          ${draft.mode === 'edit' ? '<button class="btn" type="button" data-workspace-action="cancel-department-edit">Отмена</button>' : ''}
+          <button class="btn primary ui-button ui-button-inverted" type="submit">${draft.mode === 'edit' ? 'Сохранить отдел' : 'Добавить отдел'}</button>
+          ${draft.mode === 'edit' ? '<button class="btn ui-button" type="button" data-workspace-action="cancel-department-edit">Отмена</button>' : ''}
         </div>
       </form>
     </div>
@@ -1513,12 +1628,12 @@ const renderSettingsTeamView = () => {
       ${renderTeamDefaultsSurface()}
       ${renderDepartmentManagementSurface()}
       ${renderTeamMediaSurface()}
-      <div class="workspace-settings-surface">
+      <div class="workspace-settings-surface ui-surface">
         <div class="workspace-settings-grid workspace-settings-grid-single">
           ${renderSettingsReadonlyField('Название команды', workspaceState.team?.name || '')}
         </div>
       </div>
-      <div class="workspace-settings-surface">
+      <div class="workspace-settings-surface ui-surface">
         <div class="workspace-settings-surface-header">
           <div class="workspace-settings-surface-title">Кто состоит в этой команде</div>
         </div>
@@ -1546,7 +1661,7 @@ const renderSettingsAdminTeamsView = () => {
       </div>
       ${renderSettingsFeedback()}
       ${renderSettingsSecret()}
-      <div class="workspace-settings-surface">
+      <div class="workspace-settings-surface ui-surface">
         <div class="workspace-settings-surface-header">
           <div class="workspace-settings-surface-title">${draft.mode === 'create' ? 'Новая команда' : 'Настройки команды'}</div>
         </div>
@@ -1554,32 +1669,27 @@ const renderSettingsAdminTeamsView = () => {
           <input type="hidden" name="mode" value="${escapeHtml(draft.mode)}">
           <input type="hidden" name="teamId" value="${escapeHtml(draft.teamId)}">
           <div class="workspace-settings-grid workspace-settings-grid-single">
-            <label class="workspace-settings-field">
-              <span class="workspace-settings-field-label">Название</span>
-              <input class="workspace-settings-input" name="name" type="text" value="${escapeHtml(draft.name)}" placeholder="Например, Яндекс Практикум" required>
-            </label>
-            <label class="workspace-settings-field">
-              <span class="workspace-settings-field-label">Slug</span>
-              <input class="workspace-settings-input" name="slug" type="text" value="${escapeHtml(draft.slug)}" placeholder="yandex-practicum" required>
-            </label>
+            ${renderUiInputField({ label: 'Название', name: 'name', value: draft.name, placeholder: 'Например, Яндекс Практикум', required: true })}
+            ${renderUiInputField({ label: 'Slug', name: 'slug', value: draft.slug, placeholder: 'yandex-practicum', required: true })}
             ${draft.mode === 'edit'
-              ? `<label class="workspace-settings-field">
-                  <span class="workspace-settings-field-label">Статус</span>
-                  <select class="workspace-settings-input" name="status">
-                    <option value="active" ${draft.status === 'active' ? 'selected' : ''}>active</option>
-                    <option value="inactive" ${draft.status === 'inactive' ? 'selected' : ''}>inactive</option>
-                  </select>
-                </label>`
+              ? renderUiSelectField({
+                  label: 'Статус',
+                  name: 'status',
+                  options: [
+                    `<option value="active" ${draft.status === 'active' ? 'selected' : ''}>active</option>`,
+                    `<option value="inactive" ${draft.status === 'inactive' ? 'selected' : ''}>inactive</option>`
+                  ]
+                })
               : ''}
           </div>
           <div class="workspace-settings-form-actions">
-            <button class="btn primary" type="submit">${draft.mode === 'create' ? 'Создать команду' : 'Сохранить изменения'}</button>
+            <button class="btn primary ui-button ui-button-inverted" type="submit">${draft.mode === 'create' ? 'Создать команду' : 'Сохранить изменения'}</button>
           </div>
         </form>
       </div>
       ${draft.mode === 'edit' && selectedTeam ? `
         ${renderDepartmentManagementSurface()}
-        <div class="workspace-settings-surface">
+        <div class="workspace-settings-surface ui-surface">
           <div class="workspace-settings-surface-header">
             <div class="workspace-settings-surface-title">Кто в команде · ${escapeHtml(selectedTeam.name)}</div>
           </div>
@@ -1587,30 +1697,25 @@ const renderSettingsAdminTeamsView = () => {
             ${renderSettingsTeamMembersList(workspaceState.adminUsers, { allowRoleActions: true })}
           </div>
         </div>
-        <div class="workspace-settings-surface">
+        <div class="workspace-settings-surface ui-surface">
           <div class="workspace-settings-surface-header">
             <div class="workspace-settings-surface-title">Добавить пользователя</div>
           </div>
           <form id="workspaceAdminCreateUserForm" class="workspace-settings-form" novalidate>
             <div class="workspace-settings-grid workspace-settings-grid-single">
-              <label class="workspace-settings-field">
-                <span class="workspace-settings-field-label">Имя</span>
-                <input class="workspace-settings-input" name="displayName" type="text" placeholder="Имя пользователя">
-              </label>
-              <label class="workspace-settings-field">
-                <span class="workspace-settings-field-label">Email</span>
-                <input class="workspace-settings-input" name="email" type="email" placeholder="user@example.com" required>
-              </label>
-              <label class="workspace-settings-field">
-                <span class="workspace-settings-field-label">Роль</span>
-                <select class="workspace-settings-input" name="role">
-                  <option value="editor">editor</option>
-                  <option value="lead">lead</option>
-                </select>
-              </label>
+              ${renderUiInputField({ label: 'Имя', name: 'displayName', placeholder: 'Имя пользователя' })}
+              ${renderUiInputField({ label: 'Email', name: 'email', type: 'email', placeholder: 'user@example.com', required: true })}
+              ${renderUiSelectField({
+                label: 'Роль',
+                name: 'role',
+                options: [
+                  '<option value="editor">editor</option>',
+                  '<option value="lead">lead</option>'
+                ]
+              })}
             </div>
             <div class="workspace-settings-form-actions">
-              <button class="btn primary" type="submit" ${selectedTeam.status !== 'active' ? 'disabled' : ''}>Добавить пользователя</button>
+              <button class="btn primary ui-button ui-button-inverted" type="submit" ${selectedTeam.status !== 'active' ? 'disabled' : ''}>Добавить пользователя</button>
             </div>
           </form>
         </div>
@@ -1638,7 +1743,7 @@ const renderSettingsModal = () => {
   const navHtml = views.map((view) => `
     <button
       type="button"
-      class="workspace-settings-nav-item ${view.id === settingsView ? 'is-active' : ''}"
+      class="workspace-settings-nav-item ui-navigation-button ui-navigation-row ${view.id === settingsView ? 'is-active' : ''}"
       data-workspace-action="open-settings-view"
       data-settings-view="${escapeHtml(view.id)}"
     >
@@ -1662,7 +1767,7 @@ const renderSettingsModal = () => {
         <div class="workspace-settings-sidebar-meta-list">
           ${sidebarMetaHtml}
         </div>
-        <button class="btn btn-full" data-workspace-action="logout">Выйти</button>
+        <button class="btn btn-full ui-button ui-button-full" data-workspace-action="logout">Выйти</button>
       </div>
     `;
 
@@ -1724,35 +1829,50 @@ const renderAuthOverlay = () => {
   const errorHtml = workspaceState.authError
     ? `<div class="workspace-auth-error">${escapeHtml(workspaceState.authError)}</div>`
     : '';
+  const closeButtonHtml = workspaceState.authLoading
+    ? ''
+    : '<button class="btn btn-small ui-button ui-button-sm ui-button-subtle" type="button" data-workspace-auth-close="true">Закрыть</button>';
+  const emailField = `
+    <label class="ui-field-block">
+      <span class="ui-control-shell">
+        <input class="ui-input workspace-settings-input workspace-auth-input" id="workspaceAuthEmail" name="email" type="email" autocomplete="username" placeholder="Почта" value="${escapeHtml(draft.email)}" required>
+      </span>
+    </label>
+  `;
+  const passwordField = `
+    <label class="ui-field-block workspace-auth-password-field">
+      <span class="ui-control-shell">
+        <input class="ui-input workspace-settings-input workspace-auth-input" id="workspaceAuthPassword" name="password" type="password" autocomplete="current-password" placeholder="Пароль" value="${escapeHtml(draft.password)}" required>
+        <button
+          class="workspace-auth-password-toggle"
+          type="button"
+          data-workspace-password-toggle="true"
+          aria-label="Показать пароль"
+          aria-pressed="false"
+        >
+          <span class="material-icons" aria-hidden="true">visibility</span>
+        </button>
+      </span>
+    </label>
+  `;
 
   els.authOverlay.innerHTML = `
-    <div class="workspace-auth-shell" style="--workspace-auth-hero-image: url('${escapeHtml(AUTH_HERO_IMAGE)}')">
-      <div class="workspace-auth-card">
-        <div class="workspace-auth-card-body">
+    <div class="workspace-auth-dialog ui-surface">
+      <div class="workspace-auth-dialog-head">
+        <div class="workspace-auth-dialog-copy">
           <img class="workspace-auth-logo" src="assets/logo.svg" alt="AI-Craft">
-          <form id="workspaceAuthForm" class="workspace-auth-form">
-            <label class="workspace-field">
-              <input class="workspace-settings-input workspace-auth-input" id="workspaceAuthEmail" name="email" type="email" autocomplete="username" placeholder="Почта" value="${escapeHtml(draft.email)}" required>
-            </label>
-            <label class="workspace-field workspace-auth-password-field">
-              <input class="workspace-settings-input workspace-auth-input" id="workspaceAuthPassword" name="password" type="password" autocomplete="current-password" placeholder="Пароль" value="${escapeHtml(draft.password)}" required>
-              <button
-                class="workspace-auth-password-toggle"
-                type="button"
-                data-workspace-password-toggle="true"
-                aria-label="Показать пароль"
-                aria-pressed="false"
-              >
-                <span class="material-icons" aria-hidden="true">visibility</span>
-              </button>
-            </label>
-            ${errorHtml}
-            <button class="btn primary workspace-auth-submit" type="submit" ${(workspaceState.authLoading || !isAuthDraftComplete()) ? 'disabled' : ''}>${buttonLabel}</button>
-          </form>
+          <div class="workspace-auth-dialog-title">Войти в AI-Craft</div>
+          <div class="workspace-auth-dialog-subtitle">Войдите по почте и паролю, чтобы сохранять проекты, шаблоны и настройки команды.</div>
         </div>
-        <div class="workspace-auth-footer">Вайб-код от <a href="https://staff.yandex-team.ru/vidmich" target="_blank" rel="noopener">@vidmich</a></div>
+        ${closeButtonHtml}
       </div>
-      <div class="workspace-auth-hero" aria-hidden="true"></div>
+      <form id="workspaceAuthForm" class="workspace-auth-form ui-stack">
+        ${emailField}
+        ${passwordField}
+        ${errorHtml}
+        <button class="btn primary workspace-auth-submit ui-button ui-button-inverted" type="submit" ${(workspaceState.authLoading || !isAuthDraftComplete()) ? 'disabled' : ''}>${buttonLabel}</button>
+      </form>
+      <div class="workspace-auth-footer">Вайб-код от <a href="https://staff.yandex-team.ru/vidmich" target="_blank" rel="noopener">@vidmich</a></div>
     </div>
   `;
 
@@ -1794,7 +1914,7 @@ const resetWorkspaceSessionState = () => {
   resetDepartmentDraft();
 };
 
-const performLogout = async ({ reopenAuth = true } = {}) => {
+const performLogout = async ({ reopenAuth = false } = {}) => {
   try {
     await logoutWorkspace();
   } finally {
@@ -1831,7 +1951,7 @@ const restoreWorkspaceSession = async () => {
   restoreUserPreferences(workspaceState.user);
 
   if (!workspaceState.team) {
-    workspaceState.authScreenVisible = true;
+    workspaceState.authScreenVisible = false;
     renderWorkspaceSummary();
     renderAuthOverlay();
     return;
@@ -2128,12 +2248,12 @@ const handleSettingsModalAction = async (action, event) => {
   }
   if (action === 'logout') {
     closeModal();
-    await performLogout({ reopenAuth: true });
+    await performLogout({ reopenAuth: false });
     return;
   }
   if (action === 'logout-and-switch-team') {
     closeModal();
-    await performLogout({ reopenAuth: true });
+    await performLogout({ reopenAuth: false });
     return;
   }
   if (action === 'close-settings') {
@@ -2300,9 +2420,6 @@ const submitAuthForm = async (form) => {
     updateAuthDraftField('password', '');
     setWorkspaceSessionHint(true);
     await restoreWorkspaceSession();
-    if (workspaceState.user) {
-      await openSettingsModal({ scope: 'user', view: 'account', title: 'Настройки пользователя' });
-    }
   } catch (error) {
     workspaceState.authError = error.message || 'Не удалось завершить авторизацию';
     if (error?.status === 401) {
@@ -2408,6 +2525,17 @@ const attachGlobalListeners = () => {
   });
 
   els.authOverlay.addEventListener('click', (event) => {
+    if (event.target === els.authOverlay) {
+      closeAuthScreen();
+      return;
+    }
+
+    const closeButton = event.target.closest('[data-workspace-auth-close]');
+    if (closeButton) {
+      closeAuthScreen();
+      return;
+    }
+
     const toggle = event.target.closest('[data-workspace-password-toggle]');
     if (!toggle) return;
 
@@ -2440,14 +2568,14 @@ const injectWorkspaceUi = () => {
   controls.className = 'workspace-controls';
   controls.innerHTML = `
     <div id="workspaceStatus" class="workspace-status">Workspace...</div>
-    <button id="workspaceProjectsBtn" class="btn">Шаблоны</button>
-    <button id="workspaceSaveBtn" class="btn">Сохранить</button>
-    <button id="workspaceTemplateBtn" class="btn">Сохранить как шаблон</button>
-    <button id="workspaceTeamBtn" class="btn workspace-team-trigger" style="display:none;">
+    <button id="workspaceProjectsBtn" class="btn ui-button">Шаблоны</button>
+    <button id="workspaceSaveBtn" class="btn ui-button">Сохранить</button>
+    <button id="workspaceTemplateBtn" class="btn ui-button">Сохранить как шаблон</button>
+    <button id="workspaceTeamBtn" class="btn ui-button workspace-team-trigger" style="display:none;">
       <span class="workspace-team-trigger-label">Команда</span>
       <span class="material-icons" aria-hidden="true">settings</span>
     </button>
-    <button id="workspaceAccountBtn" class="btn primary">Войти</button>
+    <button id="workspaceAccountBtn" class="btn primary ui-button ui-button-inverted">Войти</button>
   `;
   headerActions.prepend(controls);
 
@@ -2459,7 +2587,7 @@ const injectWorkspaceUi = () => {
     <div class="workspace-modal-panel">
       <div class="workspace-modal-header">
         <div id="workspaceModalTitle" class="workspace-modal-title">Workspace</div>
-        <button id="workspaceModalCloseBtn" class="btn btn-small">Закрыть</button>
+        <button id="workspaceModalCloseBtn" class="btn btn-small ui-button ui-button-sm">Закрыть</button>
       </div>
       <div id="workspaceModalBody" class="workspace-modal-body"></div>
     </div>
@@ -2487,7 +2615,7 @@ export const initWorkspacePanel = async () => {
   if (!mounted) return;
 
   attachGlobalListeners();
-  workspaceState.authScreenVisible = true;
+  workspaceState.authScreenVisible = false;
   renderWorkspaceSummary();
   renderAuthOverlay();
 
@@ -2505,21 +2633,17 @@ export const initWorkspacePanel = async () => {
     return;
   }
 
-  if (!hasWorkspaceSessionHint()) {
-    renderWorkspaceSummary();
-    openAuthScreen();
-    return;
-  }
-
   try {
     await restoreWorkspaceSession();
+    if (workspaceState.user && workspaceState.team) {
+      setWorkspaceSessionHint(true);
+    }
   } catch (error) {
     if (error?.status === 401) {
       setWorkspaceSessionHint(false);
     } else {
       console.warn('Workspace session restore failed:', error);
     }
-    openAuthScreen();
   }
 
   renderWorkspaceSummary();

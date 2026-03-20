@@ -1,0 +1,68 @@
+/*
+ * See README.md for instructions on how to use this file.
+ *
+ * Note: This file is published publically via public npm packages. Do not include any private or sensitive information.
+ */
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Default",
+  "compilerOptions": {
+    // Modules
+    "module": "node20",
+    "moduleResolution": "node16", // Note: there is no `node20` moduleResolution.
+
+    // Interoperability
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    // Emit
+    "target": "esnext",
+    "preserveConstEnums": true, // TODO: not necessary, implied by isolatedModules
+
+    // Support single-file transpilation processes (esbuild, swc, etc.)
+    "isolatedModules": true,
+    "isolatedDeclarations": true,
+    // TODO: "verbatimModuleSyntax": true,
+
+    // Enable source maps, declaration files, and declaration maps. These are often necessary/useful,
+    // and there's little reason not to generate them by default.
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    // Include source files in the source map. This is the recommended practice for rules_ts.
+    // https://github.com/aspect-build/rules_ts/blob/main/docs/troubleshooting.md#source-maps-missing
+    "inlineSources": true,
+
+    // Maximize strictness.
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowUnreachableCode": false,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "useUnknownInCatchVariables": true,
+    "allowUnusedLabels": false,
+
+    // By default, all `@types` packages in all ancestor node_modules trees are visible. This
+    // is slow and the wrong behavior for monorepos. For example, it makes it very easy to
+    // load conflicting global types. Setting the default to `[]` instead forces explicit
+    // declaration of the desired global `@types` packages.
+    "types": [],
+
+    // Save time during compilation at the expense of type-system accuracy.
+    "skipLibCheck": true,
+
+    // Improve output formatting and behavior.
+    "pretty": true,
+    "preserveWatchOutput": true
+  },
+  // This is the same as the tsc default, but recapitulating it here avoids an undesirable
+  // interaction with `--outDir`: https://github.com/microsoft/TypeScript/issues/59036
+  "exclude": ["node_modules"]
+}

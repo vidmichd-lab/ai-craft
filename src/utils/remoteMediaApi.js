@@ -44,6 +44,17 @@ const buildJsonRequestHeaders = (body) => {
   return headers;
 };
 
+const normalizeTargetPath = (value) => {
+  if (typeof value !== 'string') return '';
+
+  const cleaned = value
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/\/+/g, '/');
+
+  return cleaned;
+};
+
 export const getRemoteMediaApiBaseUrl = async () => {
   const remote = await ensureRemoteEnabled();
   return normalizeApiBaseUrl(remote.manifestUrl);
@@ -55,6 +66,7 @@ export const isRemoteMediaEnabled = async () => {
 };
 
 export const requestPresignedUpload = async ({
+  targetPath = '',
   folder1,
   folder2,
   filename,
@@ -71,6 +83,7 @@ export const requestPresignedUpload = async ({
     method: 'POST',
     headers: buildJsonRequestHeaders(true),
     body: JSON.stringify({
+      targetPath: normalizeTargetPath(targetPath),
       folder1,
       folder2,
       filename,
@@ -89,6 +102,7 @@ export const requestPresignedUpload = async ({
 
 export const uploadRemoteFile = async ({
   file,
+  targetPath = '',
   folder1,
   folder2,
   visibility = 'published'
@@ -98,6 +112,7 @@ export const uploadRemoteFile = async ({
   }
 
   const presign = await requestPresignedUpload({
+    targetPath,
     folder1,
     folder2,
     filename: file.name,
@@ -147,6 +162,56 @@ export const deleteRemoteObject = async ({ key }) => {
     method: 'DELETE',
     body: { key }
   });
+};
+
+export const createRemoteFolder = async ({ targetPath, visibility = 'published' }) => {
+  const normalizedTargetPath = normalizeTargetPath(targetPath);
+  if (!normalizedTargetPath) {
+    throw new Error('createRemoteFolder requires a targetPath');
+  }
+
+  return sendRemoteMediaRequest('/media/folder', {
+    method: 'POST',
+    body: {
+      targetPath: normalizedTargetPath,
+      visibility
+    }
+  });
+};
+
+export const renameRemoteFolder = async ({ fromPath, toPath, visibility = 'published' }) => {
+  const normalizedFromPath = normalizeTargetPath(fromPath);
+  const normalizedToPath = normalizeTargetPath(toPath);
+  if (!normalizedFromPath || !normalizedToPath) {
+    throw new Error('renameRemoteFolder requires fromPath and toPath');
+  }
+
+  return sendRemoteMediaRequest('/media/folder/rename', {
+    method: 'POST',
+    body: {
+      fromPath: normalizedFromPath,
+      toPath: normalizedToPath,
+      visibility
+    }
+  });
+};
+
+export const loadRemoteMediaManifest = async () => {
+  const apiBaseUrl = await getRemoteMediaApiBaseUrl();
+  if (!apiBaseUrl) {
+    throw new Error('Remote media API base URL is missing');
+  }
+
+  const response = await fetch(`${apiBaseUrl}/media/manifest`, {
+    method: 'GET',
+    headers: buildJsonRequestHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorResponse(response));
+  }
+
+  return response.json();
 };
 
 export const publishRemoteObject = async ({ key, visibility = 'published' }) => {

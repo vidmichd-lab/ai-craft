@@ -80,7 +80,7 @@ const buildHeaders = (origin, extra = {}) => ({
   'Content-Type': 'application/json; charset=utf-8',
   'Access-Control-Allow-Origin': resolveCorsOrigin(origin),
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
   'Access-Control-Max-Age': '3600',
   ...extra
 });
@@ -123,6 +123,17 @@ const sanitizeSegment = (value, { allowDots = false } = {}) => {
     .toLowerCase();
 };
 
+const normalizeLogicalPath = (value) => {
+  const input = typeof value === 'string' ? value.trim() : '';
+  if (!input) return [];
+
+  return input
+    .replace(/^\/+|\/+$/g, '')
+    .split('/')
+    .map((segment) => sanitizeSegment(segment, { allowDots: false }))
+    .filter(Boolean);
+};
+
 const splitFileName = (value) => {
   const original = typeof value === 'string' ? value.trim() : '';
   if (!original) {
@@ -142,9 +153,26 @@ const splitFileName = (value) => {
   return { basename, extension };
 };
 
-const buildObjectKey = ({ visibility, folder1, folder2, filename }) => {
+const resolveTargetParts = ({ targetPath = '', folder1 = '', folder2 = '' } = {}) => {
+  const targetParts = normalizeLogicalPath(targetPath);
+  if (targetParts.length > 0) {
+    if (targetParts[0] === 'logo' || targetParts[0] === 'font') {
+      return targetParts;
+    }
+    if (targetParts[0] === 'assets') {
+      return targetParts.length > 1 ? targetParts.slice(1) : ['assets'];
+    }
+    return targetParts;
+  }
+
+  const root = sanitizeSegment(folder1);
+  const nested = sanitizeSegment(folder2);
+  return [root, nested].filter(Boolean);
+};
+
+const buildObjectKey = ({ visibility, targetParts, filename }) => {
   const prefix = visibility === 'published' ? config.mediaPublicPrefix : config.mediaDraftPrefix;
-  return `${prefix}${folder1}/${folder2}/${filename}`;
+  return `${prefix}${[...targetParts, filename].join('/')}`;
 };
 
 const detectVisibilityFromKey = (key) => {
@@ -159,14 +187,15 @@ const parseObjectKey = (key, prefix) => {
 
   const relativePath = key.slice(prefix.length);
   const parts = relativePath.split('/').filter(Boolean);
-  if (parts.length < 3) return null;
+  if (parts.length < 2) return null;
 
-  const [folder1, folder2, ...rest] = parts;
-  const fileName = rest.join('/');
+  const [rootName, ...rest] = parts;
+  const fileName = rest[rest.length - 1];
+  const nestedSegments = rest.slice(0, -1);
 
   return {
-    folder1,
-    folder2,
+    rootName,
+    nestedSegments,
     fileName,
     key,
     relativePath
@@ -194,36 +223,19 @@ const maybeBuildPublicUrl = (key) => {
   }
 };
 
-const createManifestEntry = async (object) => {
-  const parsed = parseObjectKey(object.Key, config.mediaPublicPrefix);
-  if (!parsed) return null;
-
-  let fileUrl = '';
+const createSignedGetUrl = async (key) => {
   if (config.mediaSignedGets) {
-    fileUrl = await getSignedUrl(
+    return getSignedUrl(
       client,
       new GetObjectCommand({
         Bucket: config.mediaBucket,
-        Key: object.Key
+        Key: key
       }),
       { expiresIn: config.mediaUrlTtlSeconds }
     );
-  } else {
-    fileUrl = maybeBuildPublicUrl(object.Key);
   }
 
-  if (!fileUrl) return null;
-
-  return {
-    folder1: parsed.folder1,
-    folder2: parsed.folder2,
-    name: inferDisplayName(parsed.fileName),
-    file: fileUrl,
-    key: object.Key,
-    size: object.Size || 0,
-    etag: object.ETag ? object.ETag.replace(/"/g, '') : '',
-    lastModified: object.LastModified ? new Date(object.LastModified).toISOString() : null
-  };
+  return maybeBuildPublicUrl(key);
 };
 
 const listPublishedObjects = async ({ folder1Filter = '', folder2Filter = '' } = {}) => {
@@ -259,33 +271,66 @@ const listPublishedObjects = async ({ folder1Filter = '', folder2Filter = '' } =
   return result;
 };
 
-const buildManifest = async ({ folder1Filter = '', folder2Filter = '' } = {}) => {
-  const objects = await listPublishedObjects({ folder1Filter, folder2Filter });
-  const entries = await Promise.all(objects.map((object) => createManifestEntry(object)));
+const ensureFolderNode = (tree, segments = []) => {
+  let current = tree;
+  segments.forEach((segment) => {
+    if (!current[segment] || typeof current[segment] !== 'object' || Array.isArray(current[segment])) {
+      current[segment] = {};
+    }
+    current = current[segment];
+  });
+  if (!Array.isArray(current.__files)) {
+    current.__files = [];
+  }
+  return current;
+};
 
+const sortManifestTree = (node) => {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+
+  if (Array.isArray(node.__files)) {
+    node.__files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  }
+
+  Object.entries(node).forEach(([key, value]) => {
+    if (key === '__files') return;
+    sortManifestTree(value);
+  });
+};
+
+const buildManifest = async ({ rootFilter = '', firstNestedFilter = '' } = {}) => {
+  const objects = await listPublishedObjects();
   const assets = {};
-  entries.filter(Boolean).forEach((entry) => {
-    if (!assets[entry.folder1]) {
-      assets[entry.folder1] = {};
-    }
-    if (!assets[entry.folder1][entry.folder2]) {
-      assets[entry.folder1][entry.folder2] = [];
-    }
-    assets[entry.folder1][entry.folder2].push({
-      name: entry.name,
-      file: entry.file,
-      size: entry.size,
-      etag: entry.etag,
-      lastModified: entry.lastModified,
-      key: entry.key
-    });
-  });
 
-  Object.values(assets).forEach((level1) => {
-    Object.keys(level1).forEach((folder2) => {
-      level1[folder2].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  for (const object of objects) {
+    const parsed = parseObjectKey(object.Key, config.mediaPublicPrefix);
+    if (!parsed) continue;
+    if (rootFilter && parsed.rootName !== rootFilter) continue;
+    if (firstNestedFilter && parsed.nestedSegments[0] !== firstNestedFilter) continue;
+
+    if (!assets[parsed.rootName] || typeof assets[parsed.rootName] !== 'object' || Array.isArray(assets[parsed.rootName])) {
+      assets[parsed.rootName] = {};
+    }
+
+    const targetNode = ensureFolderNode(assets[parsed.rootName], parsed.nestedSegments);
+    if (parsed.fileName === '.keep') {
+      continue;
+    }
+
+    const fileUrl = await createSignedGetUrl(object.Key);
+    if (!fileUrl) continue;
+
+    targetNode.__files.push({
+      name: inferDisplayName(parsed.fileName),
+      file: fileUrl,
+      size: object.Size || 0,
+      etag: object.ETag ? object.ETag.replace(/"/g, '') : '',
+      lastModified: object.LastModified ? new Date(object.LastModified).toISOString() : null,
+      key: object.Key
     });
-  });
+  }
+
+  Object.values(assets).forEach((rootNode) => sortManifestTree(rootNode));
 
   return {
     ok: true,
@@ -295,18 +340,18 @@ const buildManifest = async ({ folder1Filter = '', folder2Filter = '' } = {}) =>
   };
 };
 
-const buildMetadata = ({ folder1, folder2, originalFilename, requestId }) => ({
-  folder1,
-  folder2,
+const buildMetadata = ({ rootName, nestedPath, originalFilename, requestId }) => ({
+  rootName,
+  nestedPath,
   originalFilename,
   requestId
 });
 
 const handleManifest = async (event, origin) => {
   const params = event?.queryStringParameters || {};
-  const folder1Filter = sanitizeSegment(params.folder1 || '');
-  const folder2Filter = sanitizeSegment(params.folder2 || '');
-  const payload = await buildManifest({ folder1Filter, folder2Filter });
+  const rootFilter = sanitizeSegment(params.folder1 || params.root || '');
+  const firstNestedFilter = sanitizeSegment(params.folder2 || params.folder || '');
+  const payload = await buildManifest({ rootFilter, firstNestedFilter });
   return json(200, payload, origin);
 };
 
@@ -347,16 +392,19 @@ const ensureManagedObjectKey = (key) => {
 
 const handlePresignUpload = async (event, origin) => {
   const body = parseBody(event);
-  const folder1 = sanitizeSegment(body.folder1);
-  const folder2 = sanitizeSegment(body.folder2);
+  const targetParts = resolveTargetParts({
+    targetPath: body.targetPath || body.path || '',
+    folder1: body.folder1,
+    folder2: body.folder2
+  });
   const visibility = body.visibility === 'published' ? 'published' : 'draft';
   const contentType = typeof body.contentType === 'string' ? body.contentType.trim() : '';
   const overwrite = body.overwrite === true;
   const maxFileSizeBytes = Number.isFinite(body.maxFileSizeBytes) ? Number(body.maxFileSizeBytes) : config.maxFileSizeBytes;
   const fileSize = Number.isFinite(body.fileSize) ? Number(body.fileSize) : null;
 
-  if (!folder1 || !folder2) {
-    return json(400, toErrorBody('folder1 and folder2 are required'), origin);
+  if (targetParts.length === 0) {
+    return json(400, toErrorBody('targetPath is required'), origin);
   }
 
   assertAllowedMimeType(contentType);
@@ -377,8 +425,7 @@ const handlePresignUpload = async (event, origin) => {
     : fileParts.basename;
   const objectKey = buildObjectKey({
     visibility,
-    folder1,
-    folder2,
+    targetParts,
     filename: safeFilename
   });
 
@@ -391,8 +438,8 @@ const handlePresignUpload = async (event, origin) => {
 
   const requestId = randomUUID();
   const metadata = buildMetadata({
-    folder1,
-    folder2,
+    rootName: targetParts[0] || '',
+    nestedPath: targetParts.slice(1).join('/'),
     originalFilename: typeof body.filename === 'string' ? body.filename.trim() : safeFilename,
     requestId
   });
@@ -419,6 +466,103 @@ const handlePresignUpload = async (event, origin) => {
     expiresIn: config.mediaUrlTtlSeconds,
     visibility,
     maxFileSizeBytes
+  }, origin);
+};
+
+const buildFolderPrefix = ({ visibility, targetParts }) => {
+  const prefix = visibility === 'published' ? config.mediaPublicPrefix : config.mediaDraftPrefix;
+  return `${prefix}${targetParts.join('/')}/`;
+};
+
+const listManagedObjectsByPrefix = async (prefix) => {
+  const result = [];
+  let continuationToken;
+
+  do {
+    const response = await client.send(new ListObjectsV2Command({
+      Bucket: config.mediaBucket,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+      MaxKeys: LIST_PAGE_SIZE
+    }));
+
+    const contents = Array.isArray(response.Contents) ? response.Contents : [];
+    result.push(...contents.filter((item) => item?.Key));
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return result;
+};
+
+const handleCreateFolder = async (event, origin) => {
+  const body = parseBody(event);
+  const visibility = body.visibility === 'draft' ? 'draft' : 'published';
+  const targetParts = resolveTargetParts({
+    targetPath: body.targetPath || body.path || '',
+    folder1: body.folder1,
+    folder2: body.folder2
+  });
+
+  if (targetParts.length === 0) {
+    return json(400, toErrorBody('targetPath is required'), origin);
+  }
+
+  const objectKey = `${buildFolderPrefix({ visibility, targetParts })}.keep`;
+  await client.send(new PutObjectCommand({
+    Bucket: config.mediaBucket,
+    Key: objectKey,
+    Body: '',
+    ContentType: 'application/octet-stream'
+  }));
+
+  return json(200, {
+    ok: true,
+    key: objectKey,
+    folder: targetParts.join('/'),
+    visibility
+  }, origin);
+};
+
+const handleRenameFolder = async (event, origin) => {
+  const body = parseBody(event);
+  const visibility = body.visibility === 'draft' ? 'draft' : 'published';
+  const fromParts = resolveTargetParts({ targetPath: body.fromPath || '' });
+  const toParts = resolveTargetParts({ targetPath: body.toPath || '' });
+
+  if (fromParts.length === 0 || toParts.length === 0) {
+    return json(400, toErrorBody('fromPath and toPath are required'), origin);
+  }
+
+  const sourcePrefix = buildFolderPrefix({ visibility, targetParts: fromParts });
+  const destinationPrefix = buildFolderPrefix({ visibility, targetParts: toParts });
+  const objects = await listManagedObjectsByPrefix(sourcePrefix);
+
+  if (objects.length === 0) {
+    return json(404, toErrorBody('Folder not found', { fromPath: fromParts.join('/') }), origin);
+  }
+
+  for (const object of objects) {
+    const sourceKey = object.Key;
+    const relativePath = sourceKey.slice(sourcePrefix.length);
+    const destinationKey = `${destinationPrefix}${relativePath}`;
+
+    await client.send(new CopyObjectCommand({
+      Bucket: config.mediaBucket,
+      CopySource: `${config.mediaBucket}/${sourceKey}`,
+      Key: destinationKey
+    }));
+
+    await client.send(new DeleteObjectCommand({
+      Bucket: config.mediaBucket,
+      Key: sourceKey
+    }));
+  }
+
+  return json(200, {
+    ok: true,
+    renamed: true,
+    fromPath: fromParts.join('/'),
+    toPath: toParts.join('/')
   }, origin);
 };
 
@@ -516,6 +660,14 @@ export const handler = async (event = {}) => {
 
     if (method === 'POST' && (path.endsWith('/media/presign-upload') || path === '/media/presign-upload')) {
       return await handlePresignUpload(event, origin);
+    }
+
+    if (method === 'POST' && (path.endsWith('/media/folder') || path === '/media/folder')) {
+      return await handleCreateFolder(event, origin);
+    }
+
+    if (method === 'POST' && (path.endsWith('/media/folder/rename') || path === '/media/folder/rename')) {
+      return await handleRenameFolder(event, origin);
     }
 
     if (method === 'DELETE' && (path.endsWith('/media/object') || path === '/media/object')) {

@@ -1,6 +1,6 @@
-import { renderer } from './renderer.js';
 import { getState, getCheckedSizes } from './state/store.js';
 import { loadImage as loadImageCached } from './utils/imageCache.js';
+import { renderToCanvas } from '../packages/editor-renderer/src/legacy/render-to-canvas.js';
 
 const downloadBlob = (blob, filename) => {
   const url = URL.createObjectURL(blob);
@@ -36,13 +36,6 @@ const compressCanvasImage = async (canvas, format, maxSizeBytes) => {
   return bestBlob;
 };
 
-const getRendererInternals = () => {
-  if (!renderer.__unsafe_getRenderToCanvas) {
-    throw new Error('Renderer internals are not exposed.');
-  }
-  return renderer.__unsafe_getRenderToCanvas();
-};
-
 /** Load a single image from URL (uses cache). Returns Promise<Image>; use .catch(() => null) for preload. */
 const loadImage = (url) => {
   if (!url || typeof url !== 'string') return Promise.resolve(null);
@@ -74,7 +67,6 @@ const loadImage = (url) => {
 };
 
 async function renderSizeToBlob(canvas, width, height, state, format, quality) {
-  const { renderToCanvas } = getRendererInternals();
   canvas.width = width;
   canvas.height = height;
   renderToCanvas(canvas, width, height, state);
@@ -123,7 +115,6 @@ const exportSizes = async (format) => {
   }
 
   const zip = isRsyaMode ? null : new JSZip();
-  const { renderToCanvas } = getRendererInternals();
 
   // Предзагрузка всех KV и BG изображений параллельно
   const pairAssets = await Promise.all(

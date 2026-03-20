@@ -1,4 +1,25 @@
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from 'playwright/test';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const baselinePath = resolve(__dirname, './fixtures/renderer-regression-baselines.json');
+const defaultRenderStatePath = resolve(__dirname, '../packages/editor-renderer/src/default-render-state.json');
+const shouldUpdateBaselines = process.env.AI_CRAFT_UPDATE_RENDERER_BASELINES === '1';
+const defaultRenderState = JSON.parse(readFileSync(defaultRenderStatePath, 'utf8'));
+
+const readBaselines = () => {
+  if (!existsSync(baselinePath)) return {};
+  return JSON.parse(readFileSync(baselinePath, 'utf8'));
+};
+
+const writeBaselines = (payload) => {
+  mkdirSync(dirname(baselinePath), { recursive: true });
+  writeFileSync(baselinePath, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+};
 
 const RENDER_CASES = [
   {
@@ -35,10 +56,14 @@ test('keeps logo, legal and age visible when wide layouts render without KV', as
 
   await page.goto('/', { waitUntil: 'networkidle' });
 
-  const results = await page.evaluate(async (renderCases) => {
-    const { getState } = await import('/src/state/store.js');
-    const { renderer } = await import('/src/renderer.js');
-    const { renderToCanvas } = renderer.__unsafe_getRenderToCanvas();
+  const results = await page.evaluate(async ({ renderCases, defaultRenderState }) => {
+    const { configureLegacyRendererRuntime } = await import('/packages/editor-renderer/src/legacy/runtime-config.js');
+    const { renderToCanvas } = await import('/packages/editor-renderer/src/legacy/render-to-canvas.js');
+
+    configureLegacyRendererRuntime({
+      getCheckedSizes: () => [],
+      createStateSnapshot: () => structuredClone(defaultRenderState)
+    });
 
     const loadImage = (src) => new Promise((resolve, reject) => {
       const img = new Image();
@@ -52,7 +77,7 @@ test('keeps logo, legal and age visible when wide layouts render without KV', as
     return renderCases.map((renderCase) => {
       const canvas = document.createElement('canvas');
       const renderState = {
-        ...getState(),
+        ...structuredClone(defaultRenderState),
         platform: 'Regression',
         bgColor: '#1e1e1e',
         logo,
@@ -73,10 +98,25 @@ test('keeps logo, legal and age visible when wide layouts render without KV', as
         hasMeta: Boolean(meta),
         hasLogo: Boolean(meta?.elementsBounds?.logo),
         hasLegal: Boolean(meta?.elementsBounds?.legal),
-        hasAge: Boolean(meta?.elementsBounds?.age)
+        hasAge: Boolean(meta?.elementsBounds?.age),
+        imageDataUrl: canvas.toDataURL('image/png')
       };
     });
-  }, RENDER_CASES);
+  }, { renderCases: RENDER_CASES, defaultRenderState });
+
+  const baselinePayload = Object.fromEntries(
+    results.map((result) => [
+      result.label,
+      createHash('sha256').update(result.imageDataUrl).digest('hex')
+    ])
+  );
+
+  if (shouldUpdateBaselines) {
+    writeBaselines(baselinePayload);
+  }
+
+  const baselines = readBaselines();
+  expect(Object.keys(baselines).length, 'renderer baselines are missing; run npm run test:renderer:update').toBeGreaterThan(0);
 
   for (const result of results) {
     expect(result.hasMeta, `${result.label}: renderToCanvas returned no meta`).toBe(true);
@@ -90,5 +130,9 @@ test('keeps logo, legal and age visible when wide layouts render without KV', as
     expect(result.hasLogo, `${result.label}: logo disappeared`).toBe(true);
     expect(result.hasLegal, `${result.label}: legal disappeared`).toBe(true);
     expect(result.hasAge, `${result.label}: 18+ disappeared`).toBe(true);
+    expect(
+      createHash('sha256').update(result.imageDataUrl).digest('hex'),
+      `${result.label}: renderer snapshot hash changed`
+    ).toBe(baselines[result.label]);
   }
 });

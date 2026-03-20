@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { Banner, Button, SectionHeader, TabButton } from '@ai-craft/ui';
 import styles from './workspace-shell.module.css';
 
 type MediaEntry = {
@@ -106,33 +107,44 @@ export function MediaLibrary({ onUseAsset }: Props) {
   return (
     <section className={styles.panel}>
       <div className={styles.stack}>
-        <div>
-          <div className={styles.sectionLabel}>Media</div>
-          <h2 className={styles.sectionTitle}>Командная медиатека</h2>
-        </div>
-        {notice ? <div className={styles.notice}>{notice}</div> : null}
-        {error ? <div className={styles.error}>{error}</div> : null}
+        <SectionHeader eyebrow="Media" title="Командная медиатека" />
+        {notice ? (
+          <Banner className={styles.notice} tone="notice">
+            {notice}
+          </Banner>
+        ) : null}
+        {error ? (
+          <Banner className={styles.error} tone="error">
+            {error}
+          </Banner>
+        ) : null}
         {loading ? <div className={styles.empty}>Загружаем медиа...</div> : null}
         {!loading ? (
           <>
             <div className={styles.groupTabs}>
               {groups.map((group) => (
-                <button
+                <TabButton
                   key={group.id}
                   type="button"
                   className={`${styles.groupTab} ${group.id === selectedGroup?.id ? styles.groupTabActive : ''}`}
+                  active={group.id === selectedGroup?.id}
                   onClick={() => setSelectedGroupId(group.id)}
                 >
                   {group.title}
-                </button>
+                </TabButton>
               ))}
             </div>
             {selectedGroup ? (
               <>
                 <div className={styles.actionsRow}>
-                  <label className={styles.button}>
+                  <label className={styles.button} style={{ position: 'relative' }}>
                     {uploading ? 'Загружаем...' : 'Загрузить в эту папку'}
-                    <input hidden type="file" onChange={handleUpload} disabled={uploading} />
+                    <input
+                      style={{ position: 'absolute', inset: 0, opacity: 0, cursor: uploading ? 'default' : 'pointer' }}
+                      type="file"
+                      onChange={handleUpload}
+                      disabled={uploading}
+                    />
                   </label>
                 </div>
                 <div className={styles.mediaGrid}>
@@ -152,15 +164,15 @@ export function MediaLibrary({ onUseAsset }: Props) {
                       <div className={styles.memberEmail}>{entry.folder1} / {entry.folder2}</div>
                       {onUseAsset ? (
                         <div className={styles.actionsRow}>
-                          <button className={styles.button} type="button" onClick={() => onUseAsset(entry, 'background')}>
+                          <Button type="button" onClick={() => onUseAsset(entry, 'background')}>
                             Как фон
-                          </button>
-                          <button className={styles.button} type="button" onClick={() => onUseAsset(entry, 'logo')}>
+                          </Button>
+                          <Button type="button" onClick={() => onUseAsset(entry, 'logo')}>
                             Как лого
-                          </button>
-                          <button className={styles.button} type="button" onClick={() => onUseAsset(entry, 'kv')}>
+                          </Button>
+                          <Button type="button" onClick={() => onUseAsset(entry, 'kv')}>
                             Как KV
-                          </button>
+                          </Button>
                         </div>
                       ) : null}
                     </article>

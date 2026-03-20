@@ -1,0 +1,6 @@
+{
+  "1920x720 without KV": "8b3efd578daeababce42980eaf98f49e62f394bddbded47192b6b0e8dbb74407",
+  "1920x720 with stale KV flag": "8b3efd578daeababce42980eaf98f49e62f394bddbded47192b6b0e8dbb74407",
+  "320x50 without KV": "a23314328d8eae47117ce15a9195178ab213a0edb51916bed4785660e67e3335",
+  "320x50 with stale KV flag": "a23314328d8eae47117ce15a9195178ab213a0edb51916bed4785660e67e3335"
+}

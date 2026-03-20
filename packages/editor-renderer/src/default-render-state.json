@@ -1,0 +1,395 @@
+{
+  "paddingPercent": 5,
+  "titleSubtitlePairs": [
+    {
+      "id": "pair-1773953082891-0",
+      "title": "Курс «Frontend-разработчик» от Практикума",
+      "subtitle": "Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев",
+      "kvSelected": "assets/3d/logos/40.webp",
+      "bgImageSelected": null,
+      "bgColor": "#1e1e1e"
+    }
+  ],
+  "activePairIndex": 0,
+  "titleColor": "#ffffff",
+  "titleOpacity": 100,
+  "titleAlign": "left",
+  "titleVPos": "top",
+  "titleSize": 8,
+  "titleSizeBeforePro": null,
+  "titleWeight": "Regular",
+  "titleLetterSpacing": 0,
+  "titleLineHeight": 1.1,
+  "titleFontFamily": "YS Text",
+  "titleFontFamilyFile": null,
+  "titleCustomFont": null,
+  "titleCustomFontName": null,
+  "titleTransform": "none",
+  "subtitleColor": "#e0e0e0",
+  "subtitleOpacity": 90,
+  "subtitleAlign": "left",
+  "subtitleSize": 4,
+  "subtitleWeight": "Regular",
+  "subtitleLetterSpacing": 0,
+  "subtitleLineHeight": 1.2,
+  "subtitleGap": -1,
+  "titleLogoGap": 4,
+  "titleSubtitleRatio": 0.5,
+  "subtitleFontFamily": "YS Text",
+  "subtitleFontFamilyFile": null,
+  "subtitleCustomFont": null,
+  "subtitleCustomFontName": null,
+  "subtitleTransform": "none",
+  "title": "Курс «Frontend-разработчик» от Практикума",
+  "subtitle": "Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев",
+  "legal": "Рекламодатель АНО ДПО «Образовательные технологии Яндекса», действующая на основании лицензии N° ЛО35-01298-77/00185314 от 24 марта 2015 года, 119021, г. Москва, ул. Тимура Фрунзе, д. 11, к. 2. ОГРН 1147799006123 Сайт: https://practicum.yandex.ru/",
+  "legalKZ": "*Жарнама / Реклама. ТОО \"Y. Izdeu men Jarnama\", регистрационный номер:170240015454 Сайт: https://practicum.yandex.kz/.",
+  "legalColor": "#ffffff",
+  "legalOpacity": 60,
+  "legalAlign": "left",
+  "legalSize": 2,
+  "legalTransform": "none",
+  "legalWeight": "Regular",
+  "legalLetterSpacing": 0,
+  "legalLineHeight": 1.4,
+  "age": "18+",
+  "ageGapPercent": 1,
+  "titleOffsetTopPx": 0,
+  "titleOffsetBottomPx": 0,
+  "subtitleOffsetTopPx": 0,
+  "subtitleOffsetBottomPx": 0,
+  "legalOffsetTopPx": 0,
+  "legalOffsetBottomPx": 0,
+  "ageOffsetTopPx": 0,
+  "ageOffsetBottomPx": 0,
+  "ageSize": 4,
+  "ageWeight": "Regular",
+  "showLogo": true,
+  "showSubtitle": true,
+  "hideSubtitleOnWide": false,
+  "showLegal": true,
+  "showAge": true,
+  "showKV": true,
+  "showBlocks": false,
+  "showGuides": false,
+  "logo": null,
+  "logoSelected": "logo/white/ru/main.svg",
+  "defaultLogoRU": null,
+  "defaultLogoKZ": null,
+  "defaultLogoPRO": null,
+  "logoDefaultMode": "single",
+  "logoSize": 40,
+  "logoOffsetTopPx": 0,
+  "logoOffsetBottomPx": 0,
+  "logoLanguage": "ru",
+  "proMode": false,
+  "departmentId": "",
+  "projectMode": "rsya",
+  "variantMode": "reskill",
+  "rsyaLayout": "center",
+  "rsyaVisualCount": 1,
+  "rsyaKVScale": 200,
+  "rsyaKVScale1": 100,
+  "rsyaKVScale2": 100,
+  "rsyaKVScale3": 100,
+  "rsyaKVGap": 8,
+  "rsyaKVOffsetX": 0,
+  "rsyaKVOffsetY": 0,
+  "rsyaCropGridVisible": false,
+  "partnerLogo": null,
+  "partnerLogoFile": null,
+  "kv": null,
+  "kvSelected": "assets/3d/logos/40.webp",
+  "rsyaKV2": null,
+  "rsyaKV2Selected": "",
+  "rsyaKV3": null,
+  "rsyaKV3Selected": "",
+  "kvBorderRadius": 0,
+  "kvPosition": "center",
+  "bgColor": "#1e1e1e",
+  "bgGradient": null,
+  "bgGradientAngle": 0,
+  "bgImage": null,
+  "bgSize": "cover",
+  "bgPosition": "center",
+  "bgVPosition": "center",
+  "bgImageSize": 100,
+  "bgOffsetX": 0,
+  "bgOffsetY": 0,
+  "textGradientOpacity": 100,
+  "centerTextOverlayOpacity": 20,
+  "logoPos": "left",
+  "fontFamily": "YS Text",
+  "fontFamilyFile": null,
+  "customFont": null,
+  "legalFontFamily": "YS Text",
+  "legalFontFamilyFile": null,
+  "legalCustomFont": null,
+  "legalCustomFontName": null,
+  "ageFontFamily": "YS Text",
+  "ageFontFamilyFile": null,
+  "ageCustomFont": null,
+  "ageCustomFontName": null,
+  "presetSizes": {
+    "Общие": [
+      {
+        "width": 1080,
+        "height": 1080,
+        "checked": true
+      },
+      {
+        "width": 1080,
+        "height": 1920,
+        "checked": true
+      },
+      {
+        "width": 1920,
+        "height": 720,
+        "checked": true
+      }
+    ],
+    "РСЯ": [
+      {
+        "width": 1600,
+        "height": 1200,
+        "checked": true
+      },
+      {
+        "width": 240,
+        "height": 400,
+        "checked": true
+      }
+    ],
+    "Яндекс Директ": [
+      {
+        "width": 160,
+        "height": 600,
+        "checked": true
+      },
+      {
+        "width": 240,
+        "height": 600,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 250,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 300,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 500,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 600,
+        "checked": true
+      },
+      {
+        "width": 320,
+        "height": 50,
+        "checked": true
+      },
+      {
+        "width": 320,
+        "height": 100,
+        "checked": true
+      },
+      {
+        "width": 320,
+        "height": 480,
+        "checked": true
+      },
+      {
+        "width": 336,
+        "height": 280,
+        "checked": true
+      },
+      {
+        "width": 480,
+        "height": 320,
+        "checked": true
+      },
+      {
+        "width": 728,
+        "height": 90,
+        "checked": true
+      },
+      {
+        "width": 970,
+        "height": 250,
+        "checked": true
+      },
+      {
+        "width": 1000,
+        "height": 120,
+        "checked": true
+      }
+    ],
+    "MTS": [
+      {
+        "width": 200,
+        "height": 200,
+        "checked": true
+      },
+      {
+        "width": 240,
+        "height": 400,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 250,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 300,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 50,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 600,
+        "checked": true
+      },
+      {
+        "width": 320,
+        "height": 50,
+        "checked": true
+      },
+      {
+        "width": 320,
+        "height": 100,
+        "checked": true
+      },
+      {
+        "width": 320,
+        "height": 480,
+        "checked": true
+      },
+      {
+        "width": 336,
+        "height": 280,
+        "checked": true
+      },
+      {
+        "width": 728,
+        "height": 90,
+        "checked": true
+      }
+    ],
+    "Upravel": [
+      {
+        "width": 300,
+        "height": 250,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 300,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 600,
+        "checked": true
+      },
+      {
+        "width": 320,
+        "height": 50,
+        "checked": true
+      },
+      {
+        "width": 320,
+        "height": 100,
+        "checked": true
+      },
+      {
+        "width": 336,
+        "height": 280,
+        "checked": true
+      }
+    ],
+    "Habr": [
+      {
+        "width": 300,
+        "height": 250,
+        "checked": true
+      },
+      {
+        "width": 300,
+        "height": 600,
+        "checked": true
+      },
+      {
+        "width": 520,
+        "height": 800,
+        "checked": true
+      },
+      {
+        "width": 960,
+        "height": 450,
+        "checked": true
+      },
+      {
+        "width": 1560,
+        "height": 320,
+        "checked": true
+      }
+    ],
+    "Ozon": [
+      {
+        "width": 2832,
+        "height": 600,
+        "checked": true
+      },
+      {
+        "width": 1080,
+        "height": 450,
+        "checked": true
+      }
+    ]
+  },
+  "customSizes": [],
+  "namePrefix": "layout",
+  "kvCanvasWidth": null,
+  "kvCanvasHeight": null,
+  "exportScale": 1,
+  "brandName": "Практикума",
+  "favicon": "",
+  "layoutMode": "auto",
+  "maxFileSizeUnit": "KB",
+  "maxFileSizeValue": 200,
+  "habrBorderEnabled": false,
+  "habrBorderColor": "#D5DDDF",
+  "safeAreas": {
+    "Ozon": {
+      "2832x600": {
+        "width": 2100,
+        "height": 570
+      },
+      "1080x450": {
+        "width": 1020,
+        "height": 405
+      }
+    },
+    "РСЯ": {
+      "1600x1200": {
+        "width": 900,
+        "height": 900
+      }
+    }
+  },
+  "logoSizeMultipliers": {}
+}

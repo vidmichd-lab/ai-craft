@@ -1,0 +1,7 @@
+{
+  "name": "test-raw-with-substitutions",
+  "version": "1.0.0",
+  "dependencies": {
+    "react": "^18.0.0"
+  }
+}

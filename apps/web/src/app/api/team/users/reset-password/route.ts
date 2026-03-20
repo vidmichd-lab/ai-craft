@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireWorkspaceAdminSession } from '@/server/auth/request-session';
+import { createRequestContext } from '@/server/http/request-context';
 import { jsonWithCookies, toRouteErrorResponse } from '@/server/http/response';
 import { resetTeamMemberPassword } from '@/server/services/team-admin';
 
@@ -9,9 +9,10 @@ const payloadSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const context = createRequestContext(request);
   try {
     const payload = payloadSchema.parse(await request.json());
-    const session = await requireWorkspaceAdminSession(request);
+    const session = await requireWorkspaceAdminSession(request, context);
     if (!session.ok) return session.response;
 
     const result = await resetTeamMemberPassword(
@@ -19,11 +20,12 @@ export async function POST(request: Request) {
         teamId: session.me.team.id,
         userId: payload.userId
       },
-      session.cookie
+      session.cookie,
+      session.me.user
     );
 
-    return jsonWithCookies(result.data, result.setCookies);
+    return jsonWithCookies(result.data, result.setCookies, context);
   } catch (error) {
-    return toRouteErrorResponse(error, 'Password reset failed');
+    return toRouteErrorResponse(error, 'Password reset failed', context);
   }
 }

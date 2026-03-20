@@ -5,7 +5,7 @@
 import { getState, setState, setKey } from '../../state/store.js';
 import { AVAILABLE_FONTS, AVAILABLE_WEIGHTS, FONT_WEIGHT_TO_NAME, FONT_NAME_TO_WEIGHT } from '../../constants.js';
 import { renderer } from '../../renderer.js';
-import { clearTextMeasurementCache } from '../../renderer/text.js';
+import { clearTextMeasurementCache } from '../../renderer.js';
 import { getDom } from '../domCache.js';
 import { withLoader } from '../../utils/loader.js';
 
@@ -1018,4 +1018,3 @@ export const initializeFontDropdowns = () => {
     }
   }
 };
-

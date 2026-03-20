@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import styles from './workspace-shell.module.css';
+import { Button } from '@ai-craft/ui';
 
 export function LogoutButton() {
   const router = useRouter();
@@ -28,8 +28,8 @@ export function LogoutButton() {
   };
 
   return (
-    <button className={styles.button} type="button" onClick={handleClick} disabled={pending}>
+    <Button type="button" onClick={handleClick} disabled={pending}>
       {pending ? 'Выходим...' : 'Выйти'}
-    </button>
+    </Button>
   );
 }

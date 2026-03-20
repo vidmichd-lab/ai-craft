@@ -642,21 +642,49 @@ const buildStructureFromRemoteManifest = (manifest, baseUrl = '') => {
 
   const structure = {};
 
-  Object.entries(candidateRoot).forEach(([folder1, level1]) => {
-    if (!level1 || typeof level1 !== 'object') return;
+  if (isPlainObject(candidateRoot.logo)) {
+    structure.logo = candidateRoot.logo;
+  }
 
-    Object.entries(level1).forEach(([folder2, entries]) => {
-      if (!Array.isArray(entries)) return;
+  if (isPlainObject(candidateRoot.font)) {
+    structure.font = candidateRoot.font;
+  }
 
-      const files = entries
-        .map((entry) => normalizeRemoteManifestEntry(entry, folder2, baseUrl))
-        .filter(Boolean);
+  const visitNode = (folder1, node, pathSegments = []) => {
+    if (!node || typeof node !== 'object') return;
 
-      if (!files.length) return;
+    const files = Array.isArray(node.__files)
+      ? node.__files
+        .map((entry) => normalizeRemoteManifestEntry(entry, pathSegments[0] || 'root', baseUrl))
+        .filter(Boolean)
+      : [];
+
+    if (files.length > 0) {
       if (!structure[folder1]) {
         structure[folder1] = {};
       }
-      structure[folder1][folder2] = files;
+      const folder2 = pathSegments[0] || 'root';
+      if (!Array.isArray(structure[folder1][folder2])) {
+        structure[folder1][folder2] = [];
+      }
+      structure[folder1][folder2].push(...files);
+    }
+
+    Object.entries(node).forEach(([key, value]) => {
+      if (key === '__files') return;
+      visitNode(folder1, value, [...pathSegments, key]);
+    });
+  };
+
+  Object.entries(candidateRoot).forEach(([folder1, level1]) => {
+    if (folder1 === 'logo' || folder1 === 'font') return;
+    visitNode(folder1, level1, []);
+  });
+
+  Object.values(structure).forEach((level1) => {
+    Object.keys(level1).forEach((folder2) => {
+      if (!Array.isArray(level1[folder2])) return;
+      level1[folder2].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
     });
   });
 
@@ -670,50 +698,56 @@ const pickRemoteAssetRoots = (remoteStructure) => Object.fromEntries(
 const buildLogoStructureFromRemoteRoot = (remoteLogoRoot) => {
   const remoteLogos = {};
 
-  Object.entries(isPlainObject(remoteLogoRoot) ? remoteLogoRoot : {}).forEach(([folder1, entries]) => {
-    if (!Array.isArray(entries)) return;
+  const visitNode = (folder1, node, pathSegments = []) => {
+    if (!node || typeof node !== 'object') return;
 
-    entries.forEach((entry) => {
-      const relativePath = getRelativeRemotePath(entry, 'logo', folder1);
-      if (!relativePath) return;
+    const files = Array.isArray(node.__files) ? node.__files : [];
+    files.forEach((entry) => {
+      const fileUrl = typeof entry?.file === 'string' ? entry.file : '';
+      if (!fileUrl) return;
 
-      const parts = relativePath.split('/').filter(Boolean);
-      if (parts.length === 0) return;
-
-      const fileName = parts[parts.length - 1];
+      const fileName = (fileUrl.split('?')[0].split('/').pop() || '').trim();
       const displayName = fileName.replace(/\.svg$/i, '').replace(/_/g, ' ');
       const labelParts = [
         capitalizeLabel(folder1),
-        ...parts.slice(0, -1).map(capitalizeLabel),
+        ...pathSegments.map(capitalizeLabel),
         capitalizeLabel(displayName)
       ];
       const remoteItem = {
         name: labelParts.join(' / '),
-        file: entry.file,
+        file: fileUrl,
         key: entry.key || ''
       };
 
-      if (parts.length === 1) {
-        if (!remoteLogos[folder1]) remoteLogos[folder1] = {};
+      if (!remoteLogos[folder1]) remoteLogos[folder1] = {};
+
+      if (pathSegments.length === 0) {
         if (!Array.isArray(remoteLogos[folder1].root)) remoteLogos[folder1].root = [];
         remoteLogos[folder1].root.push(remoteItem);
         return;
       }
 
-      if (parts.length === 2) {
-        const [folder2] = parts;
-        if (!remoteLogos[folder1]) remoteLogos[folder1] = {};
+      if (pathSegments.length === 1) {
+        const [folder2] = pathSegments;
         if (!Array.isArray(remoteLogos[folder1][folder2])) remoteLogos[folder1][folder2] = [];
         remoteLogos[folder1][folder2].push(remoteItem);
         return;
       }
 
-      const [folder2, folder3] = parts;
-      if (!remoteLogos[folder1]) remoteLogos[folder1] = {};
+      const [folder2, folder3] = pathSegments;
       if (!isPlainObject(remoteLogos[folder1][folder2])) remoteLogos[folder1][folder2] = {};
       if (!Array.isArray(remoteLogos[folder1][folder2][folder3])) remoteLogos[folder1][folder2][folder3] = [];
       remoteLogos[folder1][folder2][folder3].push(remoteItem);
     });
+
+    Object.entries(node).forEach(([key, value]) => {
+      if (key === '__files') return;
+      visitNode(folder1, value, [...pathSegments, key]);
+    });
+  };
+
+  Object.entries(isPlainObject(remoteLogoRoot) ? remoteLogoRoot : {}).forEach(([folder1, node]) => {
+    visitNode(folder1, node, []);
   });
 
   return remoteLogos;
@@ -722,38 +756,66 @@ const buildLogoStructureFromRemoteRoot = (remoteLogoRoot) => {
 const buildRemoteFontsFromRoot = (remoteFontsRoot) => {
   const remoteFonts = [];
 
-  Object.entries(isPlainObject(remoteFontsRoot) ? remoteFontsRoot : {}).forEach(([fontFamily, entries]) => {
-    if (!Array.isArray(entries)) return;
-
+  const visitNode = (fontFamily, node) => {
     const foundFonts = new Map();
-    entries.forEach((entry) => {
-      const relativePath = getRelativeRemotePath(entry, 'font', fontFamily);
-      const fileName = relativePath.split('/').filter(Boolean).pop();
-      if (!fileName || !/\.woff2?$/i.test(fileName)) return;
 
-      const parsed = parseFontFileName(fileName, fontFamily);
-      const ext = fileName.split('.').pop().toLowerCase();
-      const key = `${fontFamily}-${parsed.weight}-${parsed.style}`;
-      const existing = foundFonts.get(key);
-      const extPriority = { woff2: 2, woff: 1, ttf: 0 };
+    const visitEntries = (entries) => {
+      if (!Array.isArray(entries)) return;
 
-      if (!existing || (extPriority[ext] || 0) > (extPriority[existing.ext] || 0)) {
-        foundFonts.set(key, {
-          family: fontFamily,
-          name: `${fontFamily} ${parsed.weightName}`,
-          file: entry.file,
-          weight: parsed.weight,
-          style: parsed.style,
-          weightName: parsed.weightName,
-          key: entry.key || '',
-          ext
-        });
+      entries.forEach((entry) => {
+        const relativePath = getRelativeRemotePath(entry, 'font', fontFamily);
+        const fileName = relativePath.split('/').filter(Boolean).pop();
+        if (!fileName || !/\.woff2?$/i.test(fileName)) return;
+
+        const parsed = parseFontFileName(fileName, fontFamily);
+        const ext = fileName.split('.').pop().toLowerCase();
+        const key = `${fontFamily}-${parsed.weight}-${parsed.style}`;
+        const existing = foundFonts.get(key);
+        const extPriority = { woff2: 2, woff: 1, ttf: 0 };
+
+        if (!existing || (extPriority[ext] || 0) > (extPriority[existing.ext] || 0)) {
+          foundFonts.set(key, {
+            family: fontFamily,
+            name: `${fontFamily} ${parsed.weightName}`,
+            file: entry.file,
+            weight: parsed.weight,
+            style: parsed.style,
+            weightName: parsed.weightName,
+            key: entry.key || '',
+            ext
+          });
+        }
+      });
+    };
+
+    const walk = (value) => {
+      if (Array.isArray(value)) {
+        visitEntries(value);
+        return;
       }
-    });
+
+      if (!isPlainObject(value)) return;
+
+      if (Array.isArray(value.__files)) {
+        visitEntries(value.__files);
+      }
+
+      Object.entries(value).forEach(([key, child]) => {
+        if (key === '__files') return;
+        walk(child);
+      });
+    };
+
+    walk(node);
 
     foundFonts.forEach((font) => {
       remoteFonts.push(font);
     });
+  };
+
+  Object.entries(isPlainObject(remoteFontsRoot) ? remoteFontsRoot : {}).forEach(([fontFamily, node]) => {
+    if (!fontFamily) return;
+    visitNode(fontFamily, node);
   });
 
   return remoteFonts;

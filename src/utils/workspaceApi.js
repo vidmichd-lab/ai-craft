@@ -41,7 +41,7 @@ const buildRequestHeaders = ({ body, headers = {} }) => {
   };
 
   if (body !== undefined && !nextHeaders['Content-Type']) {
-    nextHeaders['Content-Type'] = 'text/plain;charset=UTF-8';
+    nextHeaders['Content-Type'] = 'application/json';
   }
 
   return nextHeaders;

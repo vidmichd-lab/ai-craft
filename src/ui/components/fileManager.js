@@ -3,107 +3,67 @@
  */
 
 import { scanLogos, scanKV, scanBG } from '../../utils/assetScanner.js';
-import { deleteRemoteObject, isRemoteMediaEnabled, publishRemoteObject, uploadRemoteFile } from '../../utils/remoteMediaApi.js';
+import {
+  createRemoteFolder,
+  deleteRemoteObject,
+  isRemoteMediaEnabled,
+  loadRemoteMediaManifest,
+  publishRemoteObject,
+  renameRemoteFolder,
+  uploadRemoteFile
+} from '../../utils/remoteMediaApi.js';
 
 const isRemoteFilePath = (filePath) => typeof filePath === 'string' && /^(https?:)?\/\//i.test(filePath);
-const REMOTE_ASSETS_FOLDERS_STORAGE_KEY = 'file-manager-remote-assets-folders';
+const REMOTE_FOLDER_FILES_KEY = '__files';
 
-const parseRemoteAssetsTargetPath = (targetPath) => {
-  if (typeof targetPath !== 'string') return null;
+const normalizeManagerPath = (value) => String(value || '')
+  .trim()
+  .replace(/^\/+|\/+$/g, '')
+  .replace(/\/+/g, '/');
 
-  const normalized = targetPath.trim().replace(/^\/+|\/+$/g, '');
-  if (!normalized.startsWith('assets/')) return null;
-
-  const parts = normalized.split('/');
-  if (parts.length !== 3) return null;
-
-  const [, folder1, folder2] = parts;
-  if (!folder1 || !folder2) return null;
-
-  return { folder1, folder2 };
+const getRemoteManifestAssets = async () => {
+  const manifest = await loadRemoteMediaManifest();
+  return manifest?.assets && typeof manifest.assets === 'object' ? manifest.assets : {};
 };
 
-const normalizeFolderSegment = (value) => {
-  if (typeof value !== 'string') return '';
-  return value.trim().replace(/^\/+|\/+$/g, '');
-};
-
-const normalizeRemoteFolderRegistryEntry = (value) => {
-  const normalized = normalizeFolderSegment(value);
-  if (!normalized.startsWith('assets/')) return '';
-
-  const parts = normalized.split('/').filter(Boolean);
-  if (parts[0] !== 'assets') return '';
-  if (parts.length === 2 && parts[1]) {
-    return `assets/${parts[1]}`;
-  }
-  if (parts.length === 3 && parts[1] && parts[2]) {
-    return `assets/${parts[1]}/${parts[2]}`;
+const normalizeRemoteTreeNode = (node) => {
+  if (Array.isArray(node)) {
+    return node;
   }
 
-  return '';
-};
-
-const loadRemoteAssetsFolderRegistry = () => {
-  if (typeof window === 'undefined') return [];
-
-  try {
-    const raw = window.localStorage.getItem(REMOTE_ASSETS_FOLDERS_STORAGE_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    return Array.from(new Set(parsed.map(normalizeRemoteFolderRegistryEntry).filter(Boolean))).sort();
-  } catch (error) {
-    console.warn('Не удалось прочитать реестр remote-папок:', error);
-    return [];
+  if (!node || typeof node !== 'object') {
+    return {};
   }
-};
 
-const saveRemoteAssetsFolderRegistry = (folders) => {
-  if (typeof window === 'undefined') return;
-
-  const normalized = Array.from(new Set((folders || []).map(normalizeRemoteFolderRegistryEntry).filter(Boolean))).sort();
-  window.localStorage.setItem(REMOTE_ASSETS_FOLDERS_STORAGE_KEY, JSON.stringify(normalized));
-};
-
-const registerRemoteAssetsFolder = (folderPath) => {
-  const normalized = normalizeRemoteFolderRegistryEntry(folderPath);
-  if (!normalized) return [];
-
-  const next = Array.from(new Set([...loadRemoteAssetsFolderRegistry(), normalized])).sort();
-  saveRemoteAssetsFolderRegistry(next);
-  return next;
-};
-
-const unregisterRemoteAssetsFolder = (folderPath) => {
-  const normalized = normalizeRemoteFolderRegistryEntry(folderPath);
-  if (!normalized) return [];
-
-  const next = loadRemoteAssetsFolderRegistry().filter((item) => item !== normalized && !item.startsWith(`${normalized}/`));
-  saveRemoteAssetsFolderRegistry(next);
-  return next;
-};
-
-const mergeRemoteAssetsFoldersIntoStructure = (structure, folders) => {
-  const target = structure && typeof structure === 'object' ? structure : {};
-
-  (folders || []).forEach((folderPath) => {
-    const normalized = normalizeRemoteFolderRegistryEntry(folderPath);
-    if (!normalized) return;
-
-    const [, folder1, folder2] = normalized.split('/');
-    if (!target[folder1] || typeof target[folder1] !== 'object' || Array.isArray(target[folder1])) {
-      target[folder1] = {};
+  const normalized = {};
+  Object.entries(node).forEach(([key, value]) => {
+    if (key === REMOTE_FOLDER_FILES_KEY) {
+      normalized[REMOTE_FOLDER_FILES_KEY] = Array.isArray(value) ? value : [];
+      return;
     }
-    if (!folder2) return;
-    if (!target[folder1][folder2] || typeof target[folder1][folder2] !== 'object' || Array.isArray(target[folder1][folder2])) {
-      target[folder1][folder2] = {};
-    }
+    normalized[key] = normalizeRemoteTreeNode(value);
   });
 
-  return target;
+  return normalized;
+};
+
+const extractRemoteStructureForBasePath = async (basePath) => {
+  const assets = await getRemoteManifestAssets();
+
+  if (basePath === 'logo') {
+    return normalizeRemoteTreeNode(assets.logo || {});
+  }
+
+  if (basePath === 'assets') {
+    const structure = {};
+    Object.entries(assets).forEach(([rootName, value]) => {
+      if (rootName === 'logo' || rootName === 'font') return;
+      structure[rootName] = normalizeRemoteTreeNode(value);
+    });
+    return structure;
+  }
+
+  return {};
 };
 
 const parsePathSegmentsFromUrl = (value) => {
@@ -128,6 +88,26 @@ const inferFileNameFromPath = (value) => {
   const parts = parsePathSegmentsFromUrl(value);
   return parts.length > 0 ? parts[parts.length - 1] : '';
 };
+
+const joinClassNames = (...values) => values.filter(Boolean).join(' ');
+
+const fileManagerButtonClass = ({
+  small = false,
+  danger = false,
+  full = false,
+  active = false,
+  root = false,
+  icon = false
+} = {}) => joinClassNames(
+  small ? 'btn-small' : 'btn',
+  full && 'btn-full',
+  'ui-button',
+  small && 'ui-button-sm',
+  danger && 'btn-danger ui-button-danger',
+  active && 'ui-button-inverted is-active',
+  root && 'file-manager-root-button',
+  icon && 'file-manager-icon-button'
+);
 
 const buildDisplayFileName = (file) => {
   const explicitName = typeof file?.name === 'string' ? file.name.trim() : '';
@@ -156,13 +136,12 @@ const buildDisplayFileName = (file) => {
 const api = {
   async uploadFile(file, targetPath) {
     const remoteEnabled = await isRemoteMediaEnabled().catch(() => false);
-    const remoteTarget = remoteEnabled ? parseRemoteAssetsTargetPath(targetPath) : null;
+    const normalizedTargetPath = normalizeManagerPath(targetPath);
 
-    if (remoteTarget) {
+    if (remoteEnabled && (normalizedTargetPath === 'logo' || normalizedTargetPath.startsWith('logo/') || normalizedTargetPath === 'assets' || normalizedTargetPath.startsWith('assets/'))) {
       return uploadRemoteFile({
         file,
-        folder1: remoteTarget.folder1,
-        folder2: remoteTarget.folder2,
+        targetPath: normalizedTargetPath,
         visibility: 'published'
       });
     }
@@ -261,6 +240,11 @@ const api = {
  * Получает структуру папок из файловой системы
  */
 async function getFolderStructure(basePath) {
+  const remoteEnabled = await isRemoteMediaEnabled().catch(() => false);
+  if (remoteEnabled && (basePath === 'logo' || basePath === 'assets')) {
+    return extractRemoteStructureForBasePath(basePath);
+  }
+
   // Используем существующие функции сканирования
   if (basePath === 'logo') {
     const structure = await scanLogos();
@@ -310,26 +294,26 @@ export function renderFileManager() {
         </div>
       </div>
       
-      <div style="padding: 16px; background: ${bgPrimary}; border: 1px solid ${borderColor}; border-radius: 8px;">
+      <div class="file-manager-panel" style="padding: 16px; background: ${bgPrimary}; border: 1px solid ${borderColor}; border-radius: 8px;">
         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid ${borderColor};">
           <span class="material-icons" style="color: #FF9800; font-size: 20px;">image</span>
           <h3 style="margin: 0; color: ${textPrimary}; font-size: 18px; font-weight: 600;">Папки</h3>
         </div>
         
         <div style="display: flex; gap: 12px; margin-bottom: 20px;">
-          <button class="btn btn-full" id="fileManagerLogoBtn" data-base-path="logo" style="flex: 1; padding: 12px; background: var(--bg-secondary, #1a1a1a); border: 1px solid ${borderColor}; border-radius: 6px; color: ${textPrimary}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <button class="${fileManagerButtonClass({ full: true, root: true })}" id="fileManagerLogoBtn" data-base-path="logo" style="flex: 1; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
             <span class="material-icons" style="font-size: 18px;">account_circle</span>
             <span>Логотипы (logo)</span>
           </button>
-          <button class="btn btn-full" id="fileManagerAssetsBtn" data-base-path="assets" style="flex: 1; padding: 12px; background: var(--bg-secondary, #1a1a1a); border: 1px solid ${borderColor}; border-radius: 6px; color: ${textPrimary}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <button class="${fileManagerButtonClass({ full: true, root: true })}" id="fileManagerAssetsBtn" data-base-path="assets" style="flex: 1; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
             <span class="material-icons" style="font-size: 18px;">image</span>
             <span>Ассеты (assets)</span>
           </button>
         </div>
         
         <div id="fileManagerContent" style="display: none;">
-          <div id="fileManagerBreadcrumb" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 12px; background: ${bgPrimary}; border: 1px solid ${borderColor}; border-radius: 6px; flex-wrap: wrap;">
-            <button class="btn btn-small" id="fileManagerBackBtn" style="display: none; padding: 4px 8px; background: var(--bg-secondary, #1a1a1a); border: 1px solid ${borderColor}; border-radius: 4px; color: ${textPrimary}; cursor: pointer;" title="Назад">
+          <div id="fileManagerBreadcrumb" class="file-manager-breadcrumb" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 12px; background: ${bgPrimary}; border: 1px solid ${borderColor}; border-radius: 6px; flex-wrap: wrap;">
+            <button class="${fileManagerButtonClass({ small: true, icon: true })}" id="fileManagerBackBtn" style="display: none;" title="Назад">
               <span class="material-icons" style="font-size: 18px;">arrow_back</span>
             </button>
             <span class="material-icons" style="font-size: 18px; color: ${textSecondary};">folder</span>
@@ -337,21 +321,21 @@ export function renderFileManager() {
           </div>
           
           <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-            <button class="btn" id="fileManagerCreateFolderBtn" style="flex: 1; padding: 10px; background: var(--bg-secondary, #1a1a1a); border: 1px solid ${borderColor}; border-radius: 6px; color: ${textPrimary}; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <button class="${fileManagerButtonClass()}" id="fileManagerCreateFolderBtn" style="flex: 1; padding: 10px; display: flex; align-items: center; justify-content: center; gap: 6px;">
               <span class="material-icons" style="font-size: 18px;">create_new_folder</span>
               <span>Создать папку</span>
             </button>
-            <button class="btn" id="fileManagerUploadBtn" style="flex: 1; padding: 10px; background: var(--bg-secondary, #1a1a1a); border: 1px solid ${borderColor}; border-radius: 6px; color: ${textPrimary}; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+            <button class="${fileManagerButtonClass()}" id="fileManagerUploadBtn" style="flex: 1; padding: 10px; display: flex; align-items: center; justify-content: center;">
               <span>Загрузить файл</span>
             </button>
-            <button class="btn" id="fileManagerRefreshBtn" style="padding: 10px; background: var(--bg-secondary, #1a1a1a); border: 1px solid ${borderColor}; border-radius: 6px; color: ${textPrimary}; cursor: pointer;">
+            <button class="${fileManagerButtonClass({ icon: true })}" id="fileManagerRefreshBtn" style="padding: 10px;">
               <span class="material-icons" style="font-size: 18px;">refresh</span>
             </button>
           </div>
           
           <div id="fileManagerHint" style="display: none; margin-bottom: 16px; padding: 10px 12px; background: rgba(33, 150, 243, 0.1); border-left: 3px solid #2196F3; border-radius: 4px; color: ${textSecondary}; font-size: 13px; line-height: 1.45;"></div>
           
-          <div id="fileManagerTree" style="max-height: 500px; overflow-y: auto; border: 1px solid ${borderColor}; border-radius: 6px; padding: 12px; background: ${bgPrimary}; min-height: 200px;">
+          <div id="fileManagerTree" class="file-manager-tree" style="max-height: 500px; overflow-y: auto; border: 1px solid ${borderColor}; border-radius: 6px; padding: 12px; background: ${bgPrimary}; min-height: 200px;">
             <!-- Дерево файлов будет отрисовано здесь -->
           </div>
         </div>
@@ -369,22 +353,9 @@ export function initFileManager() {
   let pathHistory = []; // История путей для навигации назад
   let latestStructure = null;
   let pendingUploadTargetPath = '';
-
-  const getRemoteAssetsTarget = () => parseRemoteAssetsTargetPath(currentPath || currentBasePath || '');
-  const getCurrentAssetsDepth = () => (currentPath || currentBasePath || '').split('/').filter(Boolean).length;
-
-  const getRemoteAssetsSubfolders = () => {
-    if (!latestStructure || currentBasePath !== 'assets') return [];
-
-    const currentContent = getFolderContent(latestStructure, currentPath);
-    if (!currentContent || typeof currentContent !== 'object' || Array.isArray(currentContent)) {
-      return [];
-    }
-
-    return Object.entries(currentContent)
-      .filter(([, value]) => Array.isArray(value))
-      .map(([key]) => key)
-      .sort();
+  const isRemoteManagedBasePath = async () => {
+    if (currentBasePath !== 'assets' && currentBasePath !== 'logo') return false;
+    return isRemoteMediaEnabled().catch(() => false);
   };
 
   const getRemoteFolderKeys = (node) => {
@@ -401,44 +372,6 @@ export function initFileManager() {
     return Object.values(node).flatMap((value) => getRemoteFolderKeys(value));
   };
 
-  const resolveRemoteUploadTargetPath = () => {
-    const directTarget = getRemoteAssetsTarget();
-    if (directTarget) {
-      return `assets/${directTarget.folder1}/${directTarget.folder2}`;
-    }
-
-    const pathParts = (currentPath || '').split('/').filter(Boolean);
-    if (pathParts.length !== 2 || pathParts[0] !== 'assets') {
-      return '';
-    }
-
-    const options = getRemoteAssetsSubfolders();
-    if (options.length === 0) {
-      return '';
-    }
-
-    if (options.length === 1) {
-      return `${currentPath}/${options[0]}`;
-    }
-
-    const selected = prompt(
-      `Выберите подпапку для загрузки: ${options.join(', ')}`,
-      options[0]
-    );
-
-    if (!selected) {
-      return '';
-    }
-
-    const normalized = selected.trim();
-    if (!options.includes(normalized)) {
-      alert(`Допустимые папки: ${options.join(', ')}`);
-      return '';
-    }
-
-    return `${currentPath}/${normalized}`;
-  };
-
   const setButtonDisabled = (button, disabled) => {
     if (!button) return;
     button.disabled = disabled;
@@ -451,41 +384,16 @@ export function initFileManager() {
     const uploadBtn = document.getElementById('fileManagerUploadBtn');
     const hint = document.getElementById('fileManagerHint');
 
-    const remoteMediaEnabled = await isRemoteMediaEnabled().catch(() => false);
-    const remoteAssetsEnabled = currentBasePath === 'assets' && remoteMediaEnabled;
-    const remoteLogoMode = currentBasePath === 'logo' && remoteMediaEnabled;
-    const remoteTarget = remoteAssetsEnabled ? getRemoteAssetsTarget() : null;
-    const remoteSubfolders = remoteAssetsEnabled ? getRemoteAssetsSubfolders() : [];
-    const canChooseRemoteSubfolder = !remoteTarget && remoteSubfolders.length > 0;
-    const canCreateRemoteFolder = remoteAssetsEnabled && getCurrentAssetsDepth() <= 2;
+    const remoteManaged = await isRemoteManagedBasePath();
 
-    setButtonDisabled(createFolderBtn, remoteLogoMode || (remoteAssetsEnabled ? !canCreateRemoteFolder : false));
-    setButtonDisabled(uploadBtn, remoteLogoMode || (remoteAssetsEnabled && !remoteTarget && !canChooseRemoteSubfolder));
+    setButtonDisabled(createFolderBtn, false);
+    setButtonDisabled(uploadBtn, false);
 
     if (!hint) return;
 
-    if (remoteLogoMode) {
+    if (remoteManaged) {
       hint.style.display = 'block';
-      hint.textContent = 'Логотипы сейчас берутся из общей библиотеки команды. Здесь можно быстро просматривать структуру, а для добавления новых логотипов нужен отдельный remote logo flow.';
-      return;
-    }
-
-    if (remoteAssetsEnabled && !remoteTarget) {
-      hint.style.display = 'block';
-      if (getCurrentAssetsDepth() === 1) {
-        hint.textContent = 'В корне assets можно создавать категории. Откройте категорию, чтобы создать внутри неё папку или загрузить туда файлы.';
-        return;
-      }
-
-      hint.textContent = canChooseRemoteSubfolder
-        ? `Вы находитесь в ${currentPath}. Можно создать новую подпапку или выбрать существующую: ${remoteSubfolders.join(', ')}.`
-        : 'В этой категории пока нет подпапок. Создайте папку и после этого загружайте в неё файлы.';
-      return;
-    }
-
-    if (remoteAssetsEnabled && remoteTarget) {
-      hint.style.display = 'block';
-      hint.textContent = `Remote media активно. Загрузка пойдёт в assets/${remoteTarget.folder1}/${remoteTarget.folder2}.`;
+      hint.textContent = 'Можно создавать любые папки, загружать файлы прямо в текущую папку и свободно собирать свою структуру для логотипов и ассетов.';
       return;
     }
 
@@ -553,9 +461,6 @@ export function initFileManager() {
     
     try {
       let structure = await getFolderStructure(currentBasePath);
-      if (currentBasePath === 'assets' && await isRemoteMediaEnabled().catch(() => false)) {
-        structure = mergeRemoteAssetsFoldersIntoStructure(structure, loadRemoteAssetsFolderRegistry());
-      }
       latestStructure = structure;
       treeElement.innerHTML = renderFileTree(structure, currentBasePath);
       
@@ -616,11 +521,7 @@ export function initFileManager() {
     const source = typeof file.source === 'string' ? file.source : (isRemoteFilePath(filePath) ? 'remote' : 'local');
     const publishButton = source === 'remote'
       ? `
-            <button class="btn btn-small file-manager-publish-btn" data-path="${filePath}"${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" data-visibility="${visibility}" style="
-              padding: 4px;
-              opacity: 0.7;
-              flex-shrink: 0;
-            " title="${visibility === 'draft' ? 'Опубликовать' : 'Снять с публикации'}" onclick="event.stopPropagation();">
+            <button class="${fileManagerButtonClass({ small: true, icon: true })} file-manager-publish-btn" data-path="${filePath}"${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" data-visibility="${visibility}" title="${visibility === 'draft' ? 'Опубликовать' : 'Снять с публикации'}" onclick="event.stopPropagation();">
               <span class="material-icons" style="font-size: 16px;">${visibility === 'draft' ? 'publish' : 'visibility_off'}</span>
             </button>
           `
@@ -685,11 +586,7 @@ export function initFileManager() {
               white-space: nowrap;
             " title="${fileName}">${fileName}</span>
             ${publishButton}
-            <button class="btn btn-small file-manager-delete-btn" data-path="${filePath}" data-type="file"${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" style="
-              padding: 4px;
-              opacity: 0.7;
-              flex-shrink: 0;
-            " title="Удалить" onclick="event.stopPropagation();">
+            <button class="${fileManagerButtonClass({ small: true, danger: true, icon: true })} file-manager-delete-btn" data-path="${filePath}" data-type="file"${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" title="Удалить" onclick="event.stopPropagation();">
               <span class="material-icons" style="font-size: 16px;">delete</span>
             </button>
           </div>
@@ -702,7 +599,7 @@ export function initFileManager() {
           ${isImage ? `<img src="${filePath}" alt="${fileName}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"><span class="material-icons" style="font-size: 18px; color: ${getComputedStyle(document.documentElement).getPropertyValue('--text-secondary') || '#999999'}; display: none;">insert_drive_file</span>` : `<span class="material-icons" style="font-size: 18px; color: ${getComputedStyle(document.documentElement).getPropertyValue('--text-secondary') || '#999999'};">insert_drive_file</span>`}
           <span style="flex: 1; color: ${getComputedStyle(document.documentElement).getPropertyValue('--text-primary') || '#e9e9e9'}; font-size: var(--font-size-sm);">${fileName}</span>
           ${publishButton}
-          <button class="btn btn-small file-manager-delete-btn" data-path="${filePath}" data-type="file"${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" style="padding: 4px 8px; opacity: 0.7;" title="Удалить">
+          <button class="${fileManagerButtonClass({ small: true, danger: true, icon: true })} file-manager-delete-btn" data-path="${filePath}" data-type="file"${remoteKey ? ` data-remote-key="${remoteKey}"` : ''} data-source="${source}" title="Удалить">
             <span class="material-icons" style="font-size: 16px;">delete</span>
           </button>
         </div>
@@ -752,62 +649,64 @@ export function initFileManager() {
         }
       }
     } else if (typeof currentContent === 'object' && currentContent !== null) {
-      // Это объект (папка с подпапками или файлами)
-      const keys = Object.keys(currentContent);
+      // Это объект (папка с подпапками и/или файлами)
+      const keys = Object.keys(currentContent).filter((key) => key !== REMOTE_FOLDER_FILES_KEY);
+      const currentFiles = Array.isArray(currentContent[REMOTE_FOLDER_FILES_KEY]) ? currentContent[REMOTE_FOLDER_FILES_KEY] : [];
       
-      if (keys.length === 0) {
+      if (keys.length === 0 && currentFiles.length === 0) {
         html = `<div style="text-align: center; padding: var(--spacing-md); color: ${textSecondary};">Папка пуста</div>`;
       } else {
-        // Сначала отображаем папки
+        // Сначала отображаем подпапки
         keys.forEach(key => {
           const subPath = currentPath ? `${currentPath}/${key}` : key;
           const subValue = currentContent[key];
-          
-          // Проверяем, является ли это папкой (объект) или файлами (массив)
-          const isFolder = typeof subValue === 'object' && !Array.isArray(subValue);
-          
-          if (isFolder) {
-            // Это подпапка
-            html += `
-              <div class="file-manager-item" data-type="folder" data-path="${subPath}" style="display: flex; align-items: center; gap: var(--spacing-xs); padding: var(--spacing-xs); margin-left: 0px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s;">
-                <span class="material-icons" style="font-size: 18px; color: ${textSecondary};">folder</span>
-                <span class="file-manager-folder-name" style="flex: 1; color: ${textPrimary}; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold);">${key}</span>
-                <button class="btn btn-small file-manager-rename-btn" data-path="${subPath}" data-type="folder" style="padding: 4px 8px; opacity: 0.7;" title="Переименовать">
-                  <span class="material-icons" style="font-size: 16px;">edit</span>
-                </button>
-                <button class="btn btn-small file-manager-delete-btn" data-path="${subPath}" data-type="folder" style="padding: 4px 8px; opacity: 0.7;" title="Удалить">
-                  <span class="material-icons" style="font-size: 16px;">delete</span>
-                </button>
+          const folderItems = Array.isArray(subValue)
+            ? subValue.length
+            : Array.isArray(subValue?.[REMOTE_FOLDER_FILES_KEY])
+              ? subValue[REMOTE_FOLDER_FILES_KEY].length
+              : 0;
+          const childFoldersCount = subValue && typeof subValue === 'object' && !Array.isArray(subValue)
+            ? Object.keys(subValue).filter((childKey) => childKey !== REMOTE_FOLDER_FILES_KEY).length
+            : 0;
+          const metaParts = [];
+          if (childFoldersCount > 0) {
+            metaParts.push(`${childFoldersCount} папк.`);
+          }
+          if (folderItems > 0) {
+            metaParts.push(`${folderItems} файл.`);
+          }
+
+          html += `
+            <div class="file-manager-item file-manager-folder-item" data-type="folder" data-path="${subPath}" style="display: flex; align-items: center; gap: var(--spacing-xs); padding: var(--spacing-xs); margin-left: 0px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s;">
+              <span class="material-icons" style="font-size: 18px; color: ${textSecondary};">folder</span>
+              <div style="flex: 1; min-width: 0;">
+                <div class="file-manager-folder-name" style="color: ${textPrimary}; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold);">${key}</div>
+                ${metaParts.length ? `<div style="color: ${textSecondary}; font-size: 11px; margin-top: 2px;">${metaParts.join(' · ')}</div>` : ''}
               </div>
-            `;
-          }
+              <button class="${fileManagerButtonClass({ small: true, icon: true })} file-manager-rename-btn" data-path="${subPath}" data-type="folder" title="Переименовать">
+                <span class="material-icons" style="font-size: 16px;">edit</span>
+              </button>
+              <button class="${fileManagerButtonClass({ small: true, danger: true, icon: true })} file-manager-delete-btn" data-path="${subPath}" data-type="folder" title="Удалить">
+                <span class="material-icons" style="font-size: 16px;">delete</span>
+              </button>
+            </div>
+          `;
         });
-        
-        // Затем отображаем файлы
-        keys.forEach(key => {
-          const subPath = currentPath ? `${currentPath}/${key}` : key;
-          const subValue = currentContent[key];
-          
-          if (Array.isArray(subValue) && subValue.length > 0) {
-            // Это массив файлов
-            const hasImages = subValue.some(file => isImageFile(file.file));
-            
-            if (hasImages) {
-              // Отображаем в виде сетки с превью
-              html += `<div style="margin-top: 16px; margin-bottom: 8px; color: ${textPrimary}; font-size: 14px; font-weight: 600;">${key}</div>`;
-              html += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; padding: 8px; margin-bottom: 16px;">`;
-              subValue.forEach(file => {
-                html += renderFileItem(file, true);
-              });
-              html += `</div>`;
-            } else {
-              // Отображаем в виде списка
-              subValue.forEach(file => {
-                html += renderFileItem(file, false);
-              });
-            }
+
+        if (currentFiles.length > 0) {
+          const hasImages = currentFiles.some(file => isImageFile(file.file));
+          if (hasImages) {
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; padding: 8px; margin-top: 8px;">`;
+            currentFiles.forEach(file => {
+              html += renderFileItem(file, true);
+            });
+            html += `</div>`;
+          } else {
+            currentFiles.forEach(file => {
+              html += renderFileItem(file, false);
+            });
           }
-        });
+        }
       }
     } else {
       html = `<div style="text-align: center; padding: var(--spacing-md); color: ${textSecondary};">Папка пуста</div>`;
@@ -838,10 +737,10 @@ export function initFileManager() {
       
       // Hover эффект
       item.addEventListener('mouseenter', () => {
-        item.style.background = 'var(--bg-secondary, #1a1a1a)';
+        item.classList.add('is-hovered');
       });
       item.addEventListener('mouseleave', () => {
-        item.style.background = 'transparent';
+        item.classList.remove('is-hovered');
       });
     });
     
@@ -891,15 +790,18 @@ export function initFileManager() {
             return;
           }
 
-          if (currentBasePath === 'assets' && await isRemoteMediaEnabled().catch(() => false)) {
-            alert('Переименование папок в assets отключено, пока не появится отдельный remote folder API.');
-            input.remove();
-            nameSpan.style.display = '';
-            return;
-          }
-
-          if (currentBasePath === 'logo' && await isRemoteMediaEnabled().catch(() => false)) {
-            alert('Переименование логотипных папок пока недоступно: для remote logo еще нет отдельного folder API.');
+          if ((currentBasePath === 'assets' || currentBasePath === 'logo') && await isRemoteMediaEnabled().catch(() => false)) {
+            const parentPath = folderPath.includes('/') ? folderPath.split('/').slice(0, -1).join('/') : currentBasePath;
+            await renameRemoteFolder({
+              fromPath: folderPath,
+              toPath: normalizeManagerPath(`${parentPath}/${newName}`),
+              visibility: 'published'
+            });
+            await loadFileManagerTree();
+            await refreshLibraries();
+            if (typeof window.updateLogoAssetsPreview === 'function') {
+              window.updateLogoAssetsPreview();
+            }
             input.remove();
             nameSpan.style.display = '';
             return;
@@ -980,20 +882,10 @@ export function initFileManager() {
       
       // Hover эффект
       item.addEventListener('mouseenter', () => {
-        if (!item.classList.contains('file-manager-image-item')) {
-          item.style.background = 'var(--bg-secondary, #1a1a1a)';
-        } else {
-          item.style.transform = 'translateY(-2px)';
-          item.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-        }
+        item.classList.add('is-hovered');
       });
       item.addEventListener('mouseleave', () => {
-        if (!item.classList.contains('file-manager-image-item')) {
-          item.style.background = 'transparent';
-        } else {
-          item.style.transform = 'translateY(0)';
-          item.style.boxShadow = 'none';
-        }
+        item.classList.remove('is-hovered');
       });
     });
     
@@ -1014,17 +906,13 @@ export function initFileManager() {
         
         try {
           if (type === 'folder') {
-            if (currentBasePath === 'logo' && await isRemoteMediaEnabled().catch(() => false)) {
-              throw new Error('Удаление логотипных папок пока недоступно: для remote logo еще нет отдельного folder API.');
-            }
-            if (currentBasePath === 'assets' && await isRemoteMediaEnabled().catch(() => false)) {
+            if ((currentBasePath === 'logo' || currentBasePath === 'assets') && await isRemoteMediaEnabled().catch(() => false)) {
               const folderNode = getFolderContent(latestStructure, path);
               const remoteKeys = Array.from(new Set(getRemoteFolderKeys(folderNode)));
 
               for (const key of remoteKeys) {
                 await deleteRemoteObject({ key });
               }
-              unregisterRemoteAssetsFolder(path);
             } else {
               await api.deleteFolder(path);
             }
@@ -1135,6 +1023,10 @@ export function initFileManager() {
   const logoBtn = document.getElementById('fileManagerLogoBtn');
   const assetsBtn = document.getElementById('fileManagerAssetsBtn');
   const contentDiv = document.getElementById('fileManagerContent');
+  const setActiveBasePathButton = (basePath) => {
+    logoBtn?.classList.toggle('is-active', basePath === 'logo');
+    assetsBtn?.classList.toggle('is-active', basePath === 'assets');
+  };
   
   if (logoBtn) {
     logoBtn.addEventListener('click', () => {
@@ -1144,14 +1036,7 @@ export function initFileManager() {
       if (contentDiv) contentDiv.style.display = 'block';
       updateFileManagerPath();
       loadFileManagerTree();
-      
-      // Обновляем активную кнопку
-      logoBtn.style.background = 'var(--accent-color, #027EF2)';
-      logoBtn.style.color = 'white';
-      if (assetsBtn) {
-        assetsBtn.style.background = 'var(--bg-secondary, #1a1a1a)';
-        assetsBtn.style.color = 'var(--text-primary, #e9e9e9)';
-      }
+      setActiveBasePathButton('logo');
     });
   }
   
@@ -1163,14 +1048,7 @@ export function initFileManager() {
       if (contentDiv) contentDiv.style.display = 'block';
       updateFileManagerPath();
       loadFileManagerTree();
-      
-      // Обновляем активную кнопку
-      assetsBtn.style.background = 'var(--accent-color, #027EF2)';
-      assetsBtn.style.color = 'white';
-      if (logoBtn) {
-        logoBtn.style.background = 'var(--bg-secondary, #1a1a1a)';
-        logoBtn.style.color = 'var(--text-primary, #e9e9e9)';
-      }
+      setActiveBasePathButton('assets');
     });
   }
   
@@ -1189,11 +1067,6 @@ export function initFileManager() {
         return;
       }
 
-      if (currentBasePath === 'logo' && await isRemoteMediaEnabled().catch(() => false)) {
-        alert('Создание папок для remote logo пока не поддерживается. Для логотипов сейчас доступен просмотр командной библиотеки.');
-        return;
-      }
-      
       const folderName = prompt('Введите имя новой папки:');
       if (!folderName || !folderName.trim()) {
         return;
@@ -1222,19 +1095,12 @@ export function initFileManager() {
         // Убеждаемся, что путь нормализован (без начальных/конечных слэшей)
         targetPath = targetPath.trim().replace(/^\/+|\/+$/g, '');
 
-        if (currentBasePath === 'assets' && await isRemoteMediaEnabled().catch(() => false)) {
-          const targetDepth = targetPath.split('/').filter(Boolean).length;
-          let remoteFolderPath = '';
-
-          if (targetDepth === 1) {
-            remoteFolderPath = `assets/${folderName.trim()}`;
-          } else if (targetDepth === 2) {
-            remoteFolderPath = `${targetPath}/${folderName.trim()}`;
-          } else {
-            throw new Error('Для remote assets доступны только два уровня: assets/{категория}/{папка}.');
-          }
-
-          registerRemoteAssetsFolder(remoteFolderPath);
+        if ((currentBasePath === 'assets' || currentBasePath === 'logo') && await isRemoteMediaEnabled().catch(() => false)) {
+          const remoteFolderPath = normalizeManagerPath(`${targetPath}/${folderName.trim()}`);
+          await createRemoteFolder({
+            targetPath: remoteFolderPath,
+            visibility: 'published'
+          });
           await loadFileManagerTree();
           await refreshLibraries();
           if (typeof window.updateLogoAssetsPreview === 'function') {
@@ -1276,43 +1142,7 @@ export function initFileManager() {
         return;
       }
 
-      if (currentBasePath === 'logo') {
-        isRemoteMediaEnabled().then((remoteEnabled) => {
-          if (remoteEnabled) {
-            alert('Прямая загрузка логотипов в remote logo пока не подключена. Для логотипов здесь доступна библиотека команды, а загрузка ассетов работает ниже без ограничений.');
-            return;
-          }
-          pendingUploadTargetPath = currentPath || currentBasePath;
-          uploadInput.click();
-        }).catch(() => {
-          pendingUploadTargetPath = currentPath || currentBasePath;
-          uploadInput.click();
-        });
-        return;
-      }
-
-      const targetPath = currentPath || currentBasePath;
-      if (currentBasePath === 'assets') {
-        isRemoteMediaEnabled().then((remoteEnabled) => {
-          if (remoteEnabled && !parseRemoteAssetsTargetPath(targetPath)) {
-            const resolvedTargetPath = resolveRemoteUploadTargetPath();
-            if (!resolvedTargetPath) {
-              return;
-            }
-            pendingUploadTargetPath = resolvedTargetPath;
-            uploadInput.click();
-            return;
-          }
-          pendingUploadTargetPath = targetPath;
-          uploadInput.click();
-        }).catch(() => {
-          pendingUploadTargetPath = targetPath;
-          uploadInput.click();
-        });
-        return;
-      }
-
-      pendingUploadTargetPath = targetPath;
+      pendingUploadTargetPath = currentPath || currentBasePath;
       uploadInput.click();
     });
     
@@ -1321,18 +1151,11 @@ export function initFileManager() {
       
       const targetPath = pendingUploadTargetPath || currentPath || currentBasePath;
       const files = Array.from(e.target.files);
-      const remoteEnabled = currentBasePath === 'assets' ? await isRemoteMediaEnabled().catch(() => false) : false;
+      const remoteEnabled = (currentBasePath === 'assets' || currentBasePath === 'logo') ? await isRemoteMediaEnabled().catch(() => false) : false;
       
       try {
-        if (remoteEnabled && !parseRemoteAssetsTargetPath(targetPath)) {
-          throw new Error('Для remote assets выберите конкретную папку вида assets/{folder1}/{folder2}');
-        }
-
         for (const file of files) {
           await api.uploadFile(file, targetPath);
-        }
-        if (remoteEnabled && parseRemoteAssetsTargetPath(targetPath)) {
-          registerRemoteAssetsFolder(targetPath);
         }
         await loadFileManagerTree();
         await refreshLibraries();
@@ -1340,7 +1163,7 @@ export function initFileManager() {
         if (typeof window.updateLogoAssetsPreview === 'function') {
           window.updateLogoAssetsPreview();
         }
-        alert(remoteEnabled ? `Загружено в remote media: ${files.length}` : `Загружено файлов: ${files.length}`);
+        alert(remoteEnabled ? `Загружено в медиатеку: ${files.length}` : `Загружено файлов: ${files.length}`);
       } catch (error) {
         alert(`Ошибка при загрузке файлов: ${error.message}`);
       }

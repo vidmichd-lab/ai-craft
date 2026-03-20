@@ -6,8 +6,16 @@ const envSchema = z.object({
   MEDIA_MANIFEST_URL: z.string().url().default('https://d5dcfknc559sg4v868te.laqt4bj7.apigw.yandexcloud.net/media/manifest')
 });
 
-export const env = envSchema.parse({
+const rawEnv = {
   NODE_ENV: process.env.NODE_ENV,
   WORKSPACE_API_BASE_URL: process.env.WORKSPACE_API_BASE_URL,
   MEDIA_MANIFEST_URL: process.env.MEDIA_MANIFEST_URL
-});
+};
+
+const parsedEnv = envSchema.safeParse(rawEnv);
+
+if (!parsedEnv.success) {
+  throw new Error(`Invalid apps/web env: ${parsedEnv.error.issues.map((issue) => issue.path.join('.') || 'root').join(', ')}`);
+}
+
+export const env = parsedEnv.data;

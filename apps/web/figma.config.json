@@ -1,0 +1,38 @@
+{
+  "codeConnect": {
+    "parser": "react",
+    "include": [
+      "src/components/**/*.{ts,tsx}",
+      "src/figma/**/*.{ts,tsx}",
+      "../../packages/ui/src/**/*.{ts,tsx}"
+    ],
+    "exclude": [
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "../../packages/ui/src/**/*.test.ts",
+      "../../packages/ui/src/**/*.test.tsx",
+      ".next/**",
+      "node_modules/**"
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@ai-craft/editor-model": [
+        "../../packages/editor-model/src/index.ts"
+      ],
+      "@ai-craft/editor-renderer": [
+        "../../packages/editor-renderer/src/index.ts"
+      ],
+      "@ai-craft/ui": [
+        "../../packages/ui/src/index.ts"
+      ],
+      "@ai-craft/workspace-domain": [
+        "../../packages/workspace-domain/src/index.ts"
+      ],
+      "@ai-craft/workspace-sdk": [
+        "../../packages/workspace-sdk/src/index.ts"
+      ]
+    }
+  }
+}

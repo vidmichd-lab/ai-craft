@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
 import { requestPresignedUpload } from '@/server/media-api/client';
+import { createRequestContext } from '@/server/http/request-context';
+import { jsonResponse, toRouteErrorResponse } from '@/server/http/response';
 
 export async function POST(request: Request) {
+  const context = createRequestContext(request);
   try {
     const formData = await request.formData();
     const file = formData.get('file');
@@ -9,7 +11,11 @@ export async function POST(request: Request) {
     const folder2 = String(formData.get('folder2') || '').trim();
 
     if (!(file instanceof File) || !folder1 || !folder2) {
-      return NextResponse.json({ error: 'file, folder1 and folder2 are required' }, { status: 400 });
+      return jsonResponse(
+        { error: 'file, folder1 and folder2 are required', errorCode: 'REQUEST_ERROR', requestId: context.requestId },
+        context,
+        { status: 400 }
+      );
     }
 
     const presign = await requestPresignedUpload({
@@ -22,7 +28,11 @@ export async function POST(request: Request) {
     });
 
     if (!presign || typeof presign !== 'object' || !('uploadUrl' in presign)) {
-      return NextResponse.json({ error: 'Presign response is invalid' }, { status: 502 });
+      return jsonResponse(
+        { error: 'Presign response is invalid', errorCode: 'UPSTREAM_ERROR', requestId: context.requestId },
+        context,
+        { status: 502 }
+      );
     }
 
     const uploadPayload = presign as {
@@ -38,15 +48,19 @@ export async function POST(request: Request) {
     });
 
     if (!uploadResponse.ok) {
-      return NextResponse.json({ error: `Upload failed: HTTP ${uploadResponse.status}` }, { status: 502 });
+      return jsonResponse(
+        {
+          error: `Upload failed: HTTP ${uploadResponse.status}`,
+          errorCode: 'UPSTREAM_ERROR',
+          requestId: context.requestId
+        },
+        context,
+        { status: 502 }
+      );
     }
 
-    return NextResponse.json({ ok: true, uploaded: uploadPayload });
+    return jsonResponse({ ok: true, uploaded: uploadPayload }, context);
   } catch (error) {
-    const status = (error as Error & { status?: number }).status || 400;
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Media upload failed' },
-      { status }
-    );
+    return toRouteErrorResponse(error, 'Media upload failed', context);
   }
 }

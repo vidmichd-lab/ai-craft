@@ -1,3 +1,5 @@
+@import url("./packages/ui/src/theme.css");
+
 * {
   margin: 0;
   padding: 0;
@@ -39,28 +41,28 @@
 
 :root {
   /* Темная тема (по умолчанию) */
-  --bg-primary: #0d0d0d;
-  --bg-secondary: #141414;
-  --bg-tertiary: #1a1a1a;
-  --bg-active: #121212;
-  --bg-hover: #1a1a1a;
+  --bg-primary: var(--sds-color-background-default-default);
+  --bg-secondary: var(--sds-color-background-default-secondary);
+  --bg-tertiary: var(--sds-color-background-default-tertiary);
+  --bg-active: var(--sds-color-background-default-default-hover);
+  --bg-hover: var(--sds-color-background-default-tertiary-hover);
   --bg-canvas: #000000;
   --bg-preview: #0a0a0a;
-  --text-primary: #e9e9e9;
-  --text-secondary: #b4b4b4;
-  --text-muted: #8a8a8a;
-  --border-color: #2a2a2a;
-  --accent-color: #ffffff;
-  --accent-hover: #f2f2f2;
-  --accent-foreground: #0d0d0d;
+  --text-primary: var(--sds-color-text-default-default);
+  --text-secondary: var(--sds-color-text-default-secondary);
+  --text-muted: var(--sds-color-text-default-tertiary);
+  --border-color: var(--sds-color-border-default-default);
+  --accent-color: var(--sds-color-background-brand-default);
+  --accent-hover: var(--sds-color-background-brand-hover);
+  --accent-foreground: var(--sds-color-text-brand-on-brand);
   --hover-overlay: rgba(255, 255, 255, 0.04);
   --select-icon-filter: 1;
   --select-arrow-opacity: 0.9;
   --dropdown-shadow: rgba(0, 0, 0, 0.3);
   
   /* Цвета состояний */
-  --color-success: #07AB4B;
-  --color-warning: #FFD20A;
+  --color-success: var(--sds-color-background-positive-default);
+  --color-warning: var(--sds-color-background-warning-default);
   --color-error: #ff6b6b;
   --color-info: #ffffff;
   
@@ -147,24 +149,32 @@
   --btn-font-size: 13px;
   --btn-font-size-sm: 12px;
   --btn-font-size-xs: 11px;
+
+  --ui-color-panel: var(--bg-secondary);
+  --ui-color-panel-soft: var(--bg-primary);
+  --ui-color-field: #0d0d0d;
+  --ui-color-text: var(--text-primary);
+  --ui-color-muted: rgba(255, 255, 255, 0.64);
+  --ui-color-border: rgba(255, 255, 255, 0.08);
+  --ui-color-border-strong: rgba(255, 255, 255, 0.1);
 }
 
 [data-theme="light"] {
   /* Светлая тема */
-  --bg-primary: #f1f1f1;
-  --bg-secondary: #e7e7e7;
-  --bg-tertiary: #dddddd;
-  --bg-active: #d7d7d7;
-  --bg-hover: #e1e1e1;
+  --bg-primary: var(--sds-color-background-default-default);
+  --bg-secondary: var(--sds-color-background-default-secondary);
+  --bg-tertiary: var(--sds-color-background-default-tertiary);
+  --bg-active: var(--sds-color-background-default-default-hover);
+  --bg-hover: var(--sds-color-background-default-tertiary-hover);
   --bg-canvas: #fafafa;
   --bg-preview: #dddddd;
-  --text-primary: #1a1a1a;
-  --text-secondary: #4a4a4a;
-  --text-muted: #6a6a6a;
-  --border-color: #cecece;
-  --accent-color: #0d0d0d;
-  --accent-hover: #1a1a1a;
-  --accent-foreground: #ffffff;
+  --text-primary: var(--sds-color-text-default-default);
+  --text-secondary: var(--sds-color-text-default-secondary);
+  --text-muted: var(--sds-color-text-default-tertiary);
+  --border-color: var(--sds-color-border-default-default);
+  --accent-color: var(--sds-color-background-brand-default);
+  --accent-hover: var(--sds-color-background-brand-hover);
+  --accent-foreground: var(--sds-color-text-brand-on-brand);
   --hover-overlay: rgba(0, 0, 0, 0.04);
   --select-icon-filter: 0;
   --dropdown-shadow: rgba(0, 0, 0, 0.1);
@@ -269,6 +279,11 @@ html[data-workspace-boot="pending"] .app {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-color-panel-soft);
 }
 
 .workspace-team-trigger-logo-wrap {
@@ -402,7 +417,7 @@ html[data-workspace-boot="pending"] .app {
   height: 100%;
   border-radius: 24px;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
 }
 
 .workspace-settings-sidebar {
@@ -565,8 +580,9 @@ html[data-workspace-boot="pending"] .app {
   gap: 14px;
   padding: 20px;
   border-radius: 20px;
-  border: none;
+  border: 1px solid var(--border-color);
   background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .workspace-settings-embedded-media {
@@ -593,6 +609,7 @@ html[data-workspace-boot="pending"] .app {
   padding: 16px;
   border-radius: 20px;
   background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
 }
 
 .workspace-admin-sidebar-list {
@@ -614,9 +631,9 @@ html[data-workspace-boot="pending"] .app {
   gap: 4px;
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-color);
   border-radius: 16px;
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
   cursor: pointer;
   transition: border-color var(--transition-base), background-color var(--transition-base);
@@ -710,13 +727,13 @@ html[data-workspace-boot="pending"] .app {
   width: 100%;
   min-height: var(--btn-height);
   padding: 0 var(--spacing-md);
-  border: none;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
   font: inherit;
   box-sizing: border-box;
-  transition: background-color var(--transition-base), box-shadow var(--transition-base);
+  transition: background-color var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
 }
 
 select.workspace-settings-input {
@@ -743,7 +760,32 @@ select.workspace-settings-input {
 .workspace-settings-input:focus {
   outline: none;
   background: var(--bg-active);
+  border-color: var(--accent-color);
   box-shadow: var(--shadow-focus);
+}
+
+.ui-control-shell > .workspace-settings-input,
+.ui-control-shell > .workspace-auth-input,
+.ui-search-field > .workspace-settings-input {
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ui-control-shell > .workspace-settings-input:focus,
+.ui-control-shell > .workspace-auth-input:focus,
+.ui-search-field > .workspace-settings-input:focus {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ui-control-shell > select.workspace-settings-input {
+  padding-right: 0;
+  background-image: none;
 }
 
 .workspace-settings-list {
@@ -759,8 +801,8 @@ select.workspace-settings-input {
   gap: 14px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: none;
-  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
 }
 
 .workspace-settings-list-item.is-active {
@@ -797,11 +839,12 @@ select.workspace-settings-input {
 .workspace-settings-role-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--bg-primary);
-  color: var(--text-secondary);
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--sds-size-radius-200, 8px);
+  border: 1px solid var(--ui-color-border);
+  background: var(--ui-color-panel-soft);
+  color: var(--ui-color-text);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -818,9 +861,9 @@ select.workspace-settings-input {
   align-items: center;
   min-height: 32px;
   padding: 0 14px;
-  border: none;
+  border: 1px solid var(--border-color);
   border-radius: 999px;
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   color: var(--text-muted);
   font: inherit;
   font-size: var(--font-size-sm);
@@ -831,6 +874,7 @@ select.workspace-settings-input {
 .workspace-settings-chip.is-active {
   background: var(--bg-hover);
   color: var(--text-primary);
+  border-color: var(--accent-color);
 }
 
 .workspace-layout-departments {
@@ -856,28 +900,28 @@ select.workspace-settings-input {
 .workspace-layout-department-tag {
   display: inline-flex;
   align-items: center;
-  min-height: 38px;
-  padding: 0 16px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: var(--bg-secondary);
-  color: var(--text-muted);
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--sds-size-radius-200, 8px);
+  background: var(--ui-color-panel-soft);
+  color: var(--ui-color-muted);
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: background-color var(--transition-base), color var(--transition-base), border-color var(--transition-base);
 }
 
 .workspace-layout-department-tag:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--ui-color-field-hover);
+  color: var(--ui-color-text);
 }
 
 .workspace-layout-department-tag.is-active {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--accent-color);
+  border-color: var(--ui-color-active-bg);
+  background: var(--ui-color-active-bg);
+  color: var(--ui-color-active-text);
 }
 
 .workspace-section {
@@ -907,6 +951,7 @@ select.workspace-settings-input {
   gap: 12px;
   padding: 12px 14px;
   border-radius: 18px;
+  border: 1px solid var(--border-color);
   background: var(--bg-tertiary);
 }
 
@@ -975,7 +1020,8 @@ select.workspace-settings-input {
   gap: 12px;
   padding: 12px;
   border-radius: 20px;
-  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
   min-width: 0;
 }
 
@@ -1290,7 +1336,47 @@ select.workspace-settings-input {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: #000000;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.workspace-auth-dialog {
+  width: min(460px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--ui-color-border);
+  border-radius: 24px;
+  background: var(--ui-color-panel);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.42);
+}
+
+.workspace-auth-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.workspace-auth-dialog-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.workspace-auth-dialog-title {
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--ui-color-text);
+}
+
+.workspace-auth-dialog-subtitle {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ui-color-muted);
 }
 
 .workspace-auth-shell {
@@ -1313,7 +1399,7 @@ select.workspace-settings-input {
 }
 
 .workspace-auth-logo {
-  width: 114px;
+  width: 104px;
   filter: brightness(0) invert(1);
 }
 
@@ -1322,6 +1408,7 @@ select.workspace-settings-input {
   font-size: 12px;
   line-height: 14px;
   letter-spacing: 0.01em;
+  margin-top: -2px;
 }
 
 .workspace-auth-footer a {
@@ -1350,9 +1437,9 @@ select.workspace-settings-input {
 .workspace-auth-form {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  width: min(100%, 186px);
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
 }
 
 .workspace-auth-form .workspace-field {
@@ -1361,71 +1448,53 @@ select.workspace-settings-input {
 }
 
 .workspace-auth-password-field {
-  position: relative;
+  width: 100%;
 }
 
 .workspace-auth-input {
-  min-height: 36px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  background: #0b0b0b;
-  color: #ffffff;
+  min-height: 38px;
+  color: var(--ui-color-text);
   box-shadow: none;
   font-size: 14px;
   font-weight: 400;
   line-height: 17px;
   letter-spacing: 0;
-  transition: border-color var(--transition-base), background-color var(--transition-base), box-shadow var(--transition-base);
 }
 
 .workspace-auth-password-field .workspace-auth-input {
-  padding-right: 38px;
+  padding-right: 0;
 }
 
 .workspace-auth-input::placeholder {
-  color: #787878;
-}
-
-.workspace-auth-input:hover {
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.workspace-auth-input:focus {
-  background: #0b0b0b;
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
+  color: var(--ui-color-muted);
 }
 
 .workspace-auth-password-toggle {
-  position: absolute;
-  top: 50%;
-  right: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--ui-color-muted);
   cursor: pointer;
-  transform: translateY(-50%);
   transition: color var(--transition-base), background-color var(--transition-base);
+  flex: 0 0 auto;
 }
 
 .workspace-auth-password-toggle:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--ui-color-text);
+  background: color-mix(in srgb, var(--ui-color-text) 8%, transparent);
 }
 
 .workspace-auth-password-toggle:focus-visible {
   outline: none;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+  color: var(--ui-color-text);
+  background: color-mix(in srgb, var(--ui-color-text) 12%, transparent);
+  box-shadow: var(--ui-shadow-focus);
 }
 
 .workspace-auth-password-toggle .material-icons {
@@ -1433,24 +1502,14 @@ select.workspace-settings-input {
 }
 
 .workspace-auth-submit {
-  width: auto;
-  min-width: 72px;
-  margin-top: 2px;
-  min-height: 28px;
+  width: 100%;
+  margin-top: 4px;
+  min-height: 44px;
   padding: 0 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  background: #0b0b0b;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
+  border-radius: var(--sds-size-radius-200, 8px);
+  font-size: 14px;
+  font-weight: 600;
   box-shadow: none;
-}
-
-.workspace-auth-submit:hover:not(:disabled) {
-  background: #111111;
-  color: #ffffff;
 }
 
 .workspace-auth-submit[disabled] {
@@ -1540,22 +1599,23 @@ select.workspace-settings-input {
 }
 
 .mode-toggle {
-  width: 180px;
+  width: 220px;
   height: 34px;
   margin: 0;
   border-radius: var(--radius-full);
   padding: 4px;
-  border-color: var(--border-color);
-  background: transparent;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
 }
 
 .mode-toggle .toggle-switch-option {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--text-muted) !important;
+  color: var(--text-secondary) !important;
   min-width: 0;
   white-space: nowrap;
+  transition: color var(--interactive-transition);
 }
 
 .mode-toggle .toggle-switch-option.active {
@@ -1582,22 +1642,39 @@ select.workspace-settings-input {
 }
 
 #projectModeToggle {
-  width: 200px;
+  width: 240px;
 }
 
 #projectModeToggle .toggle-switch-track {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 #projectModeToggle .toggle-switch-option {
   width: 100%;
   min-width: 0;
+  min-height: 32px;
+  padding: 0 12px;
   text-align: center;
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--sds-size-radius-100, 4px) var(--sds-size-radius-100, 4px) 0 0;
+  background: transparent;
+  color: var(--ui-color-muted);
+}
+
+#projectModeToggle .toggle-switch-option.active,
+#projectModeToggle .toggle-switch-option.is-active {
+  border-color: var(--ui-color-active-bg);
+  background: var(--ui-color-active-bg);
+  color: var(--ui-color-active-text);
 }
 
 #projectModeToggle .toggle-switch-slider {
-  width: calc(50% - 4px);
+  display: none;
 }
 
 @media (max-width: 980px) {
@@ -1731,6 +1808,22 @@ select.workspace-settings-input {
     padding: 16px;
   }
 
+  .workspace-auth-dialog {
+    width: min(100%, calc(100vw - 32px));
+    padding: 20px;
+    border-radius: 20px;
+    gap: 16px;
+  }
+
+  .workspace-auth-dialog-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .workspace-auth-dialog-title {
+    font-size: 24px;
+  }
+
   .workspace-auth-shell,
   .workspace-modal-panel {
     border-radius: 24px;
@@ -1761,8 +1854,8 @@ select.workspace-settings-input {
   }
 
   .workspace-auth-submit {
-    min-height: 32px;
-    font-size: 12px;
+    min-height: 42px;
+    font-size: 14px;
   }
 
   .workspace-auth-footer {
@@ -2333,21 +2426,22 @@ select.workspace-settings-input {
 
 .tab {
   width: 100%;
-  padding: var(--spacing-md) var(--spacing-md);
-  background: transparent;
-  color: var(--text-muted);
+  min-height: 40px;
+  padding: 0 var(--spacing-md);
+  background: var(--ui-color-panel-soft);
+  color: var(--ui-color-muted);
   font-size: var(--font-size-sm);
   font-family: var(--font-family-base);
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  justify-content: flex-start;
   transition: all 0.2s ease;
   user-select: none;
   -webkit-user-select: none;
-  border: none;
-  border-left: 3px solid transparent;
-  border-radius: 999px;
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-pill);
   margin: 0;
   font-weight: 500;
   letter-spacing: -0.1px;
@@ -2355,20 +2449,20 @@ select.workspace-settings-input {
 }
 
 .tab:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--ui-color-field-hover);
+  color: var(--ui-color-text);
 }
 
 .tab.active {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-left-color: transparent;
-  border-radius: 999px;
+  border-color: var(--ui-color-active-bg);
+  background: var(--ui-color-active-bg);
+  color: var(--ui-color-active-text);
 }
 
 .tab.active:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  border-color: var(--ui-color-active-bg-hover);
+  background: var(--ui-color-active-bg-hover);
+  color: var(--ui-color-active-text);
 }
 
 .tabs-panel > .theme-text-muted {
@@ -2694,7 +2788,7 @@ input.input,
 textarea {
   width: 100%;
   background: var(--ui-surface-elevated);
-  border: 1px solid transparent;
+  border: 1px solid var(--border-color);
   color: var(--ui-text-strong);
   padding: var(--spacing-md);
   border-radius: 12px;
@@ -3197,7 +3291,7 @@ input[type="checkbox"]:focus-visible {
 /* === КНОПКИ - ЕДИНАЯ СИСТЕМА === */
 .btn {
   background: var(--ui-surface-muted);
-  border: none;
+  border: 1px solid var(--border-color);
   color: var(--ui-text-strong);
   padding: var(--btn-padding);
   border-radius: var(--interactive-radius);
@@ -3242,6 +3336,7 @@ input[type="checkbox"]:focus-visible {
 
 .btn.primary {
   background: var(--ui-surface-strong);
+  border-color: transparent;
   color: var(--ui-text-inverted);
 }
 
@@ -4184,7 +4279,7 @@ input[type="range"]::-moz-range-thumb:hover {
 .btn-danger {
   background: rgba(255, 107, 107, 0.15);
   color: var(--color-error);
-  border: none;
+  border: 1px solid rgba(255, 107, 107, 0.28);
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -4821,4 +4916,690 @@ input[type="range"]::-moz-range-thumb:hover {
   opacity: 0.6;
   font-family: 'Material Icons';
   font-size: 20px;
+}
+
+/* Shared UI bridge: root static app uses the same tokens and control language as packages/ui */
+.btn,
+.workspace-auth-submit,
+.rsya-visual-action-btn {
+  border-radius: var(--ui-radius-pill);
+  border-color: var(--ui-color-border-strong);
+  background: var(--ui-color-field);
+  color: var(--ui-color-text);
+  transition:
+    opacity var(--ui-transition-base),
+    background-color var(--ui-transition-base),
+    border-color var(--ui-transition-base),
+    color var(--ui-transition-base),
+    transform var(--ui-transition-base);
+}
+
+.btn:hover:not(:disabled),
+.workspace-auth-submit:hover:not(:disabled),
+.rsya-visual-action-btn:hover:not(:disabled) {
+  background: #121212;
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.btn.primary,
+.workspace-auth-shell .workspace-auth-submit,
+.workspace-settings-nav-item.is-active,
+.workspace-layout-department-tag.is-active,
+.workspace-settings-chip.is-active {
+  background: var(--ui-color-active-bg);
+  border-color: var(--ui-color-active-bg);
+  color: var(--ui-color-active-text);
+}
+
+.btn.btn-danger,
+.workspace-settings-list-side .btn-danger,
+.workspace-admin-layout .btn-danger {
+  background: var(--ui-color-danger-bg);
+  border-color: var(--ui-color-danger-border);
+  color: var(--ui-color-text);
+}
+
+.workspace-settings-input,
+.workspace-settings-textarea,
+.workspace-auth-input,
+.custom-select-button,
+.select-btn,
+.input-group input,
+.input-group textarea,
+.input-group select {
+  border-color: var(--ui-color-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-color-field);
+  color: var(--ui-color-text);
+  box-shadow: none;
+}
+
+.ui-color-input {
+  width: 44px;
+  min-width: 44px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-color-field);
+  cursor: pointer;
+}
+
+.ui-choice-native {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ui-color-active-bg);
+}
+
+.ui-legacy-select-trigger {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 40px;
+  border-radius: var(--ui-radius-control);
+}
+
+.workspace-settings-input:focus,
+.workspace-settings-textarea:focus,
+.workspace-auth-input:focus,
+.input-group input:focus,
+.input-group textarea:focus,
+.input-group select:focus {
+  border-color: var(--ui-color-border-strong);
+  box-shadow: var(--ui-shadow-focus);
+  background: var(--ui-color-field);
+}
+
+.workspace-settings-surface,
+.workspace-project-card,
+.workspace-project-composer,
+.workspace-secret-card,
+.workspace-modal-panel,
+.workspace-auth-shell,
+.workspace-status,
+.workspace-control-group,
+.panel-section,
+.format-management-content,
+.file-manager-panel {
+  border-color: var(--ui-color-border);
+  border-radius: var(--ui-radius-surface);
+}
+
+.workspace-settings-surface,
+.workspace-project-card,
+.workspace-project-composer,
+.workspace-secret-card,
+.workspace-modal-panel,
+.format-management-content,
+.file-manager-panel {
+  background: var(--ui-color-panel);
+}
+
+.workspace-settings-list-item,
+.workspace-settings-role-pill,
+.workspace-settings-nav-item,
+.workspace-layout-department-tag,
+.workspace-settings-chip,
+.workspace-project-card-body,
+.workspace-project-preview,
+.workspace-auth-card,
+.workspace-auth-password-toggle:hover,
+.workspace-auth-password-toggle:focus-visible {
+  border-color: var(--ui-color-border);
+}
+
+.workspace-settings-list-item,
+.workspace-settings-role-pill,
+.workspace-settings-nav-item,
+.workspace-layout-department-tag,
+.workspace-settings-chip,
+.workspace-project-card-body,
+.workspace-auth-card {
+  background: var(--ui-color-panel-soft);
+}
+
+.workspace-settings-view-title,
+.workspace-settings-surface-title,
+.workspace-project-card-title,
+.workspace-settings-list-title,
+.workspace-settings-sidebar-title,
+.workspace-section-title {
+  color: var(--ui-color-text);
+}
+
+.workspace-settings-view-subtitle,
+.workspace-settings-list-meta,
+.workspace-settings-sidebar-subtitle,
+.workspace-settings-sidebar-meta-label,
+.workspace-project-card-meta,
+.workspace-auth-footer,
+.workspace-settings-field-label {
+  color: var(--ui-color-muted);
+}
+
+.workspace-auth-overlay {
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 34%),
+    rgba(0, 0, 0, 0.62);
+}
+
+.workspace-auth-shell {
+  background: var(--ui-color-panel);
+  border: 1px solid var(--ui-color-border);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.42);
+}
+
+.workspace-auth-dialog {
+  background: var(--ui-color-panel);
+  border: 1px solid var(--ui-color-border);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.42);
+}
+
+.workspace-auth-card {
+  background: var(--ui-color-panel-soft);
+}
+
+.workspace-settings-nav-item {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--sds-size-radius-200, 8px);
+  background: var(--ui-color-panel-soft);
+  color: var(--ui-color-muted);
+}
+
+.workspace-settings-nav-item:not(.is-active):hover {
+  background: var(--ui-color-field-hover);
+  color: var(--ui-color-text);
+}
+
+.workspace-settings-nav-item.is-active {
+  border-color: var(--ui-color-active-bg);
+  background: var(--ui-color-active-bg);
+  color: var(--ui-color-active-text);
+}
+
+.workspace-settings-nav-column .workspace-settings-nav-item {
+  min-height: 56px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.workspace-settings-list-item.is-active {
+  outline: none;
+  border-color: var(--ui-color-border-strong);
+  box-shadow: var(--ui-shadow-focus);
+}
+
+/* Full root UI migration: make legacy static screens use the same SDS/library contract */
+.main {
+  gap: 12px;
+  padding: 0 8px 8px;
+}
+
+.tabs-panel,
+.panel,
+.panel:last-child {
+  background: var(--ui-color-panel);
+  border: 1px solid var(--ui-color-border);
+  box-shadow: none;
+}
+
+.tabs-panel {
+  padding: var(--ui-space-4);
+  gap: var(--ui-space-2);
+  border-right: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-surface);
+}
+
+.tabs-panel + .panel,
+.panel,
+.panel:last-child {
+  border-radius: var(--ui-radius-surface);
+}
+
+.panel,
+.panel:last-child {
+  padding: var(--ui-space-4);
+}
+
+.panel:last-child,
+.canvas-area {
+  margin-left: 0;
+}
+
+.canvas-area {
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-surface);
+}
+
+.section {
+  margin-bottom: var(--ui-space-6);
+}
+
+.form-group {
+  margin-bottom: var(--ui-space-6);
+  gap: var(--ui-space-2);
+}
+
+.form-group-section {
+  margin-top: var(--ui-space-6);
+  padding-top: var(--ui-space-6);
+  border-top: 1px solid var(--ui-color-border);
+}
+
+label,
+.form-label {
+  color: var(--ui-color-muted);
+  font-size: var(--ui-font-size-body-sm);
+  font-weight: var(--ui-font-weight-strong);
+}
+
+input[type="text"],
+input[type="number"],
+input[type="password"],
+input.input,
+textarea,
+select,
+.custom-select-button,
+.select-btn,
+.input-group input,
+.input-group textarea,
+.input-group select,
+.sizes-admin-platform-name,
+.sizes-admin-size-width,
+.sizes-admin-size-height {
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-color-field);
+  color: var(--ui-color-text);
+}
+
+input[type="text"],
+input[type="number"],
+input[type="password"],
+input.input,
+select,
+.custom-select-button,
+.select-btn {
+  min-height: 40px;
+}
+
+input[type="text"]:hover,
+input[type="number"]:hover,
+input[type="password"]:hover,
+input.input:hover,
+textarea:hover,
+select:hover,
+.custom-select-button:hover,
+.select-btn:hover,
+.input-group input:hover,
+.input-group textarea:hover,
+.input-group select:hover,
+.sizes-admin-platform-name:hover,
+.sizes-admin-size-width:hover,
+.sizes-admin-size-height:hover {
+  background: var(--ui-color-field-hover);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="password"]:focus,
+input.input:focus,
+textarea:focus,
+select:focus,
+.custom-select-button:focus-visible,
+.select-btn:focus-visible,
+.input-group input:focus,
+.input-group textarea:focus,
+.input-group select:focus,
+.sizes-admin-platform-name:focus,
+.sizes-admin-size-width:focus,
+.sizes-admin-size-height:focus {
+  border-color: var(--sds-color-border-brand-default);
+  box-shadow: var(--ui-shadow-focus);
+  outline: none;
+}
+
+.toggle-switch {
+  min-height: 40px;
+  padding: 4px;
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-color-panel-soft);
+}
+
+.toggle-switch-track {
+  gap: 4px;
+}
+
+.toggle-switch-option {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-pill);
+  color: var(--ui-color-muted);
+  font-weight: var(--ui-font-weight-strong);
+}
+
+.toggle-switch-option.active,
+.toggle-switch-option.is-active {
+  background: var(--ui-color-active-bg);
+  border-color: var(--ui-color-active-bg);
+  color: var(--ui-color-active-text);
+  font-weight: var(--ui-font-weight-strong);
+}
+
+.toggle-switch-slider {
+  display: none !important;
+}
+
+.mode-toggle {
+  height: 40px;
+  padding: 4px;
+  border-color: var(--ui-color-border);
+  background: var(--ui-color-panel-soft);
+}
+
+.mode-toggle .toggle-switch-option {
+  color: var(--ui-color-muted) !important;
+}
+
+.mode-toggle .toggle-switch-option.active,
+.mode-toggle .toggle-switch-option.is-active {
+  color: var(--ui-color-active-text) !important;
+}
+
+#projectModeToggle .toggle-switch-option {
+  border-radius: var(--ui-radius-pill);
+}
+
+.btn,
+.btn-small,
+.btn-tiny,
+.btn.btn-primary,
+.btn-primary,
+.sizes-admin-close {
+  min-height: 40px;
+  padding: 0 var(--ui-space-4);
+  border: 1px solid var(--ui-color-border-strong);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-color-field);
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-body-sm);
+  font-weight: var(--ui-font-weight-strong);
+  line-height: 1;
+}
+
+.btn-small {
+  min-height: 32px;
+  padding: 0 var(--ui-space-3);
+}
+
+.btn-tiny {
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.btn:hover:not(:disabled),
+.btn-small:hover:not(:disabled),
+.btn-tiny:hover:not(:disabled),
+.btn-primary:hover:not(:disabled),
+.sizes-admin-close:hover:not(:disabled) {
+  background: var(--ui-color-field-hover);
+  border-color: var(--ui-color-border-strong);
+  color: var(--ui-color-text);
+}
+
+.btn.primary,
+.btn.btn-primary,
+.btn-primary {
+  background: var(--ui-color-active-bg);
+  border-color: var(--ui-color-active-bg);
+  color: var(--ui-color-active-text);
+}
+
+.btn.primary:hover:not(:disabled),
+.btn.btn-primary:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+  background: var(--ui-color-active-bg-hover);
+  border-color: var(--ui-color-active-bg-hover);
+  color: var(--ui-color-active-text);
+}
+
+.btn-danger,
+.btn.btn-danger {
+  background: var(--ui-color-danger-bg);
+  border-color: var(--ui-color-danger-border);
+  color: var(--ui-color-text);
+}
+
+.hint-box {
+  border: 1px solid var(--ui-color-border);
+  border-left: 3px solid var(--sds-color-border-brand-default);
+  border-radius: var(--ui-radius-control);
+  background: color-mix(in srgb, var(--ui-color-panel-soft) 82%, transparent);
+}
+
+.size-item,
+.platform-group,
+.platform-header,
+.form-item,
+.preview-item,
+.preview-container {
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-control);
+}
+
+.size-item,
+.platform-group,
+.form-item,
+.preview-item,
+.preview-container {
+  background: var(--ui-color-panel-soft);
+}
+
+.size-item {
+  padding: var(--ui-space-3);
+}
+
+.platform-header {
+  background: var(--ui-color-panel-soft);
+  color: var(--ui-color-text);
+}
+
+.platform-header:hover {
+  background: var(--ui-color-field-hover);
+}
+
+.preview-item:hover {
+  border-color: var(--ui-color-border-strong);
+  transform: translateY(-1px);
+}
+
+.preview-container:hover,
+.form-item.active {
+  border-color: var(--sds-color-border-brand-default);
+  background: var(--ui-color-field-hover);
+}
+
+.modal-header,
+.workspace-modal-header {
+  background: var(--ui-color-panel);
+  border-bottom: 1px solid var(--ui-color-border);
+}
+
+.modal-title,
+.workspace-modal-title {
+  color: var(--ui-color-text);
+}
+
+.preview-placeholder,
+.slider-value,
+.hint,
+.form-textarea,
+.platform-arrow {
+  color: var(--ui-color-muted);
+}
+
+.form-textarea {
+  background: transparent;
+}
+
+.custom-select-button {
+  border-color: var(--ui-color-border);
+  background: var(--ui-color-field);
+  color: var(--ui-color-text);
+}
+
+.sizes-admin-overlay {
+  background: rgba(0, 0, 0, 0.84) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.sizes-admin-content {
+  background: var(--ui-color-panel) !important;
+  border: 1px solid var(--ui-color-border) !important;
+  border-radius: var(--ui-radius-surface) !important;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.42) !important;
+}
+
+.sizes-admin-header,
+.sizes-admin-body,
+.sizes-admin-footer {
+  background: var(--ui-color-panel) !important;
+}
+
+.sizes-admin-header,
+.sizes-admin-footer {
+  border-color: var(--ui-color-border) !important;
+}
+
+.sizes-admin-sidebar {
+  border-right: 1px solid var(--ui-color-border) !important;
+}
+
+.sizes-admin-sidebar [data-scroll-target] {
+  width: 100%;
+  justify-content: flex-start !important;
+}
+
+.sizes-admin-nav-button {
+  min-height: 40px;
+  border-color: var(--ui-color-border) !important;
+  background: var(--ui-color-panel-soft) !important;
+  color: var(--ui-color-muted) !important;
+}
+
+.sizes-admin-nav-button.is-active {
+  border-color: var(--ui-color-active-bg) !important;
+  background: var(--ui-color-active-bg) !important;
+  color: var(--ui-color-active-text) !important;
+}
+
+.sizes-admin-action-button {
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.admin-accordion-section,
+.sizes-admin-platform,
+.sizes-admin-format-group,
+.sizes-admin-size-item,
+.sizes-admin-format-hint {
+  border: 1px solid var(--ui-color-border) !important;
+  border-radius: var(--ui-radius-control) !important;
+  background: var(--ui-color-panel-soft) !important;
+}
+
+.admin-accordion-header {
+  background: var(--ui-color-panel) !important;
+  border-bottom: 1px solid var(--ui-color-border);
+}
+
+.admin-accordion-content {
+  background: transparent !important;
+}
+
+.sizes-admin-close {
+  background: transparent !important;
+}
+
+.sizes-admin-format-hint {
+  color: var(--ui-color-text);
+}
+
+.file-manager-panel,
+.file-manager-tree,
+.file-manager-files,
+.file-manager-sidebar {
+  border-color: var(--ui-color-border);
+  background: var(--ui-color-panel);
+}
+
+.file-manager-root-button,
+.file-manager-breadcrumb,
+.file-manager-tree,
+.file-manager-item,
+.file-manager-image-item {
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-control);
+}
+
+.file-manager-root-button,
+.file-manager-breadcrumb,
+.file-manager-tree,
+.file-manager-item {
+  background: var(--ui-color-panel-soft);
+}
+
+.file-manager-root-button {
+  border-color: var(--ui-color-border-strong);
+}
+
+.file-manager-root-button.is-active {
+  background: var(--ui-color-active-bg);
+  border-color: var(--ui-color-active-bg);
+  color: var(--ui-color-active-text);
+}
+
+.file-manager-icon-button {
+  min-width: 32px;
+  padding-inline: 10px;
+}
+
+.file-manager-item {
+  transition:
+    background-color var(--ui-transition-base),
+    border-color var(--ui-transition-base),
+    color var(--ui-transition-base),
+    transform var(--ui-transition-base),
+    box-shadow var(--ui-transition-base);
+}
+
+.file-manager-item.is-hovered {
+  background: var(--ui-color-field-hover);
+  border-color: var(--ui-color-border-strong);
+}
+
+.file-manager-image-item.is-hovered {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+}
+
+.file-manager-item .file-manager-delete-btn,
+.file-manager-item .file-manager-rename-btn,
+.file-manager-item .file-manager-publish-btn {
+  opacity: 0.88;
+}
+
+.file-manager-item .file-manager-delete-btn:hover,
+.file-manager-item .file-manager-rename-btn:hover,
+.file-manager-item .file-manager-publish-btn:hover {
+  opacity: 1;
 }

@@ -3,14 +3,20 @@
  * Содержит логику работы с preview canvas и индексами
  */
 
-import { getCheckedSizes } from '../../../../src/state/store.js';
 import { LAYOUT_CONSTANTS } from './constants.js';
+import { getLegacyCheckedSizes } from './runtime-config.js';
+
+const setCanvasVisibility = (canvas, visible, { opacity = null } = {}) => {
+  if (!canvas) return;
+  canvas.style.display = visible ? 'block' : 'none';
+  canvas.style.opacity = opacity === null ? (visible ? '1' : '0') : String(opacity);
+};
 
 /**
  * Получает отсортированные размеры по высоте (от маленькой к большой)
  */
 export const getSortedSizes = () => {
-  const sizes = getCheckedSizes();
+  const sizes = getLegacyCheckedSizes();
   return [...sizes].sort((a, b) => a.height - b.height);
 };
 
@@ -143,16 +149,26 @@ class CanvasManager {
     // В режиме РСЯ рендерим только один главный canvas 1600x1200
     if (isRsyaMode) {
       const rsyaSize = sizes.find((s) => s.width === 1600 && s.height === 1200) || sizes[0];
-      if (this.previewCanvasNarrow) clearCanvas(this.previewCanvasNarrow);
-      if (this.previewCanvasSquare) clearCanvas(this.previewCanvasSquare);
+      if (this.previewCanvasNarrow) {
+        clearCanvas(this.previewCanvasNarrow);
+        setCanvasVisibility(this.previewCanvasNarrow, false);
+      }
+      if (this.previewCanvasSquare) {
+        clearCanvas(this.previewCanvasSquare);
+        setCanvasVisibility(this.previewCanvasSquare, false);
+      }
 
       if (this.previewCanvasWide && rsyaSize) {
+        setCanvasVisibility(this.previewCanvasWide, true, { opacity: 0 });
         const renderState = { ...state, platform: rsyaSize.platform || 'РСЯ' };
         this.lastRenderMeta = this.renderToCanvasFn(this.previewCanvasWide, rsyaSize.width, rsyaSize.height, renderState);
         if (typeof setKey === 'function') {
           setKey('kvCanvasWidth', rsyaSize.width);
           setKey('kvCanvasHeight', rsyaSize.height);
         }
+      } else if (this.previewCanvasWide) {
+        clearCanvas(this.previewCanvasWide);
+        setCanvasVisibility(this.previewCanvasWide, false);
       }
       if (typeof window !== 'undefined' && typeof window.__updateRsyaCropPreviews === 'function') {
         window.__updateRsyaCropPreviews(this.previewCanvasWide, state);
@@ -165,6 +181,7 @@ class CanvasManager {
       const narrowSize = getSizeForCategory(categorized.narrow, this.currentNarrowIndex);
       if (narrowSize) {
         try {
+          setCanvasVisibility(this.previewCanvasNarrow, true);
           const oldWidth = this.previewCanvasNarrow.width;
           const oldHeight = this.previewCanvasNarrow.height;
           const ctx = this.previewCanvasNarrow.getContext('2d');
@@ -182,6 +199,7 @@ class CanvasManager {
       } else {
         console.warn('Не найден размер для узкого формата');
         clearCanvas(this.previewCanvasNarrow);
+        setCanvasVisibility(this.previewCanvasNarrow, false);
       }
     } else {
       console.warn('Canvas узкого формата не инициализирован');
@@ -192,6 +210,7 @@ class CanvasManager {
       const wideSize = getSizeForCategory(categorized.wide, this.currentWideIndex);
       if (wideSize) {
         try {
+          setCanvasVisibility(this.previewCanvasWide, true);
           const oldWidth = this.previewCanvasWide.width;
           const oldHeight = this.previewCanvasWide.height;
           const ctx = this.previewCanvasWide.getContext('2d');
@@ -211,6 +230,7 @@ class CanvasManager {
       } else {
         console.warn('Не найден размер для широкого формата');
         clearCanvas(this.previewCanvasWide);
+        setCanvasVisibility(this.previewCanvasWide, false);
       }
     } else {
       console.warn('Canvas широкого формата не инициализирован');
@@ -221,6 +241,7 @@ class CanvasManager {
       const squareSize = getSizeForCategory(categorized.square, this.currentSquareIndex);
       if (squareSize) {
         try {
+          setCanvasVisibility(this.previewCanvasSquare, true);
           const oldWidth = this.previewCanvasSquare.width;
           const oldHeight = this.previewCanvasSquare.height;
           const ctx = this.previewCanvasSquare.getContext('2d');
@@ -238,6 +259,7 @@ class CanvasManager {
       } else {
         console.warn('Не найден размер для квадратного формата');
         clearCanvas(this.previewCanvasSquare);
+        setCanvasVisibility(this.previewCanvasSquare, false);
       }
     } else {
         console.warn('Canvas квадратного формата не инициализирован');

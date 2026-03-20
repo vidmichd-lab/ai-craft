@@ -5,28 +5,48 @@
 // Версия кеша берется из query-параметра service worker registration: /sw.js?v=...
 const SW_URL = new URL(self.location.href);
 const CACHE_VERSION = SW_URL.searchParams.get('v') || 'dev';
+const SCOPE_URL = new URL(self.registration?.scope || new URL('./', self.location.href).toString());
+const SCOPE_PATH = SCOPE_URL.pathname.endsWith('/') ? SCOPE_URL.pathname : `${SCOPE_URL.pathname}/`;
 const CACHE_NAME = `ai-craft-v${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `ai-craft-static-v${CACHE_VERSION}`;
 const IMAGE_CACHE_NAME = `ai-craft-images-v${CACHE_VERSION}`;
 const HTML_CACHE_NAME = `ai-craft-html-v${CACHE_VERSION}`;
 
+const toScopedUrl = (path = '') => new URL(path.replace(/^\//, ''), SCOPE_URL).toString();
+
+const toScopedPath = (url) => {
+  try {
+    const parsed = new URL(url, self.location.origin);
+    const pathname = parsed.pathname;
+    if (pathname.startsWith(SCOPE_PATH)) {
+      return `/${pathname.slice(SCOPE_PATH.length)}`;
+    }
+    return pathname;
+  } catch (error) {
+    console.warn('[SW] Failed to resolve scoped path:', error);
+    return '';
+  }
+};
+
+const APP_SHELL_URL = toScopedUrl('./');
+
 // Ресурсы для кеширования при установке (с версионированием)
 const STATIC_ASSETS = [
-  `/styles.css?v=${CACHE_VERSION}`,
-  `/src/main.js?v=${CACHE_VERSION}`,
-  `/src/constants.js?v=${CACHE_VERSION}`,
-  `/src/state/store.js?v=${CACHE_VERSION}`,
-  `/src/renderer.js?v=${CACHE_VERSION}`,
-  `/src/ui/ui.js?v=${CACHE_VERSION}`,
-  `/src/ui/domCache.js?v=${CACHE_VERSION}`,
-  `/src/ui/eventHandler.js?v=${CACHE_VERSION}`,
-  `/src/utils/assetScanner.js?v=${CACHE_VERSION}`,
-  `/src/utils/mediaConfig.js?v=${CACHE_VERSION}`,
-  `/src/utils/remoteMediaApi.js?v=${CACHE_VERSION}`,
-  `/src/utils/sizesConfig.js?v=${CACHE_VERSION}`,
-  `/src/utils/imageCache.js?v=${CACHE_VERSION}`,
-  `/assets/logo.svg?v=${CACHE_VERSION}`,
-  `/fav/favicon.png?v=${CACHE_VERSION}`
+  toScopedUrl(`styles.css?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/main.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/constants.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/state/store.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/renderer.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/ui/ui.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/ui/domCache.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/ui/eventHandler.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/utils/assetScanner.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/utils/mediaConfig.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/utils/remoteMediaApi.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/utils/sizesConfig.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`src/utils/imageCache.js?v=${CACHE_VERSION}`),
+  toScopedUrl(`assets/logo.svg?v=${CACHE_VERSION}`),
+  toScopedUrl(`fav/favicon.png?v=${CACHE_VERSION}`)
 ];
 
 // Максимальное количество изображений в кеше
@@ -42,12 +62,16 @@ self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
   
   event.waitUntil(
-    caches.open(STATIC_CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching static assets');
-      return cache.addAll(STATIC_ASSETS.map(url => new Request(url, { cache: 'reload' })));
-    }).then(() => {
-      return self.skipWaiting();
-    })
+    Promise.all([
+      caches.open(STATIC_CACHE_NAME).then((cache) => {
+        console.log('[SW] Caching static assets');
+        return cache.addAll(STATIC_ASSETS.map((url) => new Request(url, { cache: 'reload' })));
+      }),
+      caches.open(HTML_CACHE_NAME).then((cache) => {
+        console.log('[SW] Caching app shell');
+        return cache.add(new Request(APP_SHELL_URL, { cache: 'reload' }));
+      })
+    ]).then(() => self.skipWaiting())
   );
 });
 
@@ -170,10 +194,11 @@ function isAnalyticsOrTracking(url) {
  * Проверка, является ли ресурс статическим
  */
 function isStaticAsset(url) {
-  return /\.(css|js|html|json)$/i.test(url) || 
-         url.includes('/src/') ||
-         url.endsWith('/') ||
-         url.endsWith('/index.html');
+  const scopedPath = toScopedPath(url);
+  return /\.(css|js|html|json)$/i.test(scopedPath) ||
+         scopedPath.includes('/src/') ||
+         scopedPath === '/' ||
+         scopedPath.endsWith('/index.html');
 }
 
 function isVersionedAsset(url) {
@@ -186,21 +211,12 @@ function isVersionedAsset(url) {
 }
 
 function isConfigRequest(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.pathname === '/config.json' || parsed.pathname === '/sizes-config.json';
-  } catch (e) {
-    return false;
-  }
+  const scopedPath = toScopedPath(url);
+  return scopedPath === '/config.json' || scopedPath === '/sizes-config.json';
 }
 
 function isManifestRequest(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.pathname === '/assets/asset-manifest.json';
-  } catch (e) {
-    return false;
-  }
+  return toScopedPath(url) === '/assets/asset-manifest.json';
 }
 
 function isHtmlRequest(request) {
@@ -214,24 +230,27 @@ function isHtmlRequest(request) {
  * Проверка, является ли ресурс JavaScript файлом
  */
 function isJavaScript(url) {
-  return /\.js$/i.test(url) || url.includes('/src/');
+  const scopedPath = toScopedPath(url);
+  return /\.js$/i.test(scopedPath) || scopedPath.includes('/src/');
 }
 
 /**
  * Проверка, является ли ресурс изображением
  */
 function isImage(url) {
-  return /\.(png|jpg|jpeg|gif|webp|svg|ico)$/i.test(url) ||
-         url.includes('/assets/') ||
-         url.includes('/logo/');
+  const scopedPath = toScopedPath(url);
+  return /\.(png|jpg|jpeg|gif|webp|svg|ico)$/i.test(scopedPath) ||
+         scopedPath.includes('/assets/') ||
+         scopedPath.includes('/logo/');
 }
 
 /**
  * Проверка, является ли ресурс шрифтом
  */
 function isFont(url) {
-  return /\.(woff|woff2|ttf|otf|eot)$/i.test(url) ||
-         url.includes('/font/');
+  const scopedPath = toScopedPath(url);
+  return /\.(woff|woff2|ttf|otf|eot)$/i.test(scopedPath) ||
+         scopedPath.includes('/font/');
 }
 
 /**
@@ -277,7 +296,7 @@ async function cacheFirst(request, cacheName) {
     return response;
   } catch (error) {
     console.error('[SW] Cache first error:', error);
-    return new Response('Network error', { status: 408 });
+    return buildOfflineResponse(request, cacheName);
   }
 }
 
@@ -339,8 +358,32 @@ async function cacheFirstWithExpiry(request, cacheName) {
     } catch (e) {
       // Игнорируем ошибки при получении кеша
     }
-    return new Response('Network error', { status: 408 });
+    return buildOfflineResponse(request, cacheName);
   }
+}
+
+async function buildOfflineResponse(request, cacheName = HTML_CACHE_NAME) {
+  if (isHtmlRequest(request)) {
+    try {
+      const cache = await caches.open(cacheName);
+      const fallback = await cache.match(APP_SHELL_URL);
+      if (fallback) {
+        return fallback;
+      }
+    } catch (error) {
+      console.warn('[SW] Failed to load offline fallback:', error);
+    }
+
+    return new Response('Offline', {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8'
+      }
+    });
+  }
+
+  return Response.error();
 }
 
 /**
@@ -359,9 +402,8 @@ async function networkFirst(request) {
     if (cached) {
       return cached;
     }
-    // Не пробрасываем ошибку — возвращаем пустой ответ, чтобы не ломать приложение
     console.warn('[SW] networkFirst fetch failed, no cache:', request.url, error.message);
-    return new Response('', { status: 408, statusText: 'Request Timeout' });
+    return buildOfflineResponse(request);
   }
 }
 
@@ -407,6 +449,9 @@ async function networkFirstWithCache(request, cacheName, options = {}) {
     const cache = await caches.open(cacheName);
     const cached = await cache.match(request);
     if (cached) {
+      if (isHtmlRequest(request)) {
+        return cached;
+      }
       const cachedDate = cached.headers.get('sw-cached-date');
       if (cachedDate) {
         const age = Date.now() - parseInt(cachedDate);
@@ -420,7 +465,7 @@ async function networkFirstWithCache(request, cacheName, options = {}) {
       }
     }
     console.warn('[SW] networkFirstWithCache fetch failed, no cache:', request.url, error.message);
-    return new Response('', { status: 408, statusText: 'Request Timeout' });
+    return buildOfflineResponse(request, cacheName);
   }
 }
 

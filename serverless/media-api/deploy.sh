@@ -37,6 +37,11 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v npx >/dev/null 2>&1; then
+  echo "npx is required" >&2
+  exit 1
+fi
+
 if ! command -v python3 >/dev/null 2>&1; then
   echo "python3 is required" >&2
   exit 1
@@ -45,12 +50,39 @@ fi
 echo "Installing serverless dependencies..."
 npm install
 
+BUILD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ai-craft-media-api.XXXXXX")"
+cleanup() {
+  rm -rf "$BUILD_DIR"
+}
+trap cleanup EXIT
+
+echo "Bundling function source..."
+npx esbuild "$SCRIPT_DIR/index.mjs" \
+  --bundle \
+  --platform=node \
+  --format=cjs \
+  --target=node22 \
+  --outfile="$BUILD_DIR/index.js"
+
 if ! yc serverless function get "$FUNCTION_NAME" >/dev/null 2>&1; then
   echo "Creating function: $FUNCTION_NAME"
   yc serverless function create "$FUNCTION_NAME"
 fi
 
 FUNCTION_ID="$(yc serverless function get "$FUNCTION_NAME" --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
+RENDERED_SPEC="$BUILD_DIR/gateway.openapi.yaml"
+python3 - "$SCRIPT_DIR/gateway.openapi.yaml" "$RENDERED_SPEC" "$FUNCTION_ID" "$FUNCTION_TAG" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1]).read_text()
+rendered = (
+    source
+    .replace('${function_id}', sys.argv[3])
+    .replace('${function_tag}', sys.argv[4])
+)
+Path(sys.argv[2]).write_text(rendered)
+PY
 
 echo "Deploying function version..."
 yc serverless function version create \
@@ -59,7 +91,7 @@ yc serverless function version create \
   --entrypoint "$ENTRYPOINT" \
   --memory "$MEMORY" \
   --execution-timeout "$EXECUTION_TIMEOUT" \
-  --source-path "$SCRIPT_DIR" \
+  --source-path "$BUILD_DIR" \
   --environment "MEDIA_BUCKET=$MEDIA_BUCKET" \
   --environment "MEDIA_PUBLIC_PREFIX=${MEDIA_PUBLIC_PREFIX:-published/}" \
   --environment "MEDIA_DRAFT_PREFIX=${MEDIA_DRAFT_PREFIX:-drafts/}" \
@@ -78,12 +110,10 @@ yc serverless function version create \
 echo "Deploying API Gateway..."
 if yc serverless api-gateway get "$GATEWAY_NAME" >/dev/null 2>&1; then
   yc serverless api-gateway update "$GATEWAY_NAME" \
-    --spec "$SCRIPT_DIR/gateway.openapi.yaml" \
-    --variables "function_id=$FUNCTION_ID,function_tag=$FUNCTION_TAG"
+    --spec "$RENDERED_SPEC"
 else
   yc serverless api-gateway create "$GATEWAY_NAME" \
-    --spec "$SCRIPT_DIR/gateway.openapi.yaml" \
-    --variables "function_id=$FUNCTION_ID,function_tag=$FUNCTION_TAG"
+    --spec "$RENDERED_SPEC"
 fi
 
 echo

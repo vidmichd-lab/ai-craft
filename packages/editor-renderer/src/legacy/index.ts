@@ -8,3 +8,4 @@ export * from './text.js';
 export * from './canvas.js';
 export * from './render-helpers.js';
 export * from './render-to-canvas.js';
+export * from './runtime-config.js';

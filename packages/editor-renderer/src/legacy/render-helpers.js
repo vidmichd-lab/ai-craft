@@ -1,10 +1,11 @@
-import { FONT_NAME_TO_WEIGHT } from '../../../../src/constants.js';
+import { getLegacyFontNameToWeight } from './runtime-config.js';
 
 export const getFontWeight = (weightName) => {
   if (typeof weightName === 'number') {
     return weightName;
   }
-  return FONT_NAME_TO_WEIGHT[weightName] || '400';
+  const fontNameToWeight = getLegacyFontNameToWeight();
+  return fontNameToWeight[weightName] || '400';
 };
 
 export const getFontString = (weight, size, fontFamily) => {

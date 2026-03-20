@@ -98,22 +98,6 @@
   gap: 16px;
 }
 
-.legacyFrameWrap {
-  min-height: 900px;
-  border-radius: 20px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #050505;
-}
-
-.legacyFrame {
-  width: 100%;
-  min-height: 900px;
-  border: 0;
-  display: block;
-  background: #050505;
-}
-
 .canvasCard {
   display: flex;
   flex-direction: column;
