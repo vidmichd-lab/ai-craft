@@ -2,7 +2,7 @@
 
 ## Canonical Frontend
 
-The canonical frontend is the Next.js App Router application in `apps/web`.
+The canonical target frontend and current primary frontend is the Next.js App Router application in `apps/web`.
 
 Primary entry points:
 
@@ -10,6 +10,15 @@ Primary entry points:
 - `apps/web/src/app/page.tsx`
 - `apps/web/src/app/editor/page.tsx`
 - `apps/web/src/app/globals.css`
+
+## Layer Status
+
+| Layer | Current status | Known debt |
+| --- | --- | --- |
+| Route layer | Active | Some routes still closely mirror backend transport |
+| Product components | Active | Some large components still need further decomposition |
+| Shared UI | Active but incomplete | Transitional inline style usage still exists |
+| Legacy static frontend | Migration-only | Still useful for parity and reference |
 
 ## Frontend Composition
 
@@ -108,6 +117,27 @@ Canonical rule:
 
 Legacy direct style mutation in root `src/*` is not a valid model for new frontend work.
 
+## Dependency Rules Matrix
+
+| From | Can import |
+| --- | --- |
+| `apps/web/src/app/*` | `apps/web/src/components/*`, `apps/web/src/server/*`, shared packages |
+| `apps/web/src/components/*` server component | shared packages, safe server modules |
+| `apps/web/src/components/*` client component | shared packages only, no server runtime imports |
+| `apps/web/src/server/*` | shared packages, upstream clients, server-local modules |
+| `packages/ui/*` | React and token/theme files only, no app/server imports |
+| `src/*` | legacy-local modules only |
+
+## Client/Server Boundary
+
+| Concern | Client | Server |
+| --- | --- | --- |
+| UI state | browser-owned | no |
+| session/auth verification | no | `apps/web/src/server/auth/*` |
+| upstream workspace/media access | no | `apps/web/src/server/workspace-api/*`, `apps/web/src/server/media-api/*` |
+| secret access | no | `apps/web/src/server/env.ts` |
+| editor model and renderer | yes | only as build/runtime dependency, not as auth source |
+
 ## Frontend Boundaries
 
 Allowed imports for `apps/web/src/components/*`:
@@ -124,6 +154,13 @@ Disallowed patterns:
 - importing from `serverless/*` directly into frontend code
 - importing from root legacy `src/*` into `apps/web`
 - redefining shared tokens or workspace DTOs inside UI code
+
+## Known Migration Debt
+
+- Some UI contract coverage is still incomplete in `packages/ui`.
+- Some styling remains transitional rather than fully tokenized.
+- Root legacy code is still referenced for parity and historical behavior.
+- Some large client components still combine orchestration and view concerns.
 
 ## Migration Stance
 

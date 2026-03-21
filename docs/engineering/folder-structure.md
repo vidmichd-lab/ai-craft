@@ -34,7 +34,7 @@ External service implementations and gateway specs.
 
 ### `src/`
 
-Legacy static app kept for migration support only.
+Legacy static app kept for migration support and parity only.
 
 ### `docs/`
 
@@ -86,6 +86,45 @@ Owns generated Figma Code Connect files only.
 - New product UI flows go to `apps/web/src/components`.
 - New API route files go to `apps/web/src/app/api`.
 - Legacy fixes in root `src/*` must stay isolated and must not become dependencies of `apps/web`.
+
+## Placement Decision Tree
+
+1. Is it a browser-facing route, page, layout, or API handler?
+   - Put it in `apps/web/src/app`.
+2. Is it product-specific React UI for the active app?
+   - Put it in `apps/web/src/components`.
+3. Is it reusable across features or apps?
+   - Put it in the appropriate package under `packages/*`.
+4. Is it server-only integration or business logic for the web app?
+   - Put it in `apps/web/src/server`.
+5. Is it legacy parity or old runtime maintenance?
+   - Keep it under `src/`.
+
+## Examples
+
+- A new workspace modal component:
+  - `apps/web/src/components/auth/...`
+- A reusable button variant or shared field primitive:
+  - `packages/ui/src/...`
+- An editor document normalization helper:
+  - `packages/editor-model/src/index.ts`
+- A BFF wrapper over a workspace endpoint:
+  - `apps/web/src/server/workspace-api/...`
+
+## Anti-Examples
+
+- A new shared type defined under `apps/web/src/components`.
+- A client component calling the workspace backend directly with `fetch`.
+- A new canonical feature added under root `src/`.
+- A reusable UI primitive copied into an app feature folder instead of extracted into `packages/ui`.
+
+## Naming Coupled To Placement
+
+- React component files: `kebab-case.tsx`
+- Route handlers: `route.ts`
+- Shared package entrypoints: `index.ts`
+- CSS modules should be paired to the owning component, for example `workspace-shell.module.css`
+- See `docs/engineering/naming-conventions.md` for the naming contract that complements placement rules.
 
 ## Forbidden Placement
 

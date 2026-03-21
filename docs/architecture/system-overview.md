@@ -13,7 +13,7 @@ This document defines the canonical high-level architecture.
 
 ## Canonical Runtime
 
-The canonical runtime is the Next.js application in `apps/web`.
+The canonical target runtime and current primary runtime is the Next.js application in `apps/web`.
 
 It is responsible for:
 
@@ -65,6 +65,31 @@ It is responsible for:
   - legacy browser client for media operations
 
 New product work must target `apps/web` and `packages/*`. The root `src/` tree exists only to preserve parity during migration.
+
+## Current Status
+
+| Surface | Status | Canonical? | Notes |
+| --- | --- | --- | --- |
+| `apps/web` | Active | Yes | Main product shell |
+| `packages/ui` | Active, incomplete | Yes | Shared UI target, not yet full coverage |
+| `packages/editor-model` | Active | Yes | Canonical editor document |
+| `packages/editor-renderer` | Active with legacy core | Yes | Public renderer API wraps legacy engine |
+| `serverless/workspace-api` | Active | External source of truth | System-of-record for workspace state |
+| `serverless/media-api` | Active | External source of truth | Media manifest/upload backend |
+| `src/` | Migration-only, partially live | No | Legacy runtime still used for parity and reference |
+
+## Known Exceptions
+
+- `src/` still contains active logic that has not been fully migrated.
+- `packages/ui` is the canonical target for shared UI, but some product UI still relies on app-level styling and transitional component patterns.
+- Inline style debt still exists in legacy code and in some transitional shared UI code.
+- Not every reusable pattern has been fully extracted yet.
+
+## Migration Interpretation Rules
+
+- If docs and code differ inside a migration-marked area, treat it as migration debt first.
+- If docs and code differ inside a canonical active area, docs win unless they are clearly wrong.
+- AI must not refactor legacy or migration-only surfaces unless the task explicitly touches them.
 
 ## Architectural Layers
 
@@ -123,8 +148,8 @@ New product work must target `apps/web` and `packages/*`. The root `src/` tree e
 
 ## Canonical Decision Summary
 
-- `apps/web` is the only canonical application shell.
+- `apps/web` is the canonical target runtime and current primary application shell.
 - `packages/*` own reusable contracts and shared implementation.
 - `serverless/*` are external backends, not UI layers.
-- `src/*` is legacy and must not define new patterns for active development.
+- `src/*` is legacy / migration-only and must not define new patterns for new canonical work.
 - `/docs` is the single source of truth for future changes.
