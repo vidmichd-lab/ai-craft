@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -6,15 +6,40 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const rootDir = process.cwd();
 
+const firstExistingPath = async (paths, label) => {
+  for (const candidate of paths.filter(Boolean)) {
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  throw new Error(`Unable to locate ${label}. Checked: ${paths.filter(Boolean).join(', ')}`);
+};
+
+const colorDarkPath = await firstExistingPath(
+  [
+    process.env.SDS_DARK_TOKENS_PATH,
+    path.join(rootDir, 'design/tokens/AI-Craft-Dark.tokens.json'),
+    '/Users/vidmich/Downloads/Color/SDS Dark.tokens.json'
+  ],
+  'dark SDS tokens'
+);
+
+const colorLightPath = await firstExistingPath(
+  [
+    process.env.SDS_LIGHT_TOKENS_PATH,
+    path.join(rootDir, 'design/tokens/AI-Craft-Light.tokens.json'),
+    '/Users/vidmich/Downloads/Color/SDS Light.tokens.json'
+  ],
+  'light SDS tokens'
+);
+
 const sources = {
-  colorDark:
-    process.env.SDS_DARK_TOKENS_PATH ||
-    path.join(rootDir, 'design/tokens/AI-Craft-Dark.tokens.json') ||
-    '/Users/vidmich/Downloads/Color/SDS Dark.tokens.json',
-  colorLight:
-    process.env.SDS_LIGHT_TOKENS_PATH ||
-    path.join(rootDir, 'design/tokens/AI-Craft-Light.tokens.json') ||
-    '/Users/vidmich/Downloads/Color/SDS Light.tokens.json',
+  colorDark: colorDarkPath,
+  colorLight: colorLightPath,
   colorPrimitivesZip:
     process.env.SDS_COLOR_PRIMITIVES_ZIP || '/Users/vidmich/Downloads/Color Primitives.zip',
   sizeZip: process.env.SDS_SIZE_ZIP || '/Users/vidmich/Downloads/Size.zip',

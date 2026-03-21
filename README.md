@@ -1,158 +1,115 @@
-# Генератор макетов
+This documentation is the single source of truth.
+All code changes must follow rules defined in /docs.
 
-Веб-приложение для генерации макетов с различными размерами.
+# AI-Craft
 
-## Запуск проекта
+AI-Craft is a monorepo for a layout-generation workspace. The active product surface is a Next.js application in `apps/web`, supported by shared packages in `packages/*`, with external workspace and media backends exposed through serverless APIs in `serverless/*`.
 
-### Способ 1: Использование Python скрипта (рекомендуется)
+## Documentation
+
+Start here, then move into the relevant section before making changes:
+
+- `docs/architecture/system-overview.md`
+- `docs/architecture/frontend-architecture.md`
+- `docs/architecture/backend-architecture.md`
+- `docs/architecture/data-flow.md`
+- `docs/design-system/tokens.md`
+- `docs/design-system/components.md`
+- `docs/design-system/ui-rules.md`
+- `docs/engineering/code-style.md`
+- `docs/engineering/folder-structure.md`
+- `docs/engineering/naming-conventions.md`
+- `docs/security/auth.md`
+- `docs/security/data-handling.md`
+- `docs/security/secrets.md`
+- `docs/product/features.md`
+- `docs/product/user-flows.md`
+- `docs/setup/installation.md`
+- `docs/setup/env.md`
+- `docs/setup/deployment.md`
+
+Supporting historical context remains in:
+
+- `docs/architecture/adr/*`
+- `docs/design-system-inventory.md`
+- `docs/figma-code-connect.md`
+
+Historical documents outside `/docs` are not authoritative unless a canonical document explicitly links to them.
+
+## Project Structure
+
+```text
+apps/
+  web/                  Next.js application and browser-facing BFF
+packages/
+  editor-model/         Canonical editor document and template model
+  editor-renderer/      Canvas renderer and legacy render bridge
+  ui/                   Shared UI primitives, fields, components, recipes, tokens
+  workspace-domain/     Workspace role and domain helpers
+  workspace-sdk/        Typed workspace/media API contracts and helpers
+serverless/
+  workspace-api/        Workspace backend implementation and schema
+  media-api/            Media manifest and upload backend
+  web-proxy-gateway/    Gateway specification
+src/                    Legacy static application kept for migration/parity
+docs/                   Canonical documentation set
+tests/                  Unit, integration, security, smoke, and renderer tests
+```
+
+## Core Principles
+
+- `apps/web` is the canonical user-facing application shell.
+- `packages/*` own reusable contracts, rendering logic, and shared UI.
+- Next.js route handlers must stay thin and delegate to `apps/web/src/server/*`.
+- UI must use shared tokens and shared components instead of ad hoc styling.
+- The root `src/` legacy app is reference and migration surface, not the target architecture for new work.
+
+## Local Development
+
+Requirements:
+
+- Node.js 22+
+- npm 11+
+
+Install and run:
 
 ```bash
-python3 start_server.py
+npm install
+npm run dev
 ```
 
-Или:
+Useful commands:
 
 ```bash
-./start_server.py
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run test:workspace
+npm run test:renderer
+npm run build
 ```
 
-Сервер автоматически откроется в браузере на `http://localhost:8000`
-
-### Способ 2: Использование встроенного HTTP сервера Python
+To run only the web app:
 
 ```bash
-python3 -m http.server 8000
+npm --prefix apps/web run dev
 ```
 
-Затем откройте в браузере: `http://localhost:8000`
+## Runtime Surfaces
 
-### Способ 3: Использование Python HTTP сервера (Python 2)
+- Web app: `apps/web`
+- Workspace backend: `serverless/workspace-api`
+- Media backend: `serverless/media-api`
+- Renderer package: `packages/editor-renderer`
+- Legacy static editor: `src/`
 
-```bash
-python -m SimpleHTTPServer 8000
-```
+## Rules For Future Changes
 
-## Остановка сервера
+Before changing code:
 
-Нажмите `Ctrl+C` в терминале, где запущен сервер.
+1. Read the relevant files in `/docs`.
+2. Follow the architecture and folder ownership rules.
+3. Reuse the shared design system and tokens.
+4. Prefer updating code to match docs instead of relaxing docs.
 
-## Требования
-
-- Python 3.x (для запуска локального сервера)
-- Современный браузер с поддержкой ES6 модулей
-
-## Структура проекта
-
-```
-prac/
-├── index.html          # Главный HTML файл
-├── src/                # Исходный код JavaScript
-│   ├── main.js        # Точка входа
-│   ├── renderer.js    # Рендеринг на canvas
-│   └── ...
-├── assets/            # Изображения и ресурсы
-├── font/              # Шрифты
-└── logo/              # Логотипы
-```
-
-## Remote media
-
-Приложение умеет подмешивать удалённые медиа-ассеты через `config.json` -> `mediaSources.remote`.
-
-Если `mediaSources.remote.enabled = true`, библиотека медиа работает в `remote-only` режиме для `assets`, `logo` и `font`.
-Командные дефолты лучше хранить в `config.json -> defaultValues`, а `localStorage` использовать только как персональный override в браузере конкретного пользователя.
-Для нескольких команд можно использовать `config.json -> teamProfiles` и выбирать профиль через `?team=<id>` в URL.
-
-Важно: приватный бакет `ai-craft-media` нельзя читать напрямую из браузера по обычным bucket URL. Для remote media нужен `manifestUrl`, который отдаёт JSON-манифест с уже доступными URL файлов, например presigned URL или ссылки через backend.
-
-Пример структуры remote manifest:
-
-```json
-{
-  "assets": {
-    "pro": {
-      "assets": [
-        {
-          "name": "Remote 01",
-          "file": "https://example.com/presigned/pro/assets/1.webp"
-        }
-      ]
-    },
-    "3d": {
-      "bg": [
-        {
-          "name": "triangle green dark",
-          "file": "https://example.com/presigned/3d/bg/shape=triangle, inside=green, theme=dark.webp"
-        }
-      ]
-    }
-  }
-}
-```
-
-Референс backend-реализации для `manifest` и `presigned upload` лежит в [serverless/media-api](/Users/vidmich/Desktop/prac/serverless/media-api).
-
-На фронте уже есть базовый клиент для presigned uploads: [remoteMediaApi.js](/Users/vidmich/Desktop/prac/src/utils/remoteMediaApi.js).
-
-Для production-подключения remote media можно взять шаблон [config.remote-media.example.json](/Users/vidmich/Desktop/prac/config.remote-media.example.json).
-
-### Профили команд
-
-Один и тот же хост можно использовать для нескольких команд:
-
-```json
-{
-  "defaultTeam": "academy",
-  "teamProfiles": {
-    "academy": {
-      "brandName": "Практикума",
-      "defaultValues": {
-        "defaultLogoRU": "logo/white/ru/main.svg",
-        "kvSelected": "assets/pro/assets/1.webp",
-        "fontFamily": "YS Text"
-      }
-    },
-    "fintech": {
-      "brandName": "Fintech Team",
-      "defaultValues": {
-        "defaultLogoRU": "logo/black/ru/main.svg",
-        "kvSelected": "assets/3d/logos/40.webp",
-        "fontFamily": "YS Display"
-      }
-    }
-  }
-}
-```
-
-Профиль открывается так:
-
-- `/` — берёт `defaultTeam`
-- `/?team=academy`
-- `/?team=fintech`
-
-Базовый `config.json` задаёт общие настройки, а профиль команды переопределяет только свои поля.
-
-### Workspace API
-
-Для многокомандной работы поверх генератора можно подключить backend `serverless/workspace-api`.
-
-Пример секции в `config.json`:
-
-```json
-{
-  "workspaceApi": {
-    "enabled": true,
-    "baseUrl": "https://example.com/api"
-  }
-}
-```
-
-Что появится во фронте:
-
-- логин пользователя внутри команды
-- список проектов команды
-- создание и архивирование проекта
-- сохранение текущего состояния проекта
-- сохранение состояния как шаблона для возврата позже
-
-Если `workspaceApi.baseUrl` не указан, фронт будет пытаться ходить в API по тому же origin, где открыт сайт.
+If current code conflicts with these docs, treat the code as migration debt unless a canonical doc explicitly marks an exception.

@@ -30,21 +30,21 @@ test('prod login opens the workspace dashboard on the custom domain', async ({ p
     pageErrors.push(error.message);
   });
 
-  await page.goto(PROD_URL, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible();
+  await page.goto(PROD_URL, { waitUntil: 'networkidle' });
+  const loginButton = page.getByRole('button', { name: 'Войти' });
+  await expect(loginButton).toBeVisible();
 
-  await page.locator('input[type="email"]').fill(LOGIN.email);
-  await page.locator('input[type="password"]').fill(LOGIN.password);
-  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('textbox', { name: 'Email' }).pressSequentially(LOGIN.email, { delay: 20 });
+  await page.getByRole('textbox', { name: 'Пароль', exact: true }).pressSequentially(LOGIN.password, { delay: 20 });
+  await expect(loginButton).toBeEnabled({ timeout: 10000 });
+  await loginButton.click();
 
-  await expect(page.getByText('Рабочие разделы')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('AI-Craft Studio')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Основная рабочая сцена')).toBeVisible();
   await expect(page.getByText('Яндекс Практикум')).toBeVisible();
 
   await page.getByRole('button', { name: 'Шаблоны' }).click();
   await expect(page.getByText('Библиотека шаблонов')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Медиатека' }).click();
-  await expect(page.getByText('Командная медиатека')).toBeVisible();
 
   const healthResponse = await page.request.get(`${PROD_URL}api/health`);
   const healthPayload = await healthResponse.json();

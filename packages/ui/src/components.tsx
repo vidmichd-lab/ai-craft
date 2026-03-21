@@ -122,6 +122,48 @@ export function Tab({ active = false, className, children, ...props }: TabProps)
   );
 }
 
+export function SegmentedControl({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cx('ui-segmented', className)} role="tablist" {...props} />;
+}
+
+export type SegmentedControlItemProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  active?: boolean;
+};
+
+export function SegmentedControlItem({
+  active = false,
+  className,
+  children,
+  ...props
+}: SegmentedControlItemProps) {
+  return (
+    <button
+      className={cx('ui-segmented-item', active && 'is-active', className)}
+      aria-pressed={active}
+      type="button"
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+export type StatCardProps = HTMLAttributes<HTMLDivElement> & {
+  label: ReactNode;
+  value: ReactNode;
+  hint?: ReactNode;
+};
+
+export function StatCard({ label, value, hint, className, ...props }: StatCardProps) {
+  return (
+    <div className={cx('ui-stat-card', className)} {...props}>
+      <div className="ui-stat-card-label">{label}</div>
+      <div className="ui-stat-card-value">{value}</div>
+      {hint ? <div className="ui-stat-card-hint">{hint}</div> : null}
+    </div>
+  );
+}
+
 export type AvatarProps = HTMLAttributes<HTMLDivElement> & {
   size?: 'small' | 'medium' | 'large';
   shape?: 'circle' | 'square';

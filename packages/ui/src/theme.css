@@ -36,6 +36,17 @@
   --ui-space-6: var(--sds-size-space-600);
   --ui-shadow-focus: 0 0 0 3px rgba(255, 255, 255, 0.04);
   --ui-transition-base: 120ms ease;
+  --studio-shell-bg: #050505;
+  --studio-surface-bg: #141414;
+  --studio-surface-soft-bg: #191919;
+  --studio-canvas-bg: #232323;
+  --studio-control-bg: #101010;
+  --studio-pill-active-bg: #ffffff;
+  --studio-pill-active-fg: #111111;
+  --studio-overlay-width: min(1480px, calc(100vw - 40px));
+  --studio-left-rail-width: 380px;
+  --studio-right-rail-width: 320px;
+  --studio-bottom-strip-height: 220px;
 }
 
 [data-theme="light"] {
@@ -445,6 +456,67 @@
   display: inline-flex;
   flex-wrap: wrap;
   gap: var(--ui-space-3);
+}
+
+.ui-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-color-border);
+  background: var(--ui-color-panel);
+}
+
+.ui-segmented-item {
+  min-height: 40px;
+  padding: 0 var(--ui-space-4);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ui-color-muted);
+  font-family: var(--ui-font-family-body);
+  font-size: var(--ui-font-size-body-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--ui-transition-base),
+    border-color var(--ui-transition-base),
+    color var(--ui-transition-base);
+}
+
+.ui-segmented-item.is-active {
+  background: var(--studio-pill-active-bg);
+  border-color: var(--studio-pill-active-bg);
+  color: var(--studio-pill-active-fg);
+}
+
+.ui-stat-card {
+  padding: var(--ui-space-4);
+  border-radius: 24px;
+  border: 1px solid var(--ui-color-border);
+  background: var(--studio-surface-soft-bg);
+}
+
+.ui-stat-card-label {
+  color: var(--ui-color-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.ui-stat-card-value {
+  margin-top: 8px;
+  color: var(--ui-color-text);
+  font-size: 20px;
+  font-weight: var(--ui-font-weight-strong);
+  line-height: 1.1;
+}
+
+.ui-stat-card-hint {
+  margin-top: 8px;
+  color: var(--ui-color-muted);
+  font-size: var(--ui-font-size-body-sm);
+  line-height: 1.4;
 }
 
 .ui-tag,

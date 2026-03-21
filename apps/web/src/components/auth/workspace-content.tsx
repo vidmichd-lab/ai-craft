@@ -9,7 +9,7 @@ import {
   normalizeStoredTemplateState,
   type EditorDocument
 } from '@ai-craft/editor-model';
-import { Button, Dialog, SectionHeader, Select, Tab } from '@ai-craft/ui';
+import { Button, Dialog, SectionHeader, SegmentedControl, SegmentedControlItem, Select, StatCard } from '@ai-craft/ui';
 import {
   canManageWorkspaceMembers,
   formatWorkspaceRoleLabel,
@@ -172,39 +172,26 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
       </section>
 
       <section className={styles.workspaceNavCard}>
-        <div className={styles.workspaceTabs} role="tablist" aria-label="Разделы AI-Craft">
-          <Tab active={activeOverlay === null} className={styles.workspaceTab} onClick={() => setActiveOverlay(null)} type="button">
+        <SegmentedControl className={styles.workspaceTabs} aria-label="Разделы AI-Craft">
+          <SegmentedControlItem active={activeOverlay === null} className={styles.workspaceTab} onClick={() => setActiveOverlay(null)}>
             Редактор
-          </Tab>
+          </SegmentedControlItem>
           {workspaceActions.map((action) => (
-            <Tab
+            <SegmentedControlItem
               key={action.id}
               active={activeOverlay === action.id}
               className={styles.workspaceTab}
               onClick={() => setActiveOverlay(action.id)}
-              type="button"
             >
               {action.label}
-            </Tab>
+            </SegmentedControlItem>
           ))}
-        </div>
+        </SegmentedControl>
         <div className={styles.statusGrid}>
-          <div className={styles.statusCard}>
-            <div className={styles.statusLabel}>Статус</div>
-            <div className={styles.statusValue}>{teamStatus}</div>
-          </div>
-          <div className={styles.statusCard}>
-            <div className={styles.statusLabel}>Участники</div>
-            <div className={styles.statusValue}>{members.length}</div>
-          </div>
-          <div className={styles.statusCard}>
-            <div className={styles.statusLabel}>Отделы</div>
-            <div className={styles.statusValue}>{departments.length}</div>
-          </div>
-          <div className={styles.statusCard}>
-            <div className={styles.statusLabel}>Defaults</div>
-            <div className={styles.statusValue}>{defaultsUpdatedAt}</div>
-          </div>
+          <StatCard className={styles.statusCard} label="Статус" value={teamStatus} />
+          <StatCard className={styles.statusCard} label="Участники" value={members.length} />
+          <StatCard className={styles.statusCard} label="Отделы" value={departments.length} />
+          <StatCard className={styles.statusCard} label="Defaults" value={defaultsUpdatedAt} />
         </div>
       </section>
 
@@ -212,6 +199,8 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
         state={editorState}
         onChange={setEditorState}
         onTemplateSaved={() => setTemplatesRefreshKey((current) => current + 1)}
+        onOpenTemplates={() => setActiveOverlay('templates')}
+        departments={departments}
         eyebrow="Studio"
         title="Основная рабочая сцена"
       />
@@ -316,22 +305,22 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
                     <div className={styles.fieldGrid}>
                       <div className={styles.field}>
                         <div className={styles.fieldLabel}>Тема</div>
-                        <div className={styles.segmentedRow}>
-                          <button
-                            className={`${styles.segmentedButton} ${interfaceTheme === 'dark' ? styles.segmentedButtonActive : ''}`}
-                            type="button"
+                        <SegmentedControl className={styles.segmentedRow}>
+                          <SegmentedControlItem
+                            className={styles.segmentedButton}
+                            active={interfaceTheme === 'dark'}
                             onClick={() => setInterfaceTheme('dark')}
                           >
                             Темная
-                          </button>
-                          <button
-                            className={`${styles.segmentedButton} ${interfaceTheme === 'light' ? styles.segmentedButtonActive : ''}`}
-                            type="button"
+                          </SegmentedControlItem>
+                          <SegmentedControlItem
+                            className={styles.segmentedButton}
+                            active={interfaceTheme === 'light'}
                             onClick={() => setInterfaceTheme('light')}
                           >
                             Светлая
-                          </button>
-                        </div>
+                          </SegmentedControlItem>
+                        </SegmentedControl>
                       </div>
                       <div className={styles.field}>
                         <div className={styles.fieldLabel}>Язык интерфейса</div>
@@ -346,26 +335,10 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
                       </div>
                     </div>
                     <div className={styles.heroStats}>
-                      <div className={styles.heroStat}>
-                        <div className={styles.heroStatLabel}>Команда</div>
-                        <div className={styles.heroStatValue}>{teamName}</div>
-                        <div className={styles.heroStatHint}>Slug: {teamSlug}</div>
-                      </div>
-                      <div className={styles.heroStat}>
-                        <div className={styles.heroStatLabel}>Доступ</div>
-                        <div className={styles.heroStatValue}>{roleLabel}</div>
-                        <div className={styles.heroStatHint}>{actorName}</div>
-                      </div>
-                      <div className={styles.heroStat}>
-                        <div className={styles.heroStatLabel}>Runtime</div>
-                        <div className={styles.heroStatValue}>Next.js</div>
-                        <div className={styles.heroStatHint}>Container + Gateway</div>
-                      </div>
-                      <div className={styles.heroStat}>
-                        <div className={styles.heroStatLabel}>Storage</div>
-                        <div className={styles.heroStatValue}>Workspace API</div>
-                        <div className={styles.heroStatHint}>YDB-backed team data</div>
-                      </div>
+                      <StatCard className={styles.heroStat} label="Команда" value={teamName} hint={`Slug: ${teamSlug}`} />
+                      <StatCard className={styles.heroStat} label="Доступ" value={roleLabel} hint={actorName} />
+                      <StatCard className={styles.heroStat} label="Runtime" value="Next.js" hint="Container + Gateway" />
+                      <StatCard className={styles.heroStat} label="Storage" value="Workspace API" hint="YDB-backed team data" />
                     </div>
                   </div>
                 </section>

@@ -3,6 +3,7 @@ import { requireWorkspaceRoleSession } from '@/server/auth/request-session';
 import { requestPresignedUpload } from '@/server/media-api/client';
 import { createRequestContext } from '@/server/http/request-context';
 import { jsonResponse, toRouteErrorResponse } from '@/server/http/response';
+import { auditLog } from '@/server/observability/audit';
 
 const folderSchema = z.string().trim().regex(/^[a-z0-9_-]{1,80}$/i, 'Invalid folder segment');
 const allowedMimeTypes = new Set([
@@ -94,6 +95,26 @@ export async function POST(request: Request) {
         { status: 502 }
       );
     }
+
+    auditLog({
+      action: 'media.upload',
+      actor: {
+        id: session.me.user.id,
+        email: session.me.user.email,
+        role: session.role
+      },
+      teamId: session.me.team.id,
+      targetId: uploadPayload.key || file.name,
+      metadata: {
+        key: uploadPayload.key || '',
+        filename: file.name,
+        contentType: file.type || 'application/octet-stream',
+        size: file.size,
+        folder1,
+        folder2,
+        visibility: uploadPayload.visibility || 'published'
+      }
+    });
 
     return jsonResponse(
       {

@@ -6,6 +6,7 @@ import { saveWorkspaceSnapshot } from '@/server/workspace-api/client';
 import { ensureTemplateProject } from '@/server/workspace-api/templates';
 import { createRequestContext } from '@/server/http/request-context';
 import { jsonResponse, toRouteErrorResponse } from '@/server/http/response';
+import { auditLog } from '@/server/observability/audit';
 
 const payloadSchema = z.object({
   name: z.string().trim().min(1),
@@ -37,6 +38,22 @@ export async function POST(request: Request) {
       },
       session.cookie
     );
+    auditLog({
+      action: 'template.save',
+      actor: {
+        id: session.me.user.id,
+        email: session.me.user.email,
+        role: session.role
+      },
+      teamId: session.me.team.id,
+      targetId: result.data.snapshot.id,
+      metadata: {
+        projectId: project.id,
+        snapshotId: result.data.snapshot.id,
+        templateName: payload.name,
+        recipe: state.definition.recipe
+      }
+    });
     return jsonResponse(result.data, context);
   } catch (error) {
     return toRouteErrorResponse(error, 'Template save failed', context);
