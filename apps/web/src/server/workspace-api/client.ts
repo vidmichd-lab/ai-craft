@@ -1,4 +1,4 @@
-import { env } from '@/server/env';
+import { env, requireServerEnv } from '@/server/env';
 import {
   loginWorkspaceInputSchema,
   workspaceAuthResponseSchema,
@@ -63,11 +63,12 @@ const requestWorkspaceApi = async <T>(
   parser: { parse: (value: unknown) => T },
   options: RequestOptions = {}
 ): Promise<RequestResult<T>> => {
-  const response = await fetch(`${env.WORKSPACE_API_BASE_URL}${path}`, {
+  const workspaceApiBaseUrl = requireServerEnv('WORKSPACE_API_BASE_URL');
+  const response = await fetch(`${workspaceApiBaseUrl}${path}`, {
     method: options.method || 'GET',
     headers: {
       Accept: 'application/json',
-      ...(options.body !== undefined ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {}),
+      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...(options.cookie ? { Cookie: options.cookie } : {})
     },
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,

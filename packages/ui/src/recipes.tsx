@@ -1,12 +1,269 @@
 import type { HTMLAttributes, ReactNode } from 'react';
+import { Button, SectionHeader, Stack, Surface, cx } from './primitives';
 import {
-  Button,
-  SectionHeader,
-  Stack,
-  Surface,
-  cx
-} from './primitives';
-import { Avatar, Card, Menu, MenuItem, TextBody, TextHeading } from './components';
+  Avatar,
+  Card,
+  EmptyState,
+  Menu,
+  MenuItem,
+  StatCard,
+  TextBody,
+  TextHeading
+} from './components';
+
+type RecipeSectionBaseProps = Omit<HTMLAttributes<HTMLElement>, 'title'> & {
+  eyebrow?: ReactNode;
+  title?: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  footer?: ReactNode;
+  bodyClassName?: string;
+};
+
+export type PageLayoutProps = HTMLAttributes<HTMLDivElement> & {
+  header?: ReactNode;
+  toolbar?: ReactNode;
+};
+
+export function PageLayout({ header, toolbar, className, children, ...props }: PageLayoutProps) {
+  return (
+    <div className={cx('ui-page-layout', className)} {...props}>
+      {header}
+      {toolbar}
+      {children}
+    </div>
+  );
+}
+
+export type PageHeaderProps = Omit<HTMLAttributes<HTMLElement>, 'title'> & {
+  eyebrow?: ReactNode;
+  title?: ReactNode;
+  description?: ReactNode;
+  brand?: ReactNode;
+  badges?: ReactNode;
+  actions?: ReactNode;
+};
+
+export function PageHeader({
+  eyebrow,
+  title,
+  description,
+  brand,
+  badges,
+  actions,
+  className,
+  ...props
+}: PageHeaderProps) {
+  return (
+    <Surface
+      className={cx('ui-page-header', className)}
+      padding="lg"
+      radius="lg"
+      {...props}
+    >
+      <div className="ui-page-header-main">
+        <div className="ui-page-header-copy">
+          {brand ? <div className="ui-page-header-brand">{brand}</div> : null}
+          {title ? (
+            <SectionHeader
+              eyebrow={eyebrow}
+              title={title}
+              description={description}
+              className="ui-page-header-heading"
+            />
+          ) : null}
+        </div>
+        {(badges || actions) ? (
+          <div className="ui-page-header-actions">
+            {badges ? <div className="ui-page-header-badges">{badges}</div> : null}
+            {actions ? <div className="ui-page-header-tools">{actions}</div> : null}
+          </div>
+        ) : null}
+      </div>
+    </Surface>
+  );
+}
+
+export function Section({
+  eyebrow,
+  title,
+  description,
+  actions,
+  footer,
+  className,
+  bodyClassName,
+  children,
+  ...props
+}: RecipeSectionBaseProps) {
+  const hasHeader = eyebrow || title || description || actions;
+
+  return (
+    <Surface className={cx('ui-section', className)} padding="lg" radius="lg" {...props}>
+      <Stack gap="md">
+        {hasHeader ? (
+          <div className="ui-section-head">
+            {title ? <SectionHeader eyebrow={eyebrow} title={title} description={description} /> : null}
+            {actions ? <div className="ui-section-head-actions">{actions}</div> : null}
+          </div>
+        ) : null}
+        <div className={cx('ui-section-body', bodyClassName)}>{children}</div>
+        {footer ? <div className="ui-section-footer">{footer}</div> : null}
+      </Stack>
+    </Surface>
+  );
+}
+
+export type FormSectionProps = RecipeSectionBaseProps;
+
+export function FormSection(props: FormSectionProps) {
+  return <Section {...props} className={cx('ui-form-section', props.className)} />;
+}
+
+export type SettingsPanelProps = RecipeSectionBaseProps & {
+  stats?: ReactNode;
+};
+
+export function SettingsPanel({
+  stats,
+  className,
+  children,
+  ...props
+}: SettingsPanelProps) {
+  return (
+    <Section {...props} className={cx('ui-settings-panel', className)}>
+      {stats}
+      {children}
+    </Section>
+  );
+}
+
+export type SidebarSectionProps = Omit<HTMLAttributes<HTMLElement>, 'title'> & {
+  eyebrow?: ReactNode;
+  title?: ReactNode;
+  description?: ReactNode;
+  footer?: ReactNode;
+};
+
+export function SidebarSection({
+  eyebrow,
+  title,
+  description,
+  footer,
+  className,
+  children,
+  ...props
+}: SidebarSectionProps) {
+  return (
+    <Surface className={cx('ui-sidebar-section', className)} padding="md" radius="lg" {...props}>
+      <Stack gap="md">
+        {title ? <SectionHeader eyebrow={eyebrow} title={title} description={description} /> : null}
+        <div className="ui-sidebar-section-body">{children}</div>
+        {footer ? <div className="ui-sidebar-section-footer">{footer}</div> : null}
+      </Stack>
+    </Surface>
+  );
+}
+
+export type InspectorSectionProps = SidebarSectionProps;
+
+export function InspectorSection(props: InspectorSectionProps) {
+  return <SidebarSection {...props} className={cx('ui-inspector-section', props.className)} />;
+}
+
+export function Toolbar({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cx('ui-toolbar', className)} {...props} />;
+}
+
+export function ToolbarGroup({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cx('ui-toolbar-group', className)} {...props} />;
+}
+
+export type SplitLayoutProps = HTMLAttributes<HTMLDivElement> & {
+  variant?: 'content-sidebar' | 'sidebar-content' | 'balanced' | 'inspector-preview' | 'preview-rail';
+  start: ReactNode;
+  end: ReactNode;
+};
+
+export function SplitLayout({
+  variant = 'content-sidebar',
+  start,
+  end,
+  className,
+  ...props
+}: SplitLayoutProps) {
+  return (
+    <div className={cx('ui-split-layout', `ui-split-layout-${variant}`, className)} {...props}>
+      <div className="ui-split-layout-start">{start}</div>
+      <div className="ui-split-layout-end">{end}</div>
+    </div>
+  );
+}
+
+export type GridSectionProps = HTMLAttributes<HTMLDivElement> & {
+  columns?: 2 | 3 | 4 | 'auto-fit';
+};
+
+export function GridSection({ columns = 'auto-fit', className, ...props }: GridSectionProps) {
+  return <div className={cx('ui-grid-section', `ui-grid-section-${columns}`, className)} {...props} />;
+}
+
+type StatItem = {
+  label: ReactNode;
+  value: ReactNode;
+  hint?: ReactNode;
+  className?: string;
+};
+
+export type StatGroupProps = HTMLAttributes<HTMLDivElement> & {
+  items?: StatItem[];
+  columns?: 2 | 3 | 4 | 'auto-fit';
+};
+
+export function StatGroup({
+  items,
+  columns = 4,
+  className,
+  children,
+  ...props
+}: StatGroupProps) {
+  return (
+    <div className={cx('ui-stat-group', `ui-stat-group-${columns}`, className)} {...props}>
+      {items
+        ? items.map((item, index) => (
+            <StatCard
+              key={index}
+              className={item.className}
+              label={item.label}
+              value={item.value}
+              hint={item.hint}
+            />
+          ))
+        : children}
+    </div>
+  );
+}
+
+export type EmptyStateLayoutProps = Omit<HTMLAttributes<HTMLElement>, 'title'> & {
+  title: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  media?: ReactNode;
+};
+
+export function EmptyStateLayout({
+  title,
+  description,
+  action,
+  media,
+  className,
+  ...props
+}: EmptyStateLayoutProps) {
+  return (
+    <Surface className={cx('ui-empty-state-layout', className)} padding="md" radius="lg" {...props}>
+      <EmptyState title={title} description={description} action={action} media={media} />
+    </Surface>
+  );
+}
 
 export type FormCardProps = HTMLAttributes<HTMLDivElement> & {
   title: ReactNode;

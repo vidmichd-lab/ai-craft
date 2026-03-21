@@ -12,16 +12,20 @@ import {
   Banner,
   Button,
   Input,
-  SectionHeader,
+  GridSection,
+  InspectorSection,
+  Section,
   SegmentedControl,
   SegmentedControlItem,
   Select,
-  StatCard,
+  SplitLayout,
+  StatGroup,
   TextArea
 } from '@ai-craft/ui';
 import type { PreviewSurface } from '@ai-craft/editor-renderer';
 import type { WorkspaceDepartmentEntry } from '@ai-craft/workspace-sdk';
 import { EditorPreview } from './editor-preview';
+import { buildSolidPreviewDataUrl } from './preview-background';
 import styles from './workspace-shell.module.css';
 
 type EditorPanel = 'general' | 'visual' | 'logo' | 'headline' | 'subheadline' | 'legal';
@@ -514,9 +518,7 @@ export function EditorShell({
   };
 
   return (
-    <section className={styles.panel}>
-      <div className={styles.stack}>
-        <SectionHeader eyebrow={eyebrow} title={title} />
+    <Section className={styles.panel} eyebrow={eyebrow} title={title}>
         {notice ? (
           <Banner className={styles.notice} tone="notice">
             {notice}
@@ -528,9 +530,12 @@ export function EditorShell({
           </Banner>
         ) : null}
 
-        <div className={styles.studioGrid}>
-          <aside className={styles.controlRail}>
-            <SegmentedControl className={styles.controlTabs}>
+        <SplitLayout
+          className={styles.studioGrid}
+          variant="inspector-preview"
+          start={<aside className={styles.controlRail}>
+            <InspectorSection className={styles.controlTabs} title="Панели">
+              <SegmentedControl className={styles.controlTabs}>
               {PANEL_LABELS.map((panel) => (
                 <SegmentedControlItem
                   key={panel.id}
@@ -541,14 +546,14 @@ export function EditorShell({
                   {panel.label}
                 </SegmentedControlItem>
               ))}
-            </SegmentedControl>
-            <section className={styles.subPanel}>
+              </SegmentedControl>
+            </InspectorSection>
+            <InspectorSection className={styles.subPanel} eyebrow="Параметры" title={PANEL_LABELS.find((entry) => entry.id === activePanel)?.label}>
               <div className={styles.sectionLabel}>{PANEL_LABELS.find((entry) => entry.id === activePanel)?.label}</div>
               {renderPanelContent()}
-            </section>
-          </aside>
-
-          <EditorPreview
+            </InspectorSection>
+          </aside>}
+          end={<EditorPreview
             state={state}
             activeSurfaceKey={activeSurfaceKey}
             onSurfaceChange={setActiveSurfaceKey}
@@ -558,26 +563,30 @@ export function EditorShell({
             onExportScaleChange={setExportScale}
             exportMaxKilobytes={exportMaxKilobytes}
             onExportMaxKilobytesChange={setExportMaxKilobytes}
-          />
-        </div>
+          />}
+        />
 
-        <section className={styles.templateStrip}>
-          <div className={styles.templateStripCard}>
-            <div className={styles.templateStripPreview} style={{ background: currentPreview.backgroundColor }}>
+        <GridSection className={styles.templateStrip} columns={3}>
+          <InspectorSection className={styles.templateStripCard} eyebrow="Текущая сцена" title={state.brand.name || 'Новый макет'}>
+            <div className={styles.templateStripPreview}>
+              <Image
+                className={styles.templatePreviewImage}
+                src={buildSolidPreviewDataUrl(currentPreview.backgroundColor)}
+                alt=""
+                fill
+                unoptimized
+                sizes="240px"
+              />
               {currentPreview.logo ? (
                 <Image className={styles.templateStripLogo} src={currentPreview.logo} alt="" width={92} height={32} unoptimized />
               ) : null}
             </div>
-            <div className={styles.templateStripBody}>
-              <div className={styles.sectionLabel}>Текущая сцена</div>
-              <div className={styles.templateStripTitle}>{state.brand.name || 'Новый макет'}</div>
-              <div className={styles.templateStripText}>
-                {state.content.headline || 'Добавь заголовок, и он появится в текущем снимке сцены.'}
-              </div>
+            <div className={styles.templateStripText}>
+              {state.content.headline || 'Добавь заголовок, и он появится в текущем снимке сцены.'}
             </div>
-          </div>
+          </InspectorSection>
 
-          <div className={styles.templateStripActions}>
+          <InspectorSection className={styles.templateStripActions} eyebrow="Действия" title="Работа с макетом">
             {enableTemplateSave ? (
               <>
                 <Button type="button" variant="inverted" onClick={handleSaveTemplate} disabled={pending || !templateName.trim()}>
@@ -594,14 +603,26 @@ export function EditorShell({
                 В public mode шаблоны не сохраняются в командную библиотеку. Используй JSON export/import для переноса.
               </div>
             )}
-          </div>
+          </InspectorSection>
 
-          <div className={styles.templateStripStats}>
-            <StatCard className={styles.heroStat} label="Отдел" value={departmentOptions.find((item) => item.id === selectedDepartmentId)?.name || 'Общий'} />
-            <StatCard className={styles.heroStat} label="Surface" value={activeSurfaceKey} hint={`${exportScale}x export`} />
-          </div>
-        </section>
-      </div>
-    </section>
+          <StatGroup
+            className={styles.templateStripStats}
+            columns={2}
+            items={[
+              {
+                className: styles.heroStat,
+                label: 'Отдел',
+                value: departmentOptions.find((item) => item.id === selectedDepartmentId)?.name || 'Общий'
+              },
+              {
+                className: styles.heroStat,
+                label: 'Surface',
+                value: activeSurfaceKey,
+                hint: `${exportScale}x export`
+              }
+            ]}
+          />
+        </GridSection>
+    </Section>
   );
 }

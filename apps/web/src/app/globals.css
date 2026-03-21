@@ -1,17 +1,5 @@
 @import "../../../../packages/ui/src/theme.css";
 
-:root {
-  --bg: #000000;
-  --panel: var(--ui-color-panel);
-  --panel-soft: var(--ui-color-panel-soft);
-  --field: var(--ui-color-field);
-  --border: var(--ui-color-border);
-  --text: var(--ui-color-text);
-  --muted: var(--ui-color-muted);
-  --placeholder: var(--sds-color-text-default-tertiary);
-  --shadow: 0 32px 80px rgba(0, 0, 0, 0.42);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -20,8 +8,8 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--ui-color-shell);
+  color: var(--ui-color-text);
   font-family: var(--ui-font-family-body), sans-serif;
   letter-spacing: -0.01em;
 }

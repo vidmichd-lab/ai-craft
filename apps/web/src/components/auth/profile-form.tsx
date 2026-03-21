@@ -2,13 +2,60 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Banner, Button, Field, Input, MetaItem, MetaList, MutedText, SectionHeader } from '@ai-craft/ui';
+import { UISchemaRenderer, type UISchemaDocument } from '@ai-craft/ui';
 import styles from './workspace-shell.module.css';
 
 type Props = {
   initialDisplayName: string;
   email: string;
   roleLabel: string;
+};
+
+const profileFormSchema: UISchemaDocument = {
+  version: 1,
+  root: {
+    type: 'form-section',
+    className: styles.stack,
+    eyebrow: 'Аккаунт',
+    title: 'Мой профиль',
+    description: 'Личные данные, под которыми ты появляешься в библиотеке шаблонов, команде и истории изменений.',
+    children: [
+      {
+        type: 'input-field',
+        className: styles.field,
+        name: 'displayName',
+        label: 'Имя',
+        placeholder: 'Как вас показывать в системе'
+      },
+      {
+        type: 'meta-list',
+        className: styles.metaList,
+        items: [
+          { label: 'Почта', value: { binding: 'email' } },
+          { label: 'Роль', value: { binding: 'roleLabel' } }
+        ]
+      },
+      {
+        type: 'banner',
+        className: styles.notice,
+        tone: 'notice',
+        text: { binding: 'notice' },
+        when: { binding: 'showNotice' }
+      },
+      {
+        type: 'banner',
+        className: styles.error,
+        tone: 'error',
+        text: { binding: 'error' },
+        when: { binding: 'showError' }
+      },
+      {
+        type: 'button',
+        label: { binding: 'submitLabel' },
+        buttonType: 'submit'
+      }
+    ]
+  }
 };
 
 export function ProfileForm({ initialDisplayName, email, roleLabel }: Props) {
@@ -53,42 +100,28 @@ export function ProfileForm({ initialDisplayName, email, roleLabel }: Props) {
 
   return (
     <form className={styles.stack} onSubmit={handleSubmit}>
-      <SectionHeader
-        eyebrow="Аккаунт"
-        title="Мой профиль"
-        description="Личные данные, под которыми ты появляешься в библиотеке шаблонов, команде и истории изменений."
+      <UISchemaRenderer
+        schema={profileFormSchema}
+        bindings={{
+          values: {
+            displayName,
+            email,
+            roleLabel,
+            notice,
+            error,
+            submitLabel: pending ? 'Сохраняем...' : 'Сохранить профиль'
+          },
+          visibility: {
+            showNotice: Boolean(notice),
+            showError: Boolean(error)
+          },
+          onValueChange: (name, value) => {
+            if (name === 'displayName') {
+              setDisplayName(value);
+            }
+          }
+        }}
       />
-      <Field className={styles.field} label="Имя">
-        <Input
-          className={styles.input}
-          value={displayName}
-          onChange={(event) => setDisplayName(event.target.value)}
-          placeholder="Как вас показывать в системе"
-        />
-      </Field>
-      <MetaList className={styles.metaList}>
-        <MetaItem className={styles.metaItem}>
-          <MutedText className={styles.metaName}>Почта</MutedText>
-          <span>{email}</span>
-        </MetaItem>
-        <MetaItem className={styles.metaItem}>
-          <MutedText className={styles.metaName}>Роль</MutedText>
-          <span>{roleLabel}</span>
-        </MetaItem>
-      </MetaList>
-      {notice ? (
-        <Banner className={styles.notice} tone="notice">
-          {notice}
-        </Banner>
-      ) : null}
-      {error ? (
-        <Banner className={styles.error} tone="error">
-          {error}
-        </Banner>
-      ) : null}
-      <Button type="submit" disabled={pending || !displayName.trim()}>
-        {pending ? 'Сохраняем...' : 'Сохранить профиль'}
-      </Button>
     </form>
   );
 }

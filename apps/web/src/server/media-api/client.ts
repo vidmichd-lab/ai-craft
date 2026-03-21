@@ -1,4 +1,4 @@
-import { env } from '@/server/env';
+import { env, requireServerEnv } from '@/server/env';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -21,14 +21,15 @@ const normalizeApiBaseUrl = (manifestUrl: string) => {
 
 const buildHeaders = (body?: unknown) => ({
   Accept: 'application/json',
-  ...(body !== undefined ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {}),
+  ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
   ...(body !== undefined && env.MEDIA_MUTATION_TOKEN
     ? { 'X-Media-Api-Token': env.MEDIA_MUTATION_TOKEN }
     : {})
 });
 
 const requestMediaApi = async (path: string, init: RequestInit = {}) => {
-  const response = await fetch(`${normalizeApiBaseUrl(env.MEDIA_MANIFEST_URL)}${path}`, {
+  const mediaManifestUrl = requireServerEnv('MEDIA_MANIFEST_URL');
+  const response = await fetch(`${normalizeApiBaseUrl(mediaManifestUrl)}${path}`, {
     ...init,
     headers: {
       ...buildHeaders(init.body),
@@ -47,7 +48,7 @@ const requestMediaApi = async (path: string, init: RequestInit = {}) => {
   return payload;
 };
 
-export const getMediaManifest = () => fetch(env.MEDIA_MANIFEST_URL, { cache: 'no-store' }).then(async (response) => {
+export const getMediaManifest = () => fetch(requireServerEnv('MEDIA_MANIFEST_URL'), { cache: 'no-store' }).then(async (response) => {
   const payload = await parseJsonSafely(response);
   if (!response.ok) {
     throw new Error(String(payload?.error || payload?.message || `HTTP ${response.status}`));

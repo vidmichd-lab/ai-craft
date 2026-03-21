@@ -17,7 +17,7 @@ Primary entry points:
 | --- | --- | --- |
 | Route layer | Active | Some routes still closely mirror backend transport |
 | Product components | Active | Some large components still need further decomposition |
-| Shared UI | Active but incomplete | Transitional inline style usage still exists |
+| Shared UI | Active and canonical | Component coverage is still expanding, but primitives are class-based and token-driven |
 | Legacy static frontend | Migration-only | Still useful for parity and reference |
 
 ## Frontend Composition
@@ -158,7 +158,7 @@ Disallowed patterns:
 ## Known Migration Debt
 
 - Some UI contract coverage is still incomplete in `packages/ui`.
-- Some styling remains transitional rather than fully tokenized.
+- Some product screens still contain large workflow components that should be decomposed further.
 - Root legacy code is still referenced for parity and historical behavior.
 - Some large client components still combine orchestration and view concerns.
 

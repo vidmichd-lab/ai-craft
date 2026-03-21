@@ -1,6 +1,5 @@
 import type {
   ButtonHTMLAttributes,
-  CSSProperties,
   HTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
@@ -11,99 +10,148 @@ import type {
 export const cx = (...values: Array<string | false | null | undefined>) =>
   values.filter(Boolean).join(' ');
 
-const colors = {
-  border: 'rgba(255, 255, 255, 0.08)',
-  borderStrong: 'rgba(255, 255, 255, 0.1)',
-  panel: '#161616',
-  panelSoft: '#101010',
-  field: '#0d0d0d',
-  text: '#ffffff',
-  muted: 'rgba(255, 255, 255, 0.64)',
-  mutedStrong: 'rgba(255, 255, 255, 0.82)',
-  noticeBg: 'rgba(66, 184, 131, 0.14)',
-  noticeText: '#b1f2d1',
-  errorBg: 'rgba(232, 64, 51, 0.14)',
-  errorText: '#ffb4ad',
-  dangerBg: 'rgba(96, 28, 28, 0.45)',
-  dangerBorder: 'rgba(255, 120, 120, 0.18)',
-  activeBg: '#ffffff',
-  activeText: '#111111'
-} as const;
-
-type WithStyle = {
+type ClassedProps = {
   className?: string;
-  style?: CSSProperties;
 };
 
+type StackGap = 'sm' | 'md' | 'lg' | 12 | 16 | 20 | 24;
+
 type StackProps = HTMLAttributes<HTMLDivElement> &
-  WithStyle & {
-    gap?: number;
+  ClassedProps & {
+    gap?: StackGap;
   };
 
-export function Stack({ gap = 16, style, ...props }: StackProps) {
-  return <div {...props} style={{ display: 'flex', flexDirection: 'column', gap, ...style }} />;
+const resolveStackGapClass = (gap: StackGap) => {
+  switch (gap) {
+    case 'sm':
+    case 12:
+      return 'ui-stack-gap-sm';
+    case 'lg':
+    case 20:
+      return 'ui-stack-gap-lg';
+    case 24:
+      return 'ui-stack-gap-xl';
+    case 'md':
+    case 16:
+    default:
+      return 'ui-stack-gap-md';
+  }
+};
+
+export function Stack({ gap = 'md', className, ...props }: StackProps) {
+  return <div {...props} className={cx('ui-stack', resolveStackGapClass(gap), className)} />;
 }
 
+type InlineGap = 'sm' | 'md' | 'lg' | 8 | 12 | 16;
+
 type InlineProps = HTMLAttributes<HTMLDivElement> &
-  WithStyle & {
-    gap?: number;
+  ClassedProps & {
+    gap?: InlineGap;
     wrap?: boolean;
-    align?: CSSProperties['alignItems'];
-    justify?: CSSProperties['justifyContent'];
+    align?: 'start' | 'center' | 'end' | 'stretch';
+    justify?: 'start' | 'center' | 'end' | 'between';
   };
 
+const resolveInlineGapClass = (gap: InlineGap) => {
+  switch (gap) {
+    case 'sm':
+    case 8:
+      return 'ui-inline-gap-sm';
+    case 'lg':
+    case 16:
+      return 'ui-inline-gap-lg';
+    case 'md':
+    case 12:
+    default:
+      return 'ui-inline-gap-md';
+  }
+};
+
 export function Inline({
-  gap = 12,
+  gap = 'md',
   wrap = true,
   align = 'center',
-  justify = 'flex-start',
-  style,
+  justify = 'start',
+  className,
   ...props
 }: InlineProps) {
   return (
     <div
       {...props}
-      style={{
-        display: 'flex',
-        flexWrap: wrap ? 'wrap' : 'nowrap',
-        alignItems: align,
-        justifyContent: justify,
-        gap,
-        ...style
-      }}
+      className={cx(
+        'ui-inline',
+        resolveInlineGapClass(gap),
+        !wrap && 'ui-inline-nowrap',
+        align === 'start' && 'ui-inline-align-start',
+        align === 'end' && 'ui-inline-align-end',
+        align === 'stretch' && 'ui-inline-align-stretch',
+        justify === 'center' && 'ui-inline-justify-center',
+        justify === 'end' && 'ui-inline-justify-end',
+        justify === 'between' && 'ui-inline-justify-between',
+        className
+      )}
     />
   );
 }
 
+type SurfacePadding = 'md' | 'lg' | 16 | 20 | 24;
+type SurfaceRadius = 'md' | 'lg' | 20 | 24;
+
 type SurfaceProps = HTMLAttributes<HTMLDivElement> &
-  WithStyle & {
-    padding?: number;
-    radius?: number;
+  ClassedProps & {
+    padding?: SurfacePadding;
+    radius?: SurfaceRadius;
     tone?: 'default' | 'soft';
   };
 
+const resolveSurfacePaddingClass = (padding: SurfacePadding) => {
+  switch (padding) {
+    case 16:
+      return 'ui-surface-padding-md';
+    case 'lg':
+    case 20:
+      return 'ui-surface-padding-lg';
+    case 'md':
+    case 24:
+    default:
+      return 'ui-surface-padding-xl';
+  }
+};
+
+const resolveSurfaceRadiusClass = (radius: SurfaceRadius) => {
+  switch (radius) {
+    case 'md':
+    case 20:
+      return 'ui-surface-radius-md';
+    case 'lg':
+    case 24:
+    default:
+      return 'ui-surface-radius-lg';
+  }
+};
+
 export function Surface({
-  padding = 24,
-  radius = 24,
+  padding = 'md',
+  radius = 'lg',
   tone = 'default',
-  style,
+  className,
   ...props
 }: SurfaceProps) {
   return (
     <div
       {...props}
-      style={{
-        padding,
-        border: `1px solid ${colors.border}`,
-        borderRadius: radius,
-        background: tone === 'soft' ? colors.panelSoft : colors.panel,
-        ...style
-      }}
+      className={cx(
+        'ui-surface',
+        tone === 'soft' && 'ui-surface-soft',
+        resolveSurfacePaddingClass(padding),
+        resolveSurfaceRadiusClass(radius),
+        className
+      )}
     />
   );
 }
 
-type SectionHeaderProps = WithStyle & {
+type SectionHeaderProps = ClassedProps & {
   eyebrow?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
@@ -113,61 +161,35 @@ export function SectionHeader({
   eyebrow,
   title,
   description,
-  className,
-  style
+  className
 }: SectionHeaderProps) {
+  const hasEyebrow = Boolean(eyebrow);
+
   return (
-    <div className={className} style={style}>
-      {eyebrow ? (
-        <div
-          style={{
-            color: 'rgba(255, 255, 255, 0.56)',
-            fontSize: 12,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em'
-          }}
-        >
-          {eyebrow}
-        </div>
-      ) : null}
-      <h2 style={{ margin: eyebrow ? '8px 0 0' : 0, fontSize: 24 }}>{title}</h2>
-      {description ? (
-        <div style={{ marginTop: 8, color: colors.muted, fontSize: 14, lineHeight: 1.4 }}>
-          {description}
-        </div>
-      ) : null}
+    <div className={cx('ui-section-header', className)}>
+      {hasEyebrow ? <div className="ui-eyebrow">{eyebrow}</div> : null}
+      <h2 className={cx('ui-section-title', hasEyebrow && 'ui-section-title-with-eyebrow')}>{title}</h2>
+      {description ? <div className="ui-section-description">{description}</div> : null}
     </div>
   );
 }
 
 type BannerProps = HTMLAttributes<HTMLDivElement> &
-  WithStyle & {
+  ClassedProps & {
     tone?: 'notice' | 'error';
   };
 
-export function Banner({ tone = 'notice', style, ...props }: BannerProps) {
-  const palette =
-    tone === 'error'
-      ? { background: colors.errorBg, color: colors.errorText }
-      : { background: colors.noticeBg, color: colors.noticeText };
-
+export function Banner({ tone = 'notice', className, ...props }: BannerProps) {
   return (
     <div
       {...props}
-      style={{
-        padding: '10px 12px',
-        borderRadius: 12,
-        fontSize: 12,
-        lineHeight: 1.35,
-        ...palette,
-        ...style
-      }}
+      className={cx('ui-banner', tone === 'error' ? 'ui-banner-error' : 'ui-banner-notice', className)}
     />
   );
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
-  WithStyle & {
+  ClassedProps & {
     variant?:
       | 'primary'
       | 'secondary'
@@ -188,7 +210,6 @@ export function Button({
   fullWidth = false,
   iconOnly = false,
   className,
-  style,
   children,
   ...props
 }: ButtonProps) {
@@ -208,62 +229,52 @@ export function Button({
         iconOnly && 'ui-button-icon-only',
         className
       )}
-      style={style}
     >
       {children}
     </button>
   );
 }
 
-type FieldProps = WithStyle & {
+type FieldProps = ClassedProps & {
   label?: ReactNode;
   htmlFor?: string;
   children: ReactNode;
 };
 
-export function Field({ label, htmlFor, children, className, style }: FieldProps) {
+export function Field({ label, htmlFor, children, className }: FieldProps) {
   return (
-    <label
-      className={className}
-      htmlFor={htmlFor}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        ...style
-      }}
-    >
-      {label ? <span style={{ color: colors.muted, fontSize: 13 }}>{label}</span> : null}
+    <label className={cx('ui-field', className)} htmlFor={htmlFor}>
+      {label ? <span className="ui-field-label">{label}</span> : null}
       {children}
     </label>
   );
 }
 
-type InputProps = InputHTMLAttributes<HTMLInputElement> & WithStyle;
+type InputProps = InputHTMLAttributes<HTMLInputElement> & ClassedProps;
 
-export function Input({ className, style, ...props }: InputProps) {
+export function Input({ className, ...props }: InputProps) {
   return (
-    <span className="ui-control-shell" style={style}>
+    <span className="ui-control-shell">
       <input {...props} className={cx('ui-input', className)} />
     </span>
   );
 }
 
-type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & WithStyle;
+type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & ClassedProps;
 
-export function TextArea({ className, style, ...props }: TextAreaProps) {
+export function TextArea({ className, ...props }: TextAreaProps) {
   return (
-    <span className="ui-control-shell ui-control-shell-textarea" style={style}>
+    <span className="ui-control-shell ui-control-shell-textarea">
       <textarea {...props} className={cx('ui-textarea', className)} />
     </span>
   );
 }
 
-type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & WithStyle;
+type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & ClassedProps;
 
-export function Select({ className, style, children, ...props }: SelectProps) {
+export function Select({ className, children, ...props }: SelectProps) {
   return (
-    <span className="ui-control-shell ui-control-shell-select" style={style}>
+    <span className="ui-control-shell ui-control-shell-select">
       <select {...props} className={cx('ui-select', className)}>
         {children}
       </select>
@@ -276,35 +287,34 @@ export function Select({ className, style, children, ...props }: SelectProps) {
   );
 }
 
-type MetaListProps = HTMLAttributes<HTMLDivElement> & WithStyle;
+type MetaListProps = HTMLAttributes<HTMLDivElement> & ClassedProps;
 
-export function MetaList({ style, ...props }: MetaListProps) {
-  return <div {...props} style={{ display: 'flex', flexDirection: 'column', gap: 10, ...style }} />;
+export function MetaList({ className, ...props }: MetaListProps) {
+  return <div {...props} className={cx('ui-meta-list', className)} />;
 }
 
-type MetaItemProps = HTMLAttributes<HTMLDivElement> & WithStyle;
+type MetaItemProps = HTMLAttributes<HTMLDivElement> & ClassedProps;
 
-export function MetaItem({ style, ...props }: MetaItemProps) {
-  return <div {...props} className={cx('ui-meta-item', props.className)} style={style} />;
+export function MetaItem({ className, ...props }: MetaItemProps) {
+  return <div {...props} className={cx('ui-meta-item', className)} />;
 }
 
-type MutedTextProps = HTMLAttributes<HTMLSpanElement> & WithStyle;
+type MutedTextProps = HTMLAttributes<HTMLSpanElement> & ClassedProps;
 
-export function MutedText({ style, ...props }: MutedTextProps) {
-  return <span {...props} style={{ color: colors.muted, ...style }} />;
+export function MutedText({ className, ...props }: MutedTextProps) {
+  return <span {...props} className={cx('ui-muted-text', className)} />;
 }
 
 type TabButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
-  WithStyle & {
+  ClassedProps & {
     active?: boolean;
   };
 
-export function TabButton({ active = false, style, ...props }: TabButtonProps) {
+export function TabButton({ active = false, className, ...props }: TabButtonProps) {
   return (
     <button
       {...props}
-      className={cx('ui-tag-toggle', active && 'is-selected', props.className)}
-      style={style}
+      className={cx('ui-tag-toggle', active && 'is-selected', className)}
     />
   );
 }

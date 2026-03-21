@@ -71,7 +71,7 @@ Responsibilities by folder:
 
 ### Workspace API
 
-Primary implementation:
+Primary entrypoint:
 
 - `serverless/workspace-api/index.mjs`
 
@@ -79,7 +79,16 @@ Supporting files:
 
 - `serverless/workspace-api/schema.yql`
 - `serverless/workspace-api/gateway.openapi.yaml`
-- `serverless/workspace-api/runtime-security.mjs`
+- `serverless/workspace-api/config.mjs`
+- `serverless/workspace-api/http.mjs`
+- `serverless/workspace-api/auth.mjs`
+- `serverless/workspace-api/admin.mjs`
+- `serverless/workspace-api/team.mjs`
+- `serverless/workspace-api/projects.mjs`
+- `serverless/workspace-api/storage-memory.mjs`
+- `serverless/workspace-api/storage-ydb.mjs`
+- `serverless/workspace-api/storage-ydb-client.mjs`
+- `serverless/workspace-api/storage-ydb-normalizers.mjs`
 
 Current responsibilities:
 
@@ -87,6 +96,33 @@ Current responsibilities:
 - user/team/project/snapshot persistence
 - team defaults and department storage
 - RBAC decisions based on memberships and superadmin rules
+
+Current module shape:
+
+- `index.mjs`
+  - request routing and module wiring only
+- `config.mjs`
+  - env parsing, config normalization, timestamps and clone helpers
+- `http.mjs`
+  - origin detection, headers and JSON error responses
+- `auth.mjs`
+  - login, register, logout, session lookup and account profile mutation
+- `admin.mjs`
+  - superadmin team/user/defaults handlers
+- `team.mjs`
+  - current-team, member-list and team-default routes
+- `projects.mjs`
+  - project and snapshot handlers
+- `storage-memory.mjs`
+  - local in-memory adapter for development and fallback mode
+- `storage-ydb*.mjs`
+  - YDB-backed persistence adapter, driver/query primitives and row mapping
+
+Current migration status:
+
+- route-level decomposition is complete
+- storage-level decomposition is partial
+- `storage-ydb.mjs` is still a large adapter and remains the next backend refactor target
 
 ### Media API
 
@@ -117,6 +153,7 @@ It owns:
 - request execution
 - status normalization
 - schema parsing through `@ai-craft/workspace-sdk`
+- required env resolution through `apps/web/src/server/env.ts`
 
 This file is the single place where `apps/web` talks to the workspace backend.
 
@@ -130,6 +167,7 @@ It owns:
 - auth token injection for mutations
 - request execution
 - error normalization
+- required env resolution through `apps/web/src/server/env.ts`
 
 This file is the single place where `apps/web` talks to the media backend.
 
@@ -183,3 +221,5 @@ Guaranteed response behavior for BFF routes:
 - All request payloads must be validated.
 - All nontrivial mutations must emit audit logs.
 - Frontend code must never call `serverless/*` directly.
+- `serverless/workspace-api/index.mjs` must remain a router/composition root, not a new monolith.
+- New workspace backend persistence logic must go into storage modules, not back into route modules.

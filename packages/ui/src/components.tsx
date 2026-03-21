@@ -286,6 +286,31 @@ export function Tooltip({
   );
 }
 
+export type EmptyStateProps = Omit<HTMLAttributes<HTMLDivElement>, 'title'> & {
+  title: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  media?: ReactNode;
+};
+
+export function EmptyState({
+  title,
+  description,
+  action,
+  media,
+  className,
+  ...props
+}: EmptyStateProps) {
+  return (
+    <div className={cx('ui-empty-state', className)} {...props}>
+      {media ? <div className="ui-empty-state-media">{media}</div> : null}
+      <div className="ui-empty-state-title">{title}</div>
+      {description ? <div className="ui-empty-state-description">{description}</div> : null}
+      {action ? <div className="ui-empty-state-action">{action}</div> : null}
+    </div>
+  );
+}
+
 export type DialogProps = HTMLAttributes<HTMLDivElement> & {
   title: ReactNode;
   description?: ReactNode;
@@ -332,7 +357,7 @@ export function Dialog({
   );
 }
 
-export type CardProps = HTMLAttributes<HTMLDivElement> & {
+export type CardProps = Omit<HTMLAttributes<HTMLDivElement>, 'title'> & {
   tone?: 'default' | 'stroke' | 'brand';
   asset?: ReactNode;
   title?: ReactNode;

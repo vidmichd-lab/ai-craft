@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { Banner, Button, cx, Field, Input, SectionHeader, Select } from '@ai-craft/ui';
+import { Banner, Button, cx, EmptyStateLayout, Field, Input, Select, SettingsPanel, SplitLayout, StatGroup } from '@ai-craft/ui';
 import { formatWorkspaceRoleLabel } from '@ai-craft/workspace-domain';
 import { listDepartmentEntries, type WorkspaceDepartmentEntry } from '@ai-craft/workspace-sdk';
 import styles from './workspace-shell.module.css';
@@ -203,37 +203,27 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
         </Banner>
       ) : null}
 
-      <div className={styles.teamLayout}>
-        <div className={styles.stack}>
-          <section className={styles.panel}>
-            <div className={styles.stack}>
-              <SectionHeader
-                eyebrow="Команда"
-                title="Настройки команды"
-                description="Название, slug и статус рабочего контура. Эти параметры задают базовую идентичность пространства."
+      <SplitLayout
+        className={styles.teamLayout}
+        variant="balanced"
+        start={<div className={styles.stack}>
+          <SettingsPanel
+            className={styles.panel}
+            eyebrow="Команда"
+            title="Настройки команды"
+            description="Название, slug и статус рабочего контура. Эти параметры задают базовую идентичность пространства."
+            stats={
+              <StatGroup
+                className={styles.heroStats}
+                items={[
+                  { className: styles.heroStat, label: 'Команда', value: teamName || '—', hint: `Slug: ${teamSlug || '—'}` },
+                  { className: styles.heroStat, label: 'Статус', value: teamStatus, hint: 'Текущий режим работы команды' },
+                  { className: styles.heroStat, label: 'Отделы', value: departmentsState.length, hint: 'Включая базовый общий отдел' },
+                  { className: styles.heroStat, label: 'Участники', value: membersState.length, hint: 'Активные пользователи workspace' }
+                ]}
               />
-              <div className={styles.heroStats}>
-                <div className={styles.heroStat}>
-                  <div className={styles.heroStatLabel}>Команда</div>
-                  <div className={styles.heroStatValue}>{teamName || '—'}</div>
-                  <div className={styles.heroStatHint}>Slug: {teamSlug || '—'}</div>
-                </div>
-                <div className={styles.heroStat}>
-                  <div className={styles.heroStatLabel}>Статус</div>
-                  <div className={styles.heroStatValue}>{teamStatus}</div>
-                  <div className={styles.heroStatHint}>Текущий режим работы команды</div>
-                </div>
-                <div className={styles.heroStat}>
-                  <div className={styles.heroStatLabel}>Отделы</div>
-                  <div className={styles.heroStatValue}>{departmentsState.length}</div>
-                  <div className={styles.heroStatHint}>Включая базовый общий отдел</div>
-                </div>
-                <div className={styles.heroStat}>
-                  <div className={styles.heroStatLabel}>Участники</div>
-                  <div className={styles.heroStatValue}>{membersState.length}</div>
-                  <div className={styles.heroStatHint}>Активные пользователи workspace</div>
-                </div>
-              </div>
+            }
+          >
               <form className={styles.stack} onSubmit={handleSaveTeam}>
                 <div className={styles.fieldGrid}>
                   <Field className={styles.field} label="Название">
@@ -270,16 +260,14 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                   </Button>
                 ) : null}
               </form>
-            </div>
-          </section>
+          </SettingsPanel>
 
-          <section className={styles.panel}>
-            <div className={styles.stack}>
-              <SectionHeader
-                eyebrow="Отделы"
-                title="Структура команды"
-                description="Общий отдел задает базовую конфигурацию. Остальные отделы наследуют ее и могут переопределять настройки."
-              />
+          <SettingsPanel
+            className={styles.panel}
+            eyebrow="Отделы"
+            title="Структура команды"
+            description="Общий отдел задает базовую конфигурацию. Остальные отделы наследуют ее и могут переопределять настройки."
+          >
               <div className={styles.memberList}>
                 {departmentsState.map((department: WorkspaceDepartmentEntry) => (
                   <article className={styles.memberItem} key={department.id}>
@@ -371,39 +359,26 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                   ) : null}
                 </div>
               </form>
-            </div>
-          </section>
-        </div>
+          </SettingsPanel>
+        </div>}
 
-        <section className={styles.panel}>
-          <div className={styles.stack}>
-            <SectionHeader
-              eyebrow="Участники"
-              title="Команда и доступы"
-              description="Управляй ролями, приглашай новых участников и быстро обслуживай доступы без ухода из workspace."
+        end={<SettingsPanel
+          className={styles.panel}
+          eyebrow="Участники"
+          title="Команда и доступы"
+          description="Управляй ролями, приглашай новых участников и быстро обслуживай доступы без ухода из workspace."
+          stats={
+            <StatGroup
+              className={styles.heroStats}
+              items={[
+                { className: styles.heroStat, label: 'Admins', value: memberStats.admins, hint: 'Полный доступ к контуру' },
+                { className: styles.heroStat, label: 'Leads', value: memberStats.leads, hint: 'Управление командой и шаблонами' },
+                { className: styles.heroStat, label: 'Editors', value: memberStats.editors, hint: 'Работа с редактором и медиа' },
+                { className: styles.heroStat, label: 'Всего', value: membersState.length, hint: 'Пользователей в workspace' }
+              ]}
             />
-            <div className={styles.heroStats}>
-              <div className={styles.heroStat}>
-                <div className={styles.heroStatLabel}>Admins</div>
-                <div className={styles.heroStatValue}>{memberStats.admins}</div>
-                <div className={styles.heroStatHint}>Полный доступ к контуру</div>
-              </div>
-              <div className={styles.heroStat}>
-                <div className={styles.heroStatLabel}>Leads</div>
-                <div className={styles.heroStatValue}>{memberStats.leads}</div>
-                <div className={styles.heroStatHint}>Управление командой и шаблонами</div>
-              </div>
-              <div className={styles.heroStat}>
-                <div className={styles.heroStatLabel}>Editors</div>
-                <div className={styles.heroStatValue}>{memberStats.editors}</div>
-                <div className={styles.heroStatHint}>Работа с редактором и медиа</div>
-              </div>
-              <div className={styles.heroStat}>
-                <div className={styles.heroStatLabel}>Всего</div>
-                <div className={styles.heroStatValue}>{membersState.length}</div>
-                <div className={styles.heroStatHint}>Пользователей в workspace</div>
-              </div>
-            </div>
+          }
+        >
           {canManageMembers ? (
             <form className={styles.stack} onSubmit={handleCreateMember}>
               <div className={styles.fieldGrid}>
@@ -546,15 +521,14 @@ export function TeamSettings({ currentTeam, teamMembers, canManageMembers }: Pro
                 ))}
               </div>
               {!filteredMembers.length ? (
-                <div className={styles.emptyRich}>По текущему фильтру участников не найдено.</div>
+                <EmptyStateLayout title="Ничего не найдено" description="По текущему фильтру участников не найдено." />
               ) : null}
             </div>
           ) : (
-            <div className={styles.emptyRich}>Список участников пока недоступен или пуст.</div>
+            <EmptyStateLayout title="Список пуст" description="Список участников пока недоступен или пуст." />
           )}
-          </div>
-        </section>
-      </div>
+        </SettingsPanel>}
+      />
     </div>
   );
 }

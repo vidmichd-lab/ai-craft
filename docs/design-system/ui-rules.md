@@ -13,8 +13,6 @@ These rules are mandatory for all future UI work.
 Allowed temporary exceptions:
 
 - root legacy `src/*`
-- existing transitional code in `packages/ui/src/primitives.tsx`
-- existing preview swatch backgrounds where data-driven color preview is unavoidable until migrated
 
 Those exceptions are migration debt and must not be copied.
 
@@ -22,11 +20,14 @@ Those exceptions are migration debt and must not be copied.
 
 - All reusable buttons, fields, dialogs, cards, tabs, segmented controls, banners, and similar controls must come from `packages/ui`.
 - Product code may wrap shared components, but must not silently fork them.
+- Product status grids, empty states, and mode switchers must use shared `StatCard`, `EmptyState`, and `SegmentedControl` when those patterns fit.
+- AI-generated UI definitions must target the schema allowlist in `packages/ui/src/schema.tsx`, not direct JSX.
 
 ### 3. Tokens only
 
 - All reusable styling must resolve from shared tokens in `packages/ui/src/theme.css` or `packages/ui/src/sds-tokens.css`.
 - Hardcoded colors, spacing, radii, and typography are forbidden in new reusable UI code.
+- Data-driven preview colors must not be rendered through inline `style` attributes in canonical UI. Use generated preview assets or other non-inline representations.
 
 ### 4. No duplicate components
 

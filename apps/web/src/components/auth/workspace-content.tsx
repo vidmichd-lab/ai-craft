@@ -9,7 +9,18 @@ import {
   normalizeStoredTemplateState,
   type EditorDocument
 } from '@ai-craft/editor-model';
-import { Button, Dialog, SectionHeader, SegmentedControl, SegmentedControlItem, Select, StatCard } from '@ai-craft/ui';
+import {
+  Button,
+  Dialog,
+  PageHeader,
+  PageLayout,
+  Section,
+  SegmentedControl,
+  SegmentedControlItem,
+  Select,
+  SplitLayout,
+  StatGroup
+} from '@ai-craft/ui';
 import {
   canManageWorkspaceMembers,
   formatWorkspaceRoleLabel,
@@ -141,37 +152,43 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
   ].filter((action) => !action.hidden);
 
   return (
-    <div className={styles.contentStack}>
-      <section className={styles.header}>
-        <div className={styles.brand}>
-          <Link className={styles.logo} href="/" aria-label="AI-Craft">
-            <Image src="/logo.svg" alt="AI-Craft" width={122} height={34} priority />
-          </Link>
-          <div className={styles.stack}>
-            <div className={styles.eyebrow}>AI-Craft Studio</div>
-            <h1 className={styles.heading}>{teamName}</h1>
-            <div className={styles.subheading}>
-              {actorName} · {roleLabel}
-            </div>
-          </div>
-        </div>
-        <div className={styles.headerActions}>
-          <div className={styles.teamBadge}>
-            <span className={styles.teamBadgeMark} aria-hidden="true" />
-            <span>{teamName}</span>
-          </div>
-          <div className={styles.badge}>{teamSlug}</div>
-          <Button className={styles.headerButton} variant="ghost" type="button" onClick={() => setActiveOverlay('account')}>
-            Профиль
-          </Button>
-          <Link className={styles.headerLink} href="/editor">
-            Public editor
-          </Link>
-          <LogoutButton className={styles.headerButton} variant="ghost" />
-        </div>
-      </section>
-
-      <section className={styles.workspaceNavCard}>
+    <PageLayout
+      className={styles.contentStack}
+      header={
+        <PageHeader
+          className={styles.header}
+          brand={
+            <Link className={styles.logo} href="/" aria-label="AI-Craft">
+              <Image src="/logo.svg" alt="AI-Craft" width={122} height={34} priority />
+            </Link>
+          }
+          eyebrow="AI-Craft Studio"
+          title={teamName}
+          description={`${actorName} · ${roleLabel}`}
+          badges={
+            <>
+              <div className={styles.teamBadge}>
+                <span className={styles.teamBadgeMark} aria-hidden="true" />
+                <span>{teamName}</span>
+              </div>
+              <div className={styles.badge}>{teamSlug}</div>
+            </>
+          }
+          actions={
+            <>
+              <Button className={styles.headerButton} variant="ghost" type="button" onClick={() => setActiveOverlay('account')}>
+                Профиль
+              </Button>
+              <Link className={styles.headerLink} href="/editor">
+                Public editor
+              </Link>
+              <LogoutButton className={styles.headerButton} variant="ghost" />
+            </>
+          }
+        />
+      }
+    >
+      <Section className={styles.workspaceNavCard}>
         <SegmentedControl className={styles.workspaceTabs} aria-label="Разделы AI-Craft">
           <SegmentedControlItem active={activeOverlay === null} className={styles.workspaceTab} onClick={() => setActiveOverlay(null)}>
             Редактор
@@ -187,13 +204,16 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
             </SegmentedControlItem>
           ))}
         </SegmentedControl>
-        <div className={styles.statusGrid}>
-          <StatCard className={styles.statusCard} label="Статус" value={teamStatus} />
-          <StatCard className={styles.statusCard} label="Участники" value={members.length} />
-          <StatCard className={styles.statusCard} label="Отделы" value={departments.length} />
-          <StatCard className={styles.statusCard} label="Defaults" value={defaultsUpdatedAt} />
-        </div>
-      </section>
+        <StatGroup
+          className={styles.statusGrid}
+          items={[
+            { className: styles.statusCard, label: 'Статус', value: teamStatus },
+            { className: styles.statusCard, label: 'Участники', value: members.length },
+            { className: styles.statusCard, label: 'Отделы', value: departments.length },
+            { className: styles.statusCard, label: 'Defaults', value: defaultsUpdatedAt }
+          ]}
+        />
+      </Section>
 
       <EditorShell
         state={editorState}
@@ -269,8 +289,10 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
           onClose={() => setActiveOverlay(null)}
           sheet
         >
-          <div className={styles.accountDialogBody}>
-            <aside className={styles.accountSidebar}>
+          <SplitLayout
+            className={styles.accountDialogBody}
+            variant="sidebar-content"
+            start={<aside className={styles.accountSidebar}>
               <button
                 className={`${styles.accountSidebarTab} ${accountView === 'profile' ? styles.accountSidebarTabActive : ''}`}
                 type="button"
@@ -286,8 +308,8 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
                 Общее
               </button>
               <LogoutButton className={styles.accountLogoutButton} variant="ghost" />
-            </aside>
-            <div className={styles.accountMain}>
+            </aside>}
+            end={<div className={styles.accountMain}>
               {accountView === 'profile' ? (
                 <ProfileForm
                   initialDisplayName={session.user.displayName || ''}
@@ -295,13 +317,12 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
                   roleLabel={roleLabel}
                 />
               ) : (
-                <section className={styles.panel}>
-                  <div className={styles.stack}>
-                    <SectionHeader
-                      eyebrow="Общее"
-                      title="Параметры интерфейса"
-                      description="Локальные предпочтения для текущего браузера без влияния на данные команды."
-                    />
+                <Section
+                  className={styles.panel}
+                  eyebrow="Общее"
+                  title="Параметры интерфейса"
+                  description="Локальные предпочтения для текущего браузера без влияния на данные команды."
+                >
                     <div className={styles.fieldGrid}>
                       <div className={styles.field}>
                         <div className={styles.fieldLabel}>Тема</div>
@@ -334,19 +355,21 @@ export function WorkspaceContent({ session, currentTeam, teamMembers }: Props) {
                         </Select>
                       </div>
                     </div>
-                    <div className={styles.heroStats}>
-                      <StatCard className={styles.heroStat} label="Команда" value={teamName} hint={`Slug: ${teamSlug}`} />
-                      <StatCard className={styles.heroStat} label="Доступ" value={roleLabel} hint={actorName} />
-                      <StatCard className={styles.heroStat} label="Runtime" value="Next.js" hint="Container + Gateway" />
-                      <StatCard className={styles.heroStat} label="Storage" value="Workspace API" hint="YDB-backed team data" />
-                    </div>
-                  </div>
-                </section>
+                    <StatGroup
+                      className={styles.heroStats}
+                      items={[
+                        { className: styles.heroStat, label: 'Команда', value: teamName, hint: `Slug: ${teamSlug}` },
+                        { className: styles.heroStat, label: 'Доступ', value: roleLabel, hint: actorName },
+                        { className: styles.heroStat, label: 'Runtime', value: 'Next.js', hint: 'Container + Gateway' },
+                        { className: styles.heroStat, label: 'Storage', value: 'Workspace API', hint: 'YDB-backed team data' }
+                      ]}
+                    />
+                </Section>
               )}
-            </div>
-          </div>
+            </div>}
+          />
         </Dialog>
       ) : null}
-    </div>
+    </PageLayout>
   );
 }

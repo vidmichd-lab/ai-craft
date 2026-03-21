@@ -1,11 +1,11 @@
 .page {
   min-height: 100vh;
-  padding: 18px;
+  padding: var(--ui-space-5);
   background:
-    radial-gradient(circle at top left, rgba(255, 148, 38, 0.08), transparent 18%),
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.04), transparent 16%),
-    var(--studio-shell-bg);
-  color: var(--text);
+    radial-gradient(circle at top left, var(--ui-color-shell-accent), transparent 18%),
+    radial-gradient(circle at top right, var(--ui-color-shell-highlight), transparent 16%),
+    var(--ui-color-shell);
+  color: var(--ui-color-text);
 }
 
 .shell {
@@ -13,40 +13,40 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 
 .contentStack,
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
   min-width: 0;
 }
 
 .header,
 .workspaceNavCard,
 .panel {
-  padding: 18px;
-  border-radius: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: var(--ui-space-5);
+  border-radius: var(--ui-radius-shell);
+  border: 1px solid var(--ui-color-border-subtle);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0)),
-    var(--studio-surface-bg);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+    linear-gradient(180deg, color-mix(in srgb, var(--ui-color-text) 4%, transparent), transparent),
+    var(--ui-color-surface-strong);
+  box-shadow: var(--ui-shadow-surface);
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: var(--ui-space-5);
   min-width: 0;
 }
 
@@ -65,8 +65,8 @@
 .heroStatLabel,
 .sidebarLabel,
 .metaValueLabel {
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 11px;
+  color: var(--ui-color-muted);
+  font-size: var(--ui-font-size-body-sm);
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
@@ -74,7 +74,7 @@
 .heading {
   margin: 0;
   font-size: clamp(24px, 3vw, 42px);
-  line-height: 0.98;
+  line-height: 1.05;
   letter-spacing: -0.04em;
 }
 
@@ -86,8 +86,8 @@
 .helperCard,
 .heroStatHint,
 .sidebarHint {
-  color: rgba(255, 255, 255, 0.64);
-  font-size: 14px;
+  color: var(--ui-color-muted);
+  font-size: var(--ui-font-size-body-sm);
   line-height: 1.5;
 }
 
@@ -101,7 +101,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: var(--ui-space-3);
 }
 
 .teamBadge,
@@ -109,21 +109,21 @@
 .statusPill {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--ui-space-3);
   min-height: 40px;
-  padding: 0 14px;
+  padding: 0 var(--ui-space-3);
   border-radius: 999px;
-  background: var(--studio-control-bg);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 13px;
+  background: var(--ui-color-control);
+  border: 1px solid var(--ui-color-border-subtle);
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-body-sm);
 }
 
 .teamBadgeMark {
   width: 16px;
   height: 16px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72));
+  border-radius: var(--sds-size-radius-100);
+  background: var(--sds-color-background-brand-default);
 }
 
 .button,
@@ -137,19 +137,19 @@
   align-items: center;
   justify-content: center;
   min-height: 42px;
-  padding: 0 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0 var(--ui-space-4);
+  border: 1px solid var(--ui-color-border-subtle);
   border-radius: 999px;
-  background: var(--studio-control-bg);
-  color: #f6f5f2;
+  background: var(--ui-color-control);
+  color: var(--ui-color-text);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--ui-font-size-body-sm);
   text-decoration: none;
   transition:
-    background-color 120ms ease,
-    color 120ms ease,
-    border-color 120ms ease,
-    transform 120ms ease;
+    background-color var(--ui-transition-base),
+    color var(--ui-transition-base),
+    border-color var(--ui-transition-base),
+    transform var(--ui-transition-base);
 }
 
 .button:hover,
@@ -159,7 +159,7 @@
 .workspaceTab:hover,
 .accountSidebarTab:hover,
 .segmentedButton:hover {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: var(--ui-color-border);
   transform: translateY(-1px);
 }
 
@@ -177,17 +177,13 @@
 .workspaceNavCard {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 
 .workspaceTabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 24px;
-  background: var(--studio-surface-soft-bg);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  gap: var(--ui-space-2);
 }
 
 .workspaceTab,
@@ -195,10 +191,10 @@
 .segmentedButton,
 .accountSidebarTab {
   min-height: 44px;
-  padding: 0 18px;
+  padding: 0 var(--ui-space-4);
   background: transparent;
   border-color: transparent;
-  color: rgba(255, 255, 255, 0.68);
+  color: var(--ui-color-muted);
 }
 
 .workspaceTabActive,
@@ -208,15 +204,15 @@
 .workspaceTab[aria-selected='true'],
 .workspaceTab[aria-pressed='true'],
 .groupTab[aria-pressed='true'] {
-  background: var(--studio-pill-active-bg);
-  border-color: var(--studio-pill-active-bg);
-  color: var(--studio-pill-active-fg);
+  background: var(--ui-color-pill-active-bg);
+  border-color: var(--ui-color-pill-active-bg);
+  color: var(--ui-color-pill-active-text);
 }
 
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 
 .subPanel,
@@ -232,40 +228,40 @@
 .heroStat,
 .sidebarCard,
 .templateMetaItem {
-  padding: 16px;
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: var(--studio-surface-soft-bg);
+  padding: var(--ui-space-4);
+  border-radius: var(--ui-radius-shell);
+  border: 1px solid var(--ui-color-border-subtle);
+  background: var(--ui-color-surface-soft);
 }
 
 .subPanel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--ui-space-3);
 }
 
 .studioGrid {
   display: grid;
   grid-template-columns: minmax(300px, var(--studio-left-rail-width)) minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--ui-space-4);
   align-items: start;
 }
 
 .controlRail {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
   min-width: 0;
 }
 
 .controlTabs {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 28px;
-  background: var(--studio-surface-soft-bg);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3);
+  border-radius: var(--ui-radius-shell);
+  background: var(--ui-color-surface-soft);
+  border: 1px solid var(--ui-color-border-subtle);
 }
 
 .controlTab {
@@ -276,7 +272,7 @@
 .previewShell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, var(--studio-right-rail-width));
-  gap: 16px;
+  gap: var(--ui-space-4);
   align-items: start;
   min-width: 0;
 }
@@ -284,7 +280,7 @@
 .previewStage {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
   min-width: 0;
 }
 
@@ -299,7 +295,7 @@
 .exportRail {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
   min-width: 0;
 }
 
@@ -311,7 +307,7 @@
 .editorGrid {
   display: grid;
   grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--ui-space-4);
   align-items: start;
 }
 
@@ -321,7 +317,7 @@
 .grid,
 .accountDialogBody {
   display: grid;
-  gap: 16px;
+  gap: var(--ui-space-4);
   align-items: start;
 }
 
@@ -356,26 +352,26 @@
 .sidebarColumn {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 
 .stickyPanel {
   position: sticky;
-  top: 18px;
+  top: var(--ui-space-5);
 }
 
 .previewStack {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--ui-space-3);
 }
 
 .accountSidebar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-5);
+  border-right: 1px solid var(--ui-color-border-subtle);
 }
 
 .accountLogoutButton {
@@ -388,7 +384,7 @@
 .heroStats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .heroStatValue,
@@ -397,28 +393,28 @@
 .overviewValue,
 .memberName,
 .templateTitle {
-  margin-top: 8px;
-  color: #f6f5f2;
-  font-size: 20px;
+  margin-top: var(--ui-space-2);
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-section);
   font-weight: 600;
   line-height: 1.1;
 }
 
 .overviewValue {
-  font-size: 24px;
+  font-size: var(--sds-typography-heading-size-base);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
 
 .fieldGrid,
 .controlGrid,
 .templateMetaGrid {
   display: grid;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .fieldGrid,
@@ -428,28 +424,23 @@
 
 .templateMetaGrid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--ui-space-3);
 }
 
 .fieldLabel,
 .metaName {
-  color: rgba(255, 255, 255, 0.56);
-  font-size: 13px;
+  color: var(--ui-color-muted);
+  font-size: var(--ui-font-size-body-sm);
 }
 
 .input,
 .textarea {
   min-height: 46px;
-  border: 0;
-  border-radius: 16px;
-  background: #101010;
-  color: #f6f5f2;
+  width: 100%;
 }
 
 .textarea {
   min-height: 116px;
-  padding-top: 12px;
-  padding-bottom: 12px;
 }
 
 .toolbarInput {
@@ -457,39 +448,37 @@
 }
 
 .dangerButton {
-  background: rgba(92, 29, 29, 0.5);
-  border-color: rgba(255, 130, 130, 0.16);
+  background: color-mix(in srgb, var(--sds-color-background-danger-secondary) 72%, transparent);
+  border-color: color-mix(in srgb, var(--sds-color-border-danger-default) 36%, transparent);
+  color: var(--sds-color-text-danger-default);
 }
 
 .notice,
 .error,
 .banner {
-  padding: 10px 12px;
-  border-radius: 16px;
-  font-size: 13px;
-  line-height: 1.4;
+  width: 100%;
 }
 
 .notice {
-  background: rgba(66, 184, 131, 0.14);
-  color: #b9f2d7;
+  background: color-mix(in srgb, var(--sds-color-background-positive-secondary) 52%, transparent);
+  color: var(--sds-color-text-positive-default);
 }
 
 .error {
-  background: rgba(232, 64, 51, 0.14);
-  color: #ffc6bf;
+  background: color-mix(in srgb, var(--sds-color-background-danger-secondary) 52%, transparent);
+  color: var(--sds-color-text-danger-default);
 }
 
 .canvasGrid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .canvasCard {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-space-3);
   width: 100%;
   text-align: left;
   color: inherit;
@@ -502,7 +491,7 @@ button.canvasCard {
 .canvasMeta {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .canvasViewport {
@@ -510,9 +499,9 @@ button.canvasCard {
   align-items: center;
   justify-content: center;
   min-height: 280px;
-  padding: 16px;
-  border-radius: 24px;
-  background: var(--studio-canvas-bg);
+  padding: var(--ui-space-4);
+  border-radius: var(--ui-radius-shell);
+  background: var(--ui-color-canvas);
   overflow: auto;
 }
 
@@ -520,34 +509,34 @@ button.canvasCard {
   width: 100%;
   height: auto;
   display: block;
-  border-radius: 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+  border-radius: var(--ui-radius-surface);
+  box-shadow: var(--ui-shadow-surface);
 }
 
 .templateGrid,
 .mediaGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 
 .templateCardBody {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .templateMetaValue {
-  margin-top: 6px;
-  color: #f6f5f2;
-  font-size: 14px;
+  margin-top: var(--ui-space-1);
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-body-sm);
   line-height: 1.35;
 }
 
 .templateActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--ui-space-3);
 }
 
 .templatePreview,
@@ -555,8 +544,8 @@ button.canvasCard {
   position: relative;
   overflow: hidden;
   min-height: 220px;
-  border-radius: 20px;
-  background: #232323;
+  border-radius: var(--ui-radius-surface);
+  background: var(--ui-color-canvas);
 }
 
 .mediaThumbWrap {
@@ -575,7 +564,11 @@ button.canvasCard {
 .templateOverlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.56));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ui-color-shell) 10%, transparent),
+    color-mix(in srgb, var(--ui-color-shell) 56%, transparent)
+  );
 }
 
 .templateContent {
@@ -584,8 +577,8 @@ button.canvasCard {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 16px;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-4);
 }
 
 .templateLogo {
@@ -595,21 +588,21 @@ button.canvasCard {
 }
 
 .templateSubtitle {
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 13px;
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-body-sm);
   line-height: 1.35;
 }
 
 .memberList {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .memberItem {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: var(--ui-space-4);
   align-items: start;
 }
 
@@ -624,33 +617,37 @@ button.canvasCard {
 .metaList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--ui-space-3);
 }
 
 .metaItem {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .empty {
-  color: rgba(255, 255, 255, 0.56);
+  color: var(--ui-color-muted);
 }
 
 .emptyRich {
-  padding: 20px;
-  border-radius: 24px;
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.02);
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 14px;
+  padding: var(--ui-space-5);
+  border-radius: var(--ui-radius-shell);
+  border: 1px dashed var(--ui-color-border-subtle);
+  background: color-mix(in srgb, var(--ui-color-panel-soft) 72%, transparent);
+  color: var(--ui-color-muted);
+  font-size: var(--ui-font-size-body-sm);
   line-height: 1.5;
 }
 
 .helperCard {
   background:
-    linear-gradient(180deg, rgba(255, 158, 55, 0.14), rgba(255, 255, 255, 0.03)),
-    #191919;
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sds-color-background-brand-secondary) 30%, transparent),
+      color-mix(in srgb, var(--ui-color-panel-soft) 78%, transparent)
+    ),
+    var(--ui-color-surface-soft);
 }
 
 .uploadInput,
@@ -673,7 +670,7 @@ button.canvasCard {
 .templateStrip {
   display: grid;
   grid-template-columns: minmax(320px, 1.2fr) minmax(280px, 0.9fr) minmax(280px, 0.9fr);
-  gap: 16px;
+  gap: var(--ui-space-4);
   align-items: stretch;
 }
 
@@ -681,16 +678,16 @@ button.canvasCard {
 .templateStripActions,
 .templateStripStats {
   min-height: 100%;
-  padding: 16px;
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: var(--studio-surface-soft-bg);
+  padding: var(--ui-space-4);
+  border-radius: var(--ui-radius-shell);
+  border: 1px solid var(--ui-color-border-subtle);
+  background: var(--ui-color-surface-soft);
 }
 
 .templateStripCard {
   display: grid;
   grid-template-columns: 144px minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--ui-space-4);
   align-items: center;
 }
 
@@ -699,9 +696,9 @@ button.canvasCard {
   align-items: center;
   justify-content: center;
   min-height: 120px;
-  border-radius: 20px;
+  border-radius: var(--ui-radius-surface);
   overflow: hidden;
-  background: var(--studio-canvas-bg);
+  background: var(--ui-color-canvas);
 }
 
 .templateStripLogo {
@@ -715,30 +712,30 @@ button.canvasCard {
 .templateStripStats {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .templateStripTitle {
-  color: #f6f5f2;
-  font-size: 20px;
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-section);
   font-weight: 600;
   line-height: 1.1;
 }
 
 .templateStripText,
 .templateStripHint {
-  color: rgba(255, 255, 255, 0.64);
-  font-size: 14px;
+  color: var(--ui-color-muted);
+  font-size: var(--ui-font-size-body-sm);
   line-height: 1.45;
 }
 
 .buttonSecondary {
-  background: #161616;
+  background: var(--ui-color-panel-soft);
 }
 
 .divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--ui-color-border-subtle);
 }
 
 .studioDialog :global(.ui-dialog),
@@ -746,9 +743,9 @@ button.canvasCard {
   width: var(--studio-overlay-width);
   max-height: calc(100vh - 40px);
   padding: 0;
-  border-radius: 32px;
-  background: var(--studio-surface-bg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: calc(var(--ui-radius-shell) + var(--sds-size-radius-200));
+  background: var(--ui-color-surface-strong);
+  border: 1px solid var(--ui-color-border-subtle);
   overflow: hidden;
 }
 
@@ -758,15 +755,15 @@ button.canvasCard {
 
 .studioDialog :global(.ui-dialog-header),
 .accountDialog :global(.ui-dialog-header) {
-  padding: 24px 24px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: var(--ui-space-6) var(--ui-space-6) var(--ui-space-5);
+  border-bottom: 1px solid var(--ui-color-border-subtle);
 }
 
 .studioDialog :global(.ui-dialog-body),
 .accountDialog :global(.ui-dialog-body) {
-  padding: 24px;
+  padding: var(--ui-space-6);
   overflow: auto;
-  background: var(--studio-surface-bg);
+  background: var(--ui-color-surface-strong);
 }
 
 @media (max-width: 1200px) {
@@ -789,20 +786,20 @@ button.canvasCard {
 
   .accountSidebar {
     border-right: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--ui-color-border-subtle);
   }
 }
 
 @media (max-width: 960px) {
   .page {
-    padding: 12px;
+    padding: var(--ui-space-3);
   }
 
   .header,
   .workspaceNavCard,
   .panel {
-    padding: 14px;
-    border-radius: 24px;
+    padding: var(--ui-space-4);
+    border-radius: var(--ui-radius-shell);
   }
 
   .header {
@@ -813,7 +810,7 @@ button.canvasCard {
   .brand {
     align-items: flex-start;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--ui-space-3);
   }
 
   .editorGrid,

@@ -28,7 +28,8 @@ Reference files:
 
 - `serverless/workspace-api/deploy.sh`
 - `serverless/workspace-api/gateway.openapi.yaml`
-- `serverless/workspace-api/README.md`
+- `serverless/workspace-api/index.mjs`
+- `serverless/workspace-api/config.mjs`
 
 Requirements:
 
@@ -62,3 +63,5 @@ Requirements:
 - Keep web and backend env configuration aligned.
 - Treat workspace and media services as separate deployable units.
 - Validate auth, upload, and template flows after deployment.
+- The web app must receive explicit `WORKSPACE_API_BASE_URL` and `MEDIA_MANIFEST_URL` at deploy time. Runtime code no longer provides production fallbacks.
+- Treat deploy-script defaults as operational convenience only. Canonical runtime requirements are defined in `docs/setup/env.md`.

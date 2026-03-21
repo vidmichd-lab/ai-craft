@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync } from 'node:crypto';
 import YdbSdk from 'ydb-sdk';
+import { getEnv, safeParseJson, splitCsv } from './config.mjs';
 
 const {
   Driver,
@@ -10,31 +11,12 @@ const {
   getCredentialsFromEnv
 } = YdbSdk;
 
-const getEnv = (name, fallback = '') => {
-  const value = process.env[name];
-  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
-};
-
-const safeParseJson = (value, fallback) => {
-  if (!value || typeof value !== 'string') return fallback;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
-};
-
 const slugify = (value, fallback) => {
   const normalized = String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return normalized || fallback;
-};
-
-const splitCsv = (value, fallback = []) => {
-  if (!value) return [...fallback];
-  return value.split(',').map((item) => item.trim()).filter(Boolean);
 };
 
 const normalizeRole = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');

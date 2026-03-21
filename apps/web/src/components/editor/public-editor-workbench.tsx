@@ -4,7 +4,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { createDefaultEditorDocument, normalizeEditorDocument, type EditorDocument } from '@ai-craft/editor-model';
-import { Banner, Button } from '@ai-craft/ui';
+import {
+  Banner,
+  Button,
+  PageHeader,
+  PageLayout,
+  Section,
+  SegmentedControl,
+  SegmentedControlItem,
+  StatGroup
+} from '@ai-craft/ui';
 import { EditorShell } from '@/components/auth/editor-shell';
 import styles from '@/components/auth/workspace-shell.module.css';
 
@@ -110,70 +119,58 @@ export function PublicEditorWorkbench() {
 
   return (
     <main className={styles.page}>
-      <div className={styles.shell}>
-        <section className={styles.header}>
-          <div className={styles.brand}>
+      <PageLayout className={styles.shell} header={
+        <PageHeader
+          className={styles.header}
+          brand={
             <Link className={styles.logo} href="/" aria-label="AI-Craft">
               <Image src="/logo.svg" alt="AI-Craft" width={122} height={34} priority />
             </Link>
-            <div className={styles.stack}>
-              <div className={styles.eyebrow}>AI-Craft Studio</div>
-              <h1 className={styles.heading}>Public editor</h1>
-              <div className={styles.subheading}>
-                JSON-черновик · локальное сохранение · быстрый перенос в основной workspace
-              </div>
-            </div>
-          </div>
-          <div className={styles.headerActions}>
-            <div className={styles.badge}>
-              {lastSavedAt ? `Сохранено в ${formatTimestamp(lastSavedAt)}` : 'Локальный черновик'}
-            </div>
-            <Button className={styles.headerButton} variant="ghost" type="button" onClick={handleExport}>
-              Экспорт JSON
-            </Button>
-            <Button className={styles.headerButton} variant="ghost" type="button" onClick={handleImportRequest}>
-              Импорт JSON
-            </Button>
-            <Button className={styles.headerButton} variant="ghost" type="button" onClick={handleReset}>
-              Сбросить
-            </Button>
-            <Link className={styles.headerLink} href="/">
-              В workspace
-            </Link>
-          </div>
-        </section>
-
-        <section className={styles.workspaceNavCard}>
-          <div className={styles.workspaceTabs} role="tablist" aria-label="Режимы public editor">
-            <button className={`${styles.workspaceTab} ${styles.workspaceTabActive}`} type="button" aria-pressed="true">
+          }
+          eyebrow="AI-Craft Studio"
+          title="Public editor"
+          description="JSON-черновик · локальное сохранение · быстрый перенос в основной workspace"
+          badges={<div className={styles.badge}>{lastSavedAt ? `Сохранено в ${formatTimestamp(lastSavedAt)}` : 'Локальный черновик'}</div>}
+          actions={
+            <>
+              <Button className={styles.headerButton} variant="ghost" type="button" onClick={handleExport}>
+                Экспорт JSON
+              </Button>
+              <Button className={styles.headerButton} variant="ghost" type="button" onClick={handleImportRequest}>
+                Импорт JSON
+              </Button>
+              <Button className={styles.headerButton} variant="ghost" type="button" onClick={handleReset}>
+                Сбросить
+              </Button>
+              <Link className={styles.headerLink} href="/">
+                В workspace
+              </Link>
+            </>
+          }
+        />
+      }>
+        <Section className={styles.workspaceNavCard}>
+          <SegmentedControl className={styles.workspaceTabs} aria-label="Режимы public editor">
+            <SegmentedControlItem className={`${styles.workspaceTab} ${styles.workspaceTabActive}`} active type="button">
               Редактор
-            </button>
-            <button className={styles.workspaceTab} type="button" onClick={handleImportRequest}>
+            </SegmentedControlItem>
+            <SegmentedControlItem className={styles.workspaceTab} type="button" onClick={handleImportRequest}>
               Импорт JSON
-            </button>
-            <button className={styles.workspaceTab} type="button" onClick={handleExport}>
+            </SegmentedControlItem>
+            <SegmentedControlItem className={styles.workspaceTab} type="button" onClick={handleExport}>
               Экспорт JSON
-            </button>
-          </div>
-          <div className={styles.statusGrid}>
-            <div className={styles.statusCard}>
-              <div className={styles.statusLabel}>Режим</div>
-              <div className={styles.statusValue}>Local</div>
-            </div>
-            <div className={styles.statusCard}>
-              <div className={styles.statusLabel}>Состояние</div>
-              <div className={styles.statusValue}>{hydrated ? 'Активно' : 'Стартуем'}</div>
-            </div>
-            <div className={styles.statusCard}>
-              <div className={styles.statusLabel}>Хранилище</div>
-              <div className={styles.statusValue}>localStorage</div>
-            </div>
-            <div className={styles.statusCard}>
-              <div className={styles.statusLabel}>Переход</div>
-              <div className={styles.statusValue}>JSON → workspace</div>
-            </div>
-          </div>
-        </section>
+            </SegmentedControlItem>
+          </SegmentedControl>
+          <StatGroup
+            className={styles.statusGrid}
+            items={[
+              { className: styles.statusCard, label: 'Режим', value: 'Local' },
+              { className: styles.statusCard, label: 'Состояние', value: hydrated ? 'Активно' : 'Стартуем' },
+              { className: styles.statusCard, label: 'Хранилище', value: 'localStorage' },
+              { className: styles.statusCard, label: 'Переход', value: 'JSON → workspace' }
+            ]}
+          />
+        </Section>
 
         {notice ? (
           <Banner className={styles.notice} tone="notice">
@@ -201,7 +198,7 @@ export function PublicEditorWorkbench() {
           title="Локальная рабочая сцена"
           enableTemplateSave={false}
         />
-      </div>
+      </PageLayout>
     </main>
   );
 }

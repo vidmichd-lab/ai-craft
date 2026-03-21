@@ -1,6 +1,7 @@
 import { getWorkspaceMe } from '@/server/workspace-api/client';
 import type { WorkspaceMeResponse } from '@ai-craft/workspace-sdk';
 import type { RequestContext } from '@/server/http/request-context';
+import { logRequestEvent } from '@/server/http/request-context';
 import { jsonResponse } from '@/server/http/response';
 import { normalizeWorkspaceRole } from '@ai-craft/workspace-domain';
 
@@ -41,6 +42,9 @@ const forbiddenResponse = (context?: RequestContext) =>
 const normalizeSessionRole = (session: WorkspaceMeResponse) =>
   normalizeWorkspaceRole(session.user.role, Boolean(session.user.isSuperadmin));
 
+const getErrorStatus = (error: unknown) =>
+  typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : undefined;
+
 export const requireWorkspaceSession = async (request: Request, context?: RequestContext) => {
   try {
     const session = await getRequestWorkspaceSession(request);
@@ -51,11 +55,30 @@ export const requireWorkspaceSession = async (request: Request, context?: Reques
       me: session.me.data,
       role: normalizeSessionRole(session.me.data)
     };
-  } catch {
-    return {
-      ok: false as const,
-      response: unauthorizedResponse(context)
-    };
+  } catch (error) {
+    const status = getErrorStatus(error);
+    if (status === 401) {
+      return {
+        ok: false as const,
+        response: unauthorizedResponse(context)
+      };
+    }
+
+    if (status === 403) {
+      return {
+        ok: false as const,
+        response: forbiddenResponse(context)
+      };
+    }
+
+    if (context) {
+      logRequestEvent('error', context, 'workspace_session_resolution_failed', {
+        status: status || 500,
+        message: error instanceof Error ? error.message : 'Unknown session resolution error'
+      });
+    }
+
+    throw error;
   }
 };
 

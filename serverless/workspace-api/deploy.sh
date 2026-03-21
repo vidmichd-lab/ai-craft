@@ -67,10 +67,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cp index.js index.mjs package.json "$BUILD_DIR/"
-if [ -f runtime-security.mjs ]; then
-  cp runtime-security.mjs "$BUILD_DIR/"
-fi
+cp package.json index.js "$BUILD_DIR/"
+find . -maxdepth 1 -name '*.mjs' -type f -exec cp {} "$BUILD_DIR/" \;
 if [ -f package-lock.json ]; then
   cp package-lock.json "$BUILD_DIR/"
 fi

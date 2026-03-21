@@ -2,7 +2,20 @@
 
 import Image from 'next/image';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { Banner, Button, Input, SectionHeader, TabButton } from '@ai-craft/ui';
+import {
+  Banner,
+  Button,
+  EmptyStateLayout,
+  Input,
+  Section,
+  SegmentedControl,
+  SegmentedControlItem,
+  SidebarSection,
+  SplitLayout,
+  StatGroup,
+  Toolbar,
+  ToolbarGroup
+} from '@ai-craft/ui';
 import styles from './workspace-shell.module.css';
 
 type MediaEntry = {
@@ -190,20 +203,22 @@ export function MediaLibrary({ onUseAsset }: Props) {
   };
 
   return (
-    <section className={styles.panel}>
-      <div className={styles.stack}>
-        <SectionHeader eyebrow="Media" title="Командная медиатека" />
-        <div className={styles.toolbarRow}>
+    <Section className={styles.panel} eyebrow="Media" title="Командная медиатека">
+      <Toolbar className={styles.toolbarRow}>
+        <ToolbarGroup className={styles.toolbarInput}>
           <Input
             className={`${styles.input} ${styles.toolbarInput}`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Поиск по названию, папке или URL"
           />
+        </ToolbarGroup>
+        <ToolbarGroup>
           <Button type="button" onClick={() => setReloadKey((current) => current + 1)} disabled={loading || uploading}>
             {loading ? 'Обновляем...' : 'Обновить'}
           </Button>
-        </div>
+        </ToolbarGroup>
+      </Toolbar>
         {notice ? (
           <Banner className={styles.notice} tone="notice">
             {notice}
@@ -216,48 +231,42 @@ export function MediaLibrary({ onUseAsset }: Props) {
         ) : null}
         {loading ? <div className={styles.empty}>Загружаем медиа...</div> : null}
         {!loading ? (
-          <>
-            <div className={styles.libraryLayout}>
+          <SplitLayout
+            className={styles.libraryLayout}
+            variant="content-sidebar"
+            start={
               <div className={styles.stack}>
                 <div className={styles.groupTabs}>
-                  {groups.map((group) => (
-                    <TabButton
-                      key={group.id}
-                      type="button"
-                      className={`${styles.groupTab} ${group.id === selectedGroup?.id ? styles.groupTabActive : ''}`}
-                      active={group.id === selectedGroup?.id}
-                      onClick={() => setSelectedGroupId(group.id)}
-                    >
-                      {group.title}
-                    </TabButton>
-                  ))}
+                  <SegmentedControl>
+                    {groups.map((group) => (
+                      <SegmentedControlItem
+                        key={group.id}
+                        type="button"
+                        className={`${styles.groupTab} ${group.id === selectedGroup?.id ? styles.groupTabActive : ''}`}
+                        active={group.id === selectedGroup?.id}
+                        onClick={() => setSelectedGroupId(group.id)}
+                      >
+                        {group.title}
+                      </SegmentedControlItem>
+                    ))}
+                  </SegmentedControl>
                 </div>
                 {selectedGroup ? (
                   <>
-                    <div className={styles.heroStats}>
-                      <div className={styles.heroStat}>
-                        <div className={styles.heroStatLabel}>Папка</div>
-                        <div className={styles.heroStatValue}>{selectedGroup.title}</div>
-                        <div className={styles.heroStatHint}>
-                          {selectedGroup.entries[0]?.folder1 || 'media'} / {selectedGroup.entries[0]?.folder2 || 'shared'}
-                        </div>
-                      </div>
-                      <div className={styles.heroStat}>
-                        <div className={styles.heroStatLabel}>Файлы</div>
-                        <div className={styles.heroStatValue}>{selectedGroup.entries.length}</div>
-                        <div className={styles.heroStatHint}>Всего в активной папке</div>
-                      </div>
-                      <div className={styles.heroStat}>
-                        <div className={styles.heroStatLabel}>В выдаче</div>
-                        <div className={styles.heroStatValue}>{filteredEntries.length}</div>
-                        <div className={styles.heroStatHint}>После текущего поиска</div>
-                      </div>
-                      <div className={styles.heroStat}>
-                        <div className={styles.heroStatLabel}>Библиотека</div>
-                        <div className={styles.heroStatValue}>{totalEntries}</div>
-                        <div className={styles.heroStatHint}>Всего файлов во всех папках</div>
-                      </div>
-                    </div>
+                    <StatGroup
+                      className={styles.heroStats}
+                      items={[
+                        {
+                          className: styles.heroStat,
+                          label: 'Папка',
+                          value: selectedGroup.title,
+                          hint: `${selectedGroup.entries[0]?.folder1 || 'media'} / ${selectedGroup.entries[0]?.folder2 || 'shared'}`
+                        },
+                        { className: styles.heroStat, label: 'Файлы', value: selectedGroup.entries.length, hint: 'Всего в активной папке' },
+                        { className: styles.heroStat, label: 'В выдаче', value: filteredEntries.length, hint: 'После текущего поиска' },
+                        { className: styles.heroStat, label: 'Библиотека', value: totalEntries, hint: 'Всего файлов во всех папках' }
+                      ]}
+                    />
                     <div className={styles.mediaGrid}>
                       {filteredEntries.map((entry) => (
                         <article className={styles.mediaCard} key={entry.key || entry.file}>
@@ -293,24 +302,28 @@ export function MediaLibrary({ onUseAsset }: Props) {
                       ))}
                     </div>
                     {!filteredEntries.length ? (
-                      <div className={styles.emptyRich}>
-                        По текущему фильтру в этой папке ничего не найдено. Очисти поиск или переключись на другую папку.
-                      </div>
+                      <EmptyStateLayout
+                        title="Ничего не найдено"
+                        description="По текущему фильтру в этой папке ничего не найдено. Очисти поиск или переключись на другую папку."
+                      />
                     ) : null}
                   </>
                 ) : (
-                  <div className={styles.emptyRich}>Папок в manifest пока нет.</div>
+                  <EmptyStateLayout
+                    title="Папок пока нет"
+                    description="Manifest пока не вернул групп медиа. Проверь backend или загрузи первый ассет в ожидаемую папку."
+                  />
                 )}
               </div>
+            }
+            end={
               <aside className={`${styles.sidebarColumn} ${styles.stickyPanel}`}>
-                <div className={styles.sidebarCard}>
-                  <div className={styles.sidebarLabel}>Загрузка</div>
-                  <div className={styles.sidebarTitle}>
-                    {selectedGroup ? `В папку ${selectedGroup.title}` : 'Выбери папку'}
-                  </div>
-                  <div className={styles.sidebarHint}>
-                    Новые ассеты сразу попадают в командную библиотеку и после синхронизации доступны для фона, лого и KV.
-                  </div>
+                <SidebarSection
+                  className={styles.sidebarCard}
+                  eyebrow="Загрузка"
+                  title={selectedGroup ? `В папку ${selectedGroup.title}` : 'Выбери папку'}
+                  description="Новые ассеты сразу попадают в командную библиотеку и после синхронизации доступны для фона, лого и KV."
+                >
                   {selectedGroup ? (
                     <label className={`${styles.button} ${styles.uploadLabel}`}>
                       {uploading ? 'Загружаем...' : 'Загрузить файл'}
@@ -322,9 +335,8 @@ export function MediaLibrary({ onUseAsset }: Props) {
                       />
                     </label>
                   ) : null}
-                </div>
-                <div className={styles.sidebarCard}>
-                  <div className={styles.sidebarLabel}>Применение</div>
+                </SidebarSection>
+                <SidebarSection className={styles.sidebarCard} eyebrow="Применение" title="Куда вставлять ассеты">
                   <div className={styles.sidebarList}>
                     <div className={styles.sidebarListItem}>
                       <span>Как фон</span>
@@ -339,12 +351,11 @@ export function MediaLibrary({ onUseAsset }: Props) {
                       <span>Key Visual</span>
                     </div>
                   </div>
-                </div>
+                </SidebarSection>
               </aside>
-            </div>
-          </>
+            }
+          />
         ) : null}
-      </div>
-    </section>
+    </Section>
   );
 }

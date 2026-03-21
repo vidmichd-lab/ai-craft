@@ -39,6 +39,11 @@ This file is generated and must not be hand-edited.
 
 This is the canonical token layer consumed by shared components and app CSS.
 
+The current SDS baseline is aligned against:
+
+- the Figma Simple Design System community file
+- the reference implementation in `https://github.com/figma/sds`
+
 ## Token Usage Rules
 
 - Use `--ui-*` tokens in product styling by default.
@@ -56,17 +61,20 @@ This is the canonical token layer consumed by shared components and app CSS.
 
 ## Current Token Characteristics
 
-The current shared theme is dark-first and uses:
+The current shared theme is SDS-aligned and uses:
 
 - grayscale neutrals
 - brand/background contrast driven by SDS tokens
 - spacing scale from `--sds-size-space-*`
 - typography driven by `--sds-typography-*`
+- semantic status colors mapped from SDS danger/positive token groups
 
 These values are already wired into:
 
 - `packages/ui/src/theme.css`
 - `apps/web/src/app/globals.css`
+
+Preview surfaces with data-driven colors must not bypass the token system with inline styles. When a product screen needs to show a user-defined color swatch or document preview, represent that value as content data, for example via generated preview media, rather than as ad hoc inline styling.
 
 ## Enforceable Constraints
 

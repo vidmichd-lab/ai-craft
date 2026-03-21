@@ -14,6 +14,7 @@ Current component groups:
 - fields: `packages/ui/src/fields.tsx`
 - components: `packages/ui/src/components.tsx`
 - recipes: `packages/ui/src/recipes.tsx`
+- schema renderer: `packages/ui/src/schema.tsx`
 
 ## Shared Component Responsibilities
 
@@ -48,6 +49,7 @@ Examples visible in current code:
 - `SegmentedControl`
 - `SegmentedControlItem`
 - `StatCard`
+- `EmptyState`
 - `Banner`
 - `Avatar`
 - `Tag`
@@ -56,6 +58,22 @@ Examples visible in current code:
 ### Recipes
 
 These should contain reusable composed patterns rather than raw product pages.
+
+Canonical screen-level recipes now include:
+
+- `PageLayout`
+- `PageHeader`
+- `Section`
+- `FormSection`
+- `SettingsPanel`
+- `SidebarSection`
+- `InspectorSection`
+- `Toolbar`
+- `ToolbarGroup`
+- `SplitLayout`
+- `GridSection`
+- `StatGroup`
+- `EmptyStateLayout`
 
 ## Product Components
 
@@ -85,10 +103,20 @@ Product components may compose shared UI primitives, but they must not redefine 
 - Use shared field wrappers and controls for forms.
 - Reuse shared cards, banners, and stat components before creating new variants.
 - Do not duplicate a shared component under a new name with the same behavior.
+- Screens must be assembled from recipes in `packages/ui/src/recipes.tsx`, not from ad hoc layout JSX in `apps/web`.
+- Product components may provide data, actions, and screen-specific content, but layout composition must come from recipes first.
+- AI-generated UI must be emitted as validated JSON schema and rendered through `packages/ui/src/schema.tsx`; it must not emit raw React layout code.
 
 ## Migration Notes
 
-The current `packages/ui/src/primitives.tsx` still contains transitional inline style usage. That is migration debt, not a pattern to repeat.
+`packages/ui/src/primitives.tsx` is the canonical class-based primitive layer. It must stay token-driven and must not regress back to inline-style composition.
+
+Current shared migration targets now covered in `packages/ui`:
+
+- stat summaries via `StatCard`
+- empty/loading fallback shells via `EmptyState`
+- segmented mode switching via `SegmentedControl`
+- canonical preview-neutral primitives via `Surface`, `Stack`, `SectionHeader`, `Field`
 
 All new shared component work must move toward:
 

@@ -1,38 +1,32 @@
 .page {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: #000;
+  padding: var(--ui-space-6);
+  background: var(--ui-color-shell);
+}
+
+.layout {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  justify-content: center;
 }
 
 .shell {
-  width: min(1200px, calc(100vw - 48px));
-  min-height: min(760px, calc(100vh - 48px));
-  display: grid;
-  grid-template-columns: minmax(420px, 0.92fr) minmax(420px, 1.08fr);
-  overflow: hidden;
-  border-radius: 40px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
+  min-height: min(760px, calc(100vh - calc(var(--ui-space-6) * 2)));
+  align-items: stretch;
 }
 
 .card {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 760px;
-  padding: 48px 58px 40px;
-  background: var(--panel);
+  min-height: 100%;
+  background: var(--ui-color-panel);
+  box-shadow: var(--ui-shadow-surface);
 }
 
 .cardBody {
   display: flex;
-  flex: 1 0 auto;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 56px;
+  gap: var(--ui-space-6);
 }
 
 .logo {
@@ -44,136 +38,83 @@
   width: min(100%, 352px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-space-3);
+}
+
+.formActions {
+  display: flex;
+  padding-top: var(--ui-space-1);
 }
 
 .secondaryActions {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--ui-space-2);
 }
 
 .secondaryText {
-  color: rgba(255, 255, 255, 0.56);
-  font-size: 13px;
-  line-height: 1.4;
+  color: var(--ui-color-muted);
+  font-size: var(--ui-font-size-body-sm);
+  line-height: 1.45;
 }
 
 .editorLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 0 18px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
   width: fit-content;
-}
-
-.field {
-  position: relative;
-}
-
-.input {
-  width: 100%;
-  min-height: 58px;
-  padding: 0 20px;
-  border: 1px solid transparent;
-  border-radius: 24px;
-  background: var(--field);
-  color: var(--text);
-  font-size: 17px;
-  line-height: 1.2;
-}
-
-.input::placeholder {
-  color: var(--placeholder);
-}
-
-.passwordInput {
-  padding-right: 54px;
 }
 
 .toggle {
-  position: absolute;
-  top: 50%;
-  right: 16px;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.5);
-  transform: translateY(-50%);
-  cursor: pointer;
-}
-
-.submit {
-  width: fit-content;
-  min-width: 92px;
-  min-height: 52px;
-  margin-top: 4px;
-  padding: 0 24px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 999px;
-  background: #050505;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.submit:disabled {
-  opacity: 0.56;
-  cursor: default;
+  color: var(--ui-color-muted);
 }
 
 .error {
   width: 100%;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(232, 64, 51, 0.14);
-  color: #ffb4ad;
-  font-size: 13px;
-  line-height: 1.35;
 }
 
 .footer {
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.4;
+  color: var(--ui-color-muted);
+  font-size: var(--ui-font-size-body-sm);
+  line-height: 1.45;
 }
 
 .footer strong {
-  color: rgba(255, 255, 255, 0.95);
-  font-weight: 400;
+  color: var(--ui-color-text);
+  font-weight: var(--ui-font-weight-regular);
+}
+
+.heroSection {
+  min-height: 100%;
+  background: var(--ui-color-panel);
+  box-shadow: var(--ui-shadow-surface);
+}
+
+.heroBody {
+  min-height: 100%;
 }
 
 .hero {
-  min-height: 760px;
+  min-height: 100%;
+  border-radius: var(--ui-radius-shell);
   background:
-    linear-gradient(180deg, rgba(7, 12, 20, 0.12), rgba(7, 12, 20, 0.1)),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ui-color-shell-highlight) 84%, transparent),
+      color-mix(in srgb, var(--ui-color-shell-accent) 56%, transparent)
+    ),
     url('/auth-hero.webp') center center / cover no-repeat;
 }
 
 @media (max-width: 900px) {
+  .layout {
+    width: min(620px, 100%);
+  }
+
   .shell {
-    width: min(620px, calc(100vw - 32px));
     min-height: auto;
     grid-template-columns: 1fr;
   }
 
-  .card {
-    min-height: 0;
-    padding: 32px 28px 28px;
-  }
-
   .cardBody {
-    gap: 32px;
+    gap: var(--ui-space-5);
   }
 
   .hero {
@@ -183,20 +124,15 @@
 
 @media (max-width: 720px) {
   .page {
-    padding: 16px;
+    padding: var(--ui-space-4);
   }
 
-  .shell {
-    width: min(100%, calc(100vw - 32px));
-    border-radius: 28px;
-  }
-
-  .card {
-    padding: 24px 20px 20px;
+  .layout {
+    width: 100%;
   }
 
   .cardBody {
-    gap: 24px;
+    gap: var(--ui-space-4);
   }
 
   .hero {

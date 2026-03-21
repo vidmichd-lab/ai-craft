@@ -19,6 +19,7 @@ Defined by `apps/web/src/server/env.ts`:
 Notes:
 
 - `WORKSPACE_API_BASE_URL` and `MEDIA_MANIFEST_URL` are required integration endpoints.
+- The web app no longer hardcodes production fallback URLs in runtime code. These values must be set explicitly in the environment for any integration flow that touches the workspace or media backends.
 - `MEDIA_MUTATION_TOKEN` is optional but required for media mutations if the backend is configured to expect it.
 
 ## Workspace Backend Variables

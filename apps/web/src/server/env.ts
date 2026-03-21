@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  WORKSPACE_API_BASE_URL: z.string().url().default('https://d5dvnbnk8h8lkshgdjjm.l3hh3szr.apigw.yandexcloud.net'),
-  MEDIA_MANIFEST_URL: z.string().url().default('https://d5dcfknc559sg4v868te.laqt4bj7.apigw.yandexcloud.net/media/manifest'),
+  WORKSPACE_API_BASE_URL: z.string().url().optional(),
+  MEDIA_MANIFEST_URL: z.string().url().optional(),
   MEDIA_MUTATION_TOKEN: z.string().trim().min(1).optional()
 });
 
@@ -21,3 +21,11 @@ if (!parsedEnv.success) {
 }
 
 export const env = parsedEnv.data;
+
+export const requireServerEnv = (name: 'WORKSPACE_API_BASE_URL' | 'MEDIA_MANIFEST_URL') => {
+  const value = env[name];
+  if (!value) {
+    throw new Error(`Missing required apps/web env: ${name}`);
+  }
+  return value;
+};

@@ -6,11 +6,17 @@ import {
   renderEditorSnapshotToSurfaces,
   type PreviewSurface
 } from '@ai-craft/editor-renderer';
-import { Button, Input, SegmentedControl, SegmentedControlItem, StatCard } from '@ai-craft/ui';
+import {
+  Button,
+  InspectorSection,
+  Input,
+  SegmentedControl,
+  SegmentedControlItem,
+  SplitLayout,
+  StatGroup
+} from '@ai-craft/ui';
 import { useEffect, useMemo, useState } from 'react';
 import styles from './workspace-shell.module.css';
-
-const RENDERER_ASSET_BASE = process.env.NEXT_PUBLIC_LEGACY_ASSET_BASE_URL || 'https://aicrafter.ru';
 
 type Props = {
   state: EditorDocument;
@@ -65,6 +71,10 @@ export function EditorPreview({
     []
   );
   const [error, setError] = useState('');
+  const rendererAssetBase = useMemo(() => {
+    if (typeof window === 'undefined') return '';
+    return process.env.NEXT_PUBLIC_LEGACY_ASSET_BASE_URL?.trim() || window.location.origin;
+  }, []);
 
   const activeSurface =
     DEFAULT_PREVIEW_SURFACES.find((surface) => surface.key === activeSurfaceKey) || DEFAULT_PREVIEW_SURFACES[0];
@@ -133,7 +143,7 @@ export function EditorPreview({
             DEFAULT_PREVIEW_SURFACES.map((surface) => [surface.key, canvasRefs[surface.key as keyof typeof canvasRefs].current])
           ),
           {
-            assetBase: RENDERER_ASSET_BASE,
+            assetBase: rendererAssetBase,
             surfaces: DEFAULT_PREVIEW_SURFACES
           }
         );
@@ -149,11 +159,13 @@ export function EditorPreview({
     return () => {
       cancelled = true;
     };
-  }, [canvasRefs, state]);
+  }, [canvasRefs, rendererAssetBase, state]);
 
   return (
-    <div className={styles.previewShell}>
-      <section className={styles.previewStage}>
+    <SplitLayout
+      className={styles.previewShell}
+      variant="preview-rail"
+      start={<section className={styles.previewStage}>
         <SegmentedControl className={styles.surfaceTabs}>
           {DEFAULT_PREVIEW_SURFACES.map((surface) => (
             <SegmentedControlItem
@@ -187,21 +199,18 @@ export function EditorPreview({
             ))}
           </div>
         </div>
-      </section>
-
-      <aside className={styles.exportRail}>
-        <div className={styles.subPanel}>
-          <div className={styles.sectionLabel}>Архив</div>
+      </section>}
+      end={<aside className={styles.exportRail}>
+        <InspectorSection className={styles.subPanel} eyebrow="Архив" title="Имя выгрузки">
           <Input
             className={styles.input}
             value={archiveName}
             onChange={(event) => onArchiveNameChange(event.target.value)}
             placeholder="Имя архива"
           />
-        </div>
+        </InspectorSection>
 
-        <div className={styles.subPanel}>
-          <div className={styles.sectionLabel}>Масштаб экспорта</div>
+        <InspectorSection className={styles.subPanel} eyebrow="Экспорт" title="Масштаб">
           <SegmentedControl className={styles.segmentedRow}>
             <SegmentedControlItem
               className={styles.segmentedButton}
@@ -218,10 +227,9 @@ export function EditorPreview({
               ×2
             </SegmentedControlItem>
           </SegmentedControl>
-        </div>
+        </InspectorSection>
 
-        <div className={styles.subPanel}>
-          <div className={styles.sectionLabel}>Макс. размер, кб</div>
+        <InspectorSection className={styles.subPanel} eyebrow="Экспорт" title="Макс. размер, кб">
           <Input
             className={styles.input}
             type="number"
@@ -230,10 +238,9 @@ export function EditorPreview({
             value={exportMaxKilobytes}
             onChange={(event) => onExportMaxKilobytesChange(Number(event.target.value) || 200)}
           />
-        </div>
+        </InspectorSection>
 
-        <div className={styles.subPanel}>
-          <div className={styles.sectionLabel}>Экспорт</div>
+        <InspectorSection className={styles.subPanel} eyebrow="Экспорт" title="Форматы">
           <div className={styles.stack}>
             <Button className={styles.exportButton} type="button" variant="inverted" onClick={() => void downloadCanvas(activeSurface.key, 'png')}>
               Скачать PNG
@@ -242,17 +249,20 @@ export function EditorPreview({
               Скачать JPG
             </Button>
           </div>
-        </div>
+        </InspectorSection>
 
-        <div className={styles.heroStats}>
-          <StatCard
-            className={styles.heroStat}
-            label="Активный размер"
-            value={`${activeSurface.width}×${activeSurface.height}`}
-            hint={activeSurface.label}
-          />
-        </div>
-      </aside>
-    </div>
+        <StatGroup
+          className={styles.heroStats}
+          items={[
+            {
+              className: styles.heroStat,
+              label: 'Активный размер',
+              value: `${activeSurface.width}×${activeSurface.height}`,
+              hint: activeSurface.label
+            }
+          ]}
+        />
+      </aside>}
+    />
   );
 }
