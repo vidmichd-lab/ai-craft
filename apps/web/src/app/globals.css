@@ -1,12 +1,14 @@
+@import "../../../../packages/ui/src/theme.css";
+
 :root {
-  --bg: #050505;
-  --panel: #181818;
-  --panel-soft: #232323;
-  --field: #0b0b0b;
-  --border: rgba(255, 255, 255, 0.08);
-  --text: rgba(255, 255, 255, 0.96);
-  --muted: rgba(255, 255, 255, 0.56);
-  --placeholder: #787878;
+  --bg: #000000;
+  --panel: var(--ui-color-panel);
+  --panel-soft: var(--ui-color-panel-soft);
+  --field: var(--ui-color-field);
+  --border: var(--ui-color-border);
+  --text: var(--ui-color-text);
+  --muted: var(--ui-color-muted);
+  --placeholder: var(--sds-color-text-default-tertiary);
   --shadow: 0 32px 80px rgba(0, 0, 0, 0.42);
 }
 
@@ -20,7 +22,8 @@ body {
   min-height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: Arial, sans-serif;
+  font-family: var(--ui-font-family-body), sans-serif;
+  letter-spacing: -0.01em;
 }
 
 body {
@@ -33,6 +36,8 @@ a {
 }
 
 button,
-input {
+input,
+textarea,
+select {
   font: inherit;
 }

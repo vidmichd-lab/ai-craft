@@ -14,9 +14,19 @@ type Props = {
   state: EditorDocument;
   onChange: (next: EditorDocument) => void;
   onTemplateSaved?: () => void;
+  eyebrow?: string;
+  title?: string;
+  enableTemplateSave?: boolean;
 };
 
-export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
+export function EditorShell({
+  state,
+  onChange,
+  onTemplateSaved,
+  eyebrow = 'Studio',
+  title = 'Редактор AI-Craft',
+  enableTemplateSave = true
+}: Props) {
   const [templateName, setTemplateName] = useState('');
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState('');
@@ -79,7 +89,7 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
   return (
     <section className={styles.panel}>
       <div className={styles.stack}>
-        <SectionHeader eyebrow="Editor" title="Workspace editor shell" />
+        <SectionHeader eyebrow={eyebrow} title={title} />
         {notice ? (
           <Banner className={styles.notice} tone="notice">
             {notice}
@@ -93,7 +103,7 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
         <div className={styles.editorGrid}>
           <div className={styles.stack}>
             <section className={styles.subPanel}>
-              <div className={styles.sectionLabel}>Structure</div>
+              <div className={styles.sectionLabel}>Макет</div>
               <div className={styles.controlGrid}>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Режим проекта</span>
@@ -115,26 +125,26 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
                   />
                 </label>
                 <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Layout recipe</span>
+                  <span className={styles.fieldLabel}>Тип верстки</span>
                   <Select
                     className={styles.input}
                     value={state.layout.variant}
                     onChange={(event) => update({ layout: { variant: event.target.value as EditorDocument['layout']['variant'] } })}
                   >
-                    <option value="hero-left">Hero left</option>
-                    <option value="hero-centered">Hero centered</option>
-                    <option value="split">Split</option>
+                    <option value="hero-left">Лого слева</option>
+                    <option value="hero-centered">По центру</option>
+                    <option value="split">Сплит</option>
                   </Select>
                 </label>
                 <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Density</span>
+                  <span className={styles.fieldLabel}>Плотность</span>
                   <Select
                     className={styles.input}
                     value={state.layout.density}
                     onChange={(event) => update({ layout: { density: event.target.value as EditorDocument['layout']['density'] } })}
                   >
-                    <option value="default">Default</option>
-                    <option value="compact">Compact</option>
+                    <option value="default">Стандарт</option>
+                    <option value="compact">Компактно</option>
                   </Select>
                 </label>
                 <label className={styles.field}>
@@ -173,15 +183,15 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
                   </Select>
                 </label>
                 <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Тип surface</span>
+                  <span className={styles.fieldLabel}>Ориентация сцены</span>
                   <Select
                     className={styles.input}
                     value={state.layout.surfaceMode}
                     onChange={(event) => update({ layout: { surfaceMode: event.target.value as EditorDocument['layout']['surfaceMode'] } })}
                   >
-                    <option value="auto">Auto</option>
-                    <option value="horizontal">Horizontal</option>
-                    <option value="vertical">Vertical</option>
+                    <option value="auto">Авто</option>
+                    <option value="horizontal">Горизонталь</option>
+                    <option value="vertical">Вертикаль</option>
                   </Select>
                 </label>
                 <label className={styles.field}>
@@ -213,7 +223,7 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
             </section>
 
             <section className={styles.subPanel}>
-              <div className={styles.sectionLabel}>Copy</div>
+              <div className={styles.sectionLabel}>Текст</div>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Заголовок</span>
                 <TextArea
@@ -296,7 +306,7 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
             </section>
 
             <section className={styles.subPanel}>
-              <div className={styles.sectionLabel}>Assets</div>
+              <div className={styles.sectionLabel}>Визуал</div>
               <div className={styles.controlGrid}>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Цвет фона</span>
@@ -396,7 +406,7 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
             </section>
 
             <section className={styles.subPanel}>
-              <div className={styles.sectionLabel}>Legal</div>
+              <div className={styles.sectionLabel}>Лигал</div>
               <div className={styles.controlGrid}>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Возраст</span>
@@ -447,20 +457,22 @@ export function EditorShell({ state, onChange, onTemplateSaved }: Props) {
               </label>
             </section>
 
-            <section className={styles.subPanel}>
-              <div className={styles.sectionLabel}>Templates</div>
-              <div className={styles.actionsRow}>
-                <Input
-                  className={styles.input}
-                  value={templateName}
-                  onChange={(event) => setTemplateName(event.target.value)}
-                  placeholder="Название шаблона"
-                />
-                <Button type="button" onClick={handleSaveTemplate} disabled={pending || !templateName.trim()}>
-                  {pending ? 'Сохраняем...' : 'Сохранить как шаблон'}
-                </Button>
-              </div>
-            </section>
+            {enableTemplateSave ? (
+              <section className={styles.subPanel}>
+                <div className={styles.sectionLabel}>Шаблоны</div>
+                <div className={styles.actionsRow}>
+                  <Input
+                    className={styles.input}
+                    value={templateName}
+                    onChange={(event) => setTemplateName(event.target.value)}
+                    placeholder="Название шаблона"
+                  />
+                  <Button type="button" onClick={handleSaveTemplate} disabled={pending || !templateName.trim()}>
+                    {pending ? 'Сохраняем...' : 'Сохранить как шаблон'}
+                  </Button>
+                </div>
+              </section>
+            ) : null}
           </div>
 
           <div className={styles.editorPreviewWrap}>

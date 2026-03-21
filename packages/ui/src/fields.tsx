@@ -162,7 +162,9 @@ export function SelectField({
           {children}
         </select>
         <span className="ui-control-icon ui-control-icon-end" aria-hidden="true">
-          <span className="material-icons">expand_more</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6.25L8 10.25L12 6.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </span>
       </span>
     </FieldFrame>
@@ -182,7 +184,10 @@ export function SearchField({
   return (
     <span className={cx('ui-search-field', disabled && 'is-disabled')}>
       <span className="ui-control-icon" aria-hidden="true">
-        <span className="material-icons">search</span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="7.25" cy="7.25" r="4.75" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M10.75 10.75L13.25 13.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
       </span>
       <input {...props} disabled={disabled} className={cx('ui-input', 'ui-search-input', className)} />
       {trailingAction ? <span className="ui-control-icon ui-control-icon-end">{trailingAction}</span> : null}

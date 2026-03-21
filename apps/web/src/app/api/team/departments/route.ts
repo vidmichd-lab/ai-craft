@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { requireWorkspaceAdminSession } from '@/server/auth/request-session';
+import { requireWorkspaceRoleSession } from '@/server/auth/request-session';
 import { createRequestContext } from '@/server/http/request-context';
 import { jsonWithCookies, toRouteErrorResponse } from '@/server/http/response';
 import { saveTeamDepartments } from '@/server/services/team-departments';
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const context = createRequestContext(request);
   try {
     const payload = payloadSchema.parse(await request.json());
-    const session = await requireWorkspaceAdminSession(request, context);
+    const session = await requireWorkspaceRoleSession(request, ['admin', 'lead'], context);
     if (!session.ok) return session.response;
 
     const result = await saveTeamDepartments(payload, session.cookie, session.me.user);

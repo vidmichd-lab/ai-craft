@@ -1,8 +1,10 @@
 import { listWorkspaceProjects, listWorkspaceSnapshots, createWorkspaceProject } from '@/server/workspace-api/client';
 
+const TEMPLATE_PROJECT_DESCRIPTION = 'system-template-project';
+
 export const ensureTemplateProject = async (cookie: string, displayName = '') => {
   const projects = await listWorkspaceProjects(cookie);
-  const existing = projects.data.projects[0];
+  const existing = projects.data.projects.find((project) => project.description === TEMPLATE_PROJECT_DESCRIPTION);
   if (existing?.id) {
     return existing;
   }
@@ -11,7 +13,7 @@ export const ensureTemplateProject = async (cookie: string, displayName = '') =>
   const created = await createWorkspaceProject(
     {
       name: fallbackName,
-      description: 'system-template-project',
+      description: TEMPLATE_PROJECT_DESCRIPTION,
       state: {}
     },
     cookie

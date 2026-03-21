@@ -5,7 +5,7 @@
       "id": "pair-1773953082891-0",
       "title": "Курс «Frontend-разработчик» от Практикума",
       "subtitle": "Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев",
-      "kvSelected": "assets/3d/logos/40.webp",
+      "kvSelected": "",
       "bgImageSelected": null,
       "bgColor": "#1e1e1e"
     }
@@ -73,7 +73,7 @@
   "showBlocks": false,
   "showGuides": false,
   "logo": null,
-  "logoSelected": "logo/white/ru/main.svg",
+  "logoSelected": "",
   "defaultLogoRU": null,
   "defaultLogoKZ": null,
   "defaultLogoPRO": null,
@@ -99,7 +99,7 @@
   "partnerLogo": null,
   "partnerLogoFile": null,
   "kv": null,
-  "kvSelected": "assets/3d/logos/40.webp",
+  "kvSelected": "",
   "rsyaKV2": null,
   "rsyaKV2Selected": "",
   "rsyaKV3": null,

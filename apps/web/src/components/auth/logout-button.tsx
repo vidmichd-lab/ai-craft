@@ -4,7 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@ai-craft/ui';
 
-export function LogoutButton() {
+type Props = {
+  className?: string;
+  variant?: 'primary' | 'secondary' | 'neutral' | 'subtle' | 'danger' | 'danger-subtle' | 'inverted' | 'ghost';
+};
+
+export function LogoutButton({ className, variant = 'ghost' }: Props) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -28,7 +33,7 @@ export function LogoutButton() {
   };
 
   return (
-    <Button type="button" onClick={handleClick} disabled={pending}>
+    <Button className={className} variant={variant} type="button" onClick={handleClick} disabled={pending}>
       {pending ? 'Выходим...' : 'Выйти'}
     </Button>
   );

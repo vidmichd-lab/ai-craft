@@ -1,12 +1,22 @@
 import { expect, test } from '@playwright/test';
 
-const PROD_URL = 'https://ai-craft.website.yandexcloud.net/';
+const PROD_URL = 'https://aicrafter.ru/';
+const WWW_URL = 'https://www.aicrafter.ru/';
+const LOGIN = {
+  email: 'vidmichd@ya.ru',
+  password: 'vidmich-2026-login'
+};
 
 test.use({
   serviceWorkers: 'allow'
 });
 
-test('prod loads with remote media and active service worker', async ({ page }) => {
+test('www redirects to apex', async ({ page }) => {
+  await page.goto(WWW_URL, { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(PROD_URL);
+});
+
+test('prod login opens the workspace dashboard on the custom domain', async ({ page }) => {
   const consoleErrors = [];
   const pageErrors = [];
 
@@ -21,66 +31,30 @@ test('prod loads with remote media and active service worker', async ({ page }) 
   });
 
   await page.goto(PROD_URL, { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible();
 
-  await expect(page.locator('body')).toContainText('AI-Craft');
+  await page.locator('input[type="email"]').fill(LOGIN.email);
+  await page.locator('input[type="password"]').fill(LOGIN.password);
+  await page.getByRole('button', { name: 'Войти' }).click();
 
-  const liveChecks = await page.evaluate(async () => {
-    const configResponse = await fetch('/config.json', { cache: 'no-store' });
-    const config = await configResponse.json();
-    const manifestUrl = config?.mediaSources?.remote?.manifestUrl || '';
+  await expect(page.getByText('Рабочие разделы')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Яндекс Практикум')).toBeVisible();
 
-    const manifestResponse = await fetch(manifestUrl, { cache: 'no-store' });
-    const manifest = await manifestResponse.json();
-    const assets = manifest?.assets || {};
-    const manifestRoots = Object.keys(assets).sort();
+  await page.getByRole('button', { name: 'Шаблоны' }).click();
+  await expect(page.getByText('Библиотека шаблонов')).toBeVisible();
 
-    const countNested = (node) => {
-      if (Array.isArray(node)) return node.length;
-      if (!node || typeof node !== 'object') return 0;
+  await page.getByRole('button', { name: 'Медиатека' }).click();
+  await expect(page.getByText('Командная медиатека')).toBeVisible();
 
-      return Object.entries(node).reduce((sum, [key, value]) => {
-        if (key === '__files' && Array.isArray(value)) {
-          return sum + value.length;
-        }
-        return sum + countNested(value);
-      }, 0);
-    };
+  const healthResponse = await page.request.get(`${PROD_URL}api/health`);
+  const healthPayload = await healthResponse.json();
 
-    const manifestCount = countNested(assets);
-
-    const kvCount = countNested(assets?.['3d'] || {});
-    const logoCount = countNested(assets?.logo || {});
-    const fontNode = assets?.font || {};
-    const fontCount = countNested(fontNode);
-
-    const registration = await navigator.serviceWorker.getRegistration();
-    const serviceWorkerReady = await navigator.serviceWorker.ready.then(() => true).catch(() => false);
-
-    return {
-      appVersion: window.APP_VERSION || '',
-      manifestUrl,
-      manifestRoots,
-      manifestCount,
-      kvCount,
-      logoCount,
-      fontCount,
-      hasServiceWorkerRegistration: Boolean(registration),
-      hasActiveServiceWorker: Boolean(registration?.active),
-      serviceWorkerReady
-    };
+  expect(healthResponse.ok()).toBe(true);
+  expect(healthPayload).toEqual({
+    ok: true,
+    service: 'ai-craft-web',
+    environment: 'production'
   });
-
-  expect(liveChecks.appVersion).toBeTruthy();
-  expect(liveChecks.manifestUrl).toContain('/media/manifest');
-  expect(liveChecks.manifestRoots).toEqual(['3d', 'font', 'logo', 'pro']);
-  expect(liveChecks.manifestCount).toBeGreaterThan(400);
-  expect(liveChecks.kvCount).toBeGreaterThan(250);
-  expect(liveChecks.logoCount).toBeGreaterThan(20);
-  expect(liveChecks.fontCount).toBeGreaterThan(20);
-  expect(liveChecks.hasServiceWorkerRegistration).toBe(true);
-  expect(liveChecks.hasActiveServiceWorker).toBe(true);
-  expect(liveChecks.serviceWorkerReady).toBe(true);
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });

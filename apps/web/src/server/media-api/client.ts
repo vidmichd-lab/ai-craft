@@ -21,7 +21,10 @@ const normalizeApiBaseUrl = (manifestUrl: string) => {
 
 const buildHeaders = (body?: unknown) => ({
   Accept: 'application/json',
-  ...(body !== undefined ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {})
+  ...(body !== undefined ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {}),
+  ...(body !== undefined && env.MEDIA_MUTATION_TOKEN
+    ? { 'X-Media-Api-Token': env.MEDIA_MUTATION_TOKEN }
+    : {})
 });
 
 const requestMediaApi = async (path: string, init: RequestInit = {}) => {

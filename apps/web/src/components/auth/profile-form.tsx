@@ -53,7 +53,11 @@ export function ProfileForm({ initialDisplayName, email, roleLabel }: Props) {
 
   return (
     <form className={styles.stack} onSubmit={handleSubmit}>
-      <SectionHeader eyebrow="Аккаунт" title="Мои настройки" />
+      <SectionHeader
+        eyebrow="Аккаунт"
+        title="Мой профиль"
+        description="Личные данные, под которыми ты появляешься в библиотеке шаблонов, команде и истории изменений."
+      />
       <Field className={styles.field} label="Имя">
         <Input
           className={styles.input}
@@ -83,7 +87,7 @@ export function ProfileForm({ initialDisplayName, email, roleLabel }: Props) {
         </Banner>
       ) : null}
       <Button type="submit" disabled={pending || !displayName.trim()}>
-        {pending ? 'Сохраняем...' : 'Сохранить'}
+        {pending ? 'Сохраняем...' : 'Сохранить профиль'}
       </Button>
     </form>
   );

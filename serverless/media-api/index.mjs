@@ -12,7 +12,10 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const REQUIRED_ENV_VARS = ['MEDIA_BUCKET'];
 const DEFAULT_ALLOWED_ORIGINS = [
+  'https://aicrafter.ru',
+  'https://www.aicrafter.ru',
   'https://ai-craft.website.yandexcloud.net',
+  'https://bbatcmo4t42t8vmcrqka.containers.yandexcloud.net',
   'http://localhost:8000',
   'http://localhost:8001'
 ];
@@ -27,6 +30,7 @@ const DEFAULT_URL_TTL_SECONDS = 900;
 const DEFAULT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_MANIFEST_ITEMS = 500;
 const LIST_PAGE_SIZE = 200;
+const INSECURE_DEFAULT_MUTATION_TOKEN = 'change-me-media-token';
 
 const getEnv = (name, fallback = '') => {
   const value = process.env[name];
@@ -56,6 +60,7 @@ const config = {
   allowedOrigins: splitCsv(getEnv('MEDIA_ALLOWED_ORIGINS'), DEFAULT_ALLOWED_ORIGINS),
   allowedMimeTypes: splitCsv(getEnv('MEDIA_ALLOWED_MIME_TYPES'), DEFAULT_ALLOWED_MIME_TYPES),
   maxFileSizeBytes: Number.parseInt(getEnv('MEDIA_MAX_FILE_SIZE_BYTES', String(DEFAULT_MAX_FILE_SIZE_BYTES)), 10) || DEFAULT_MAX_FILE_SIZE_BYTES,
+  mutationToken: getEnv('MEDIA_MUTATION_TOKEN', ''),
   s3Endpoint: getEnv('S3_ENDPOINT', 'https://storage.yandexcloud.net'),
   region: getEnv('AWS_REGION', 'ru-central1')
 };
@@ -79,7 +84,7 @@ const resolveCorsOrigin = (origin) => {
 const buildHeaders = (origin, extra = {}) => ({
   'Content-Type': 'application/json; charset=utf-8',
   'Access-Control-Allow-Origin': resolveCorsOrigin(origin),
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, X-Media-Api-Token',
   'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
   'Access-Control-Max-Age': '3600',
   ...extra
@@ -101,6 +106,15 @@ const ensureEnv = () => {
   const missing = REQUIRED_ENV_VARS.filter((name) => !getEnv(name));
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+};
+
+const isProductionRuntime = () => getEnv('NODE_ENV', 'development') === 'production';
+
+const ensureSecureMutationConfig = () => {
+  if (!isProductionRuntime()) return;
+  if (!config.mutationToken || config.mutationToken === INSECURE_DEFAULT_MUTATION_TOKEN) {
+    throw new Error('MEDIA_MUTATION_TOKEN must be configured for mutation routes in production');
   }
 };
 
@@ -195,11 +209,45 @@ const parseObjectKey = (key, prefix) => {
 
   return {
     rootName,
+    folder1: rootName,
+    folder2: nestedSegments[0] || '',
     nestedSegments,
     fileName,
     key,
     relativePath
   };
+};
+
+const inferMutationToken = (event) => {
+  const headers = event?.headers || {};
+  const direct = headers['x-media-api-token'] || headers['X-Media-Api-Token'] || '';
+  if (direct) return String(direct).trim();
+
+  const authorization = headers.authorization || headers.Authorization || '';
+  const [scheme, token] = String(authorization).split(/\s+/, 2);
+  if (scheme?.toLowerCase() === 'bearer' && token) {
+    return token.trim();
+  }
+
+  return '';
+};
+
+const authorizeMutation = (event, origin) => {
+  ensureSecureMutationConfig();
+
+  if (!config.mutationToken) {
+    return null;
+  }
+
+  const token = inferMutationToken(event);
+  if (!token) {
+    return json(401, toErrorBody('Mutation token is required'), origin);
+  }
+  if (token !== config.mutationToken) {
+    return json(403, toErrorBody('Invalid mutation token'), origin);
+  }
+
+  return null;
 };
 
 const inferDisplayName = (fileName) => {
@@ -659,22 +707,32 @@ export const handler = async (event = {}) => {
     }
 
     if (method === 'POST' && (path.endsWith('/media/presign-upload') || path === '/media/presign-upload')) {
+      const authError = authorizeMutation(event, origin);
+      if (authError) return authError;
       return await handlePresignUpload(event, origin);
     }
 
     if (method === 'POST' && (path.endsWith('/media/folder') || path === '/media/folder')) {
+      const authError = authorizeMutation(event, origin);
+      if (authError) return authError;
       return await handleCreateFolder(event, origin);
     }
 
     if (method === 'POST' && (path.endsWith('/media/folder/rename') || path === '/media/folder/rename')) {
+      const authError = authorizeMutation(event, origin);
+      if (authError) return authError;
       return await handleRenameFolder(event, origin);
     }
 
     if (method === 'DELETE' && (path.endsWith('/media/object') || path === '/media/object')) {
+      const authError = authorizeMutation(event, origin);
+      if (authError) return authError;
       return await handleDeleteObject(event, origin);
     }
 
     if (method === 'POST' && (path.endsWith('/media/publish') || path === '/media/publish')) {
+      const authError = authorizeMutation(event, origin);
+      if (authError) return authError;
       return await handlePublishObject(event, origin);
     }
 
@@ -685,4 +743,11 @@ export const handler = async (event = {}) => {
       message: error instanceof Error ? error.message : String(error)
     }), origin);
   }
+};
+
+export const __private__ = {
+  authorizeMutation,
+  ensureSecureMutationConfig,
+  inferMutationToken,
+  parseObjectKey
 };

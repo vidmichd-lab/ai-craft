@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { cookies } from 'next/headers';
 import { createStoredTemplateState, normalizeStoredTemplateState } from '@ai-craft/editor-model';
+import { requireWorkspaceSession } from '@/server/auth/request-session';
 import { saveWorkspaceSnapshot } from '@/server/workspace-api/client';
 import { ensureTemplateProject } from '@/server/workspace-api/templates';
 import { createRequestContext } from '@/server/http/request-context';
@@ -17,14 +18,16 @@ const payloadSchema = z.object({
 export async function POST(request: Request) {
   const context = createRequestContext(request);
   try {
+    const session = await requireWorkspaceSession(request, context);
+    if (!session.ok) return session.response;
+
     const payload = payloadSchema.parse(await request.json());
     const state = payload.document
       ? createStoredTemplateState(payload.name, payload.document)
       : normalizeStoredTemplateState(payload.state || {}, payload.name);
     const cookieStore = await cookies();
-    const cookie = cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ');
-    const displayName = cookieStore.get('workspace_display_name')?.value || '';
-    const project = await ensureTemplateProject(cookie, displayName);
+    const displayName = session.me.user.displayName || cookieStore.get('workspace_display_name')?.value || '';
+    const project = await ensureTemplateProject(session.cookie, displayName);
     const result = await saveWorkspaceSnapshot(
       {
         projectId: project.id,
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
         kind: 'template',
         state
       },
-      cookie
+      session.cookie
     );
     return jsonResponse(result.data, context);
   } catch (error) {

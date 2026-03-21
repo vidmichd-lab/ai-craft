@@ -6,6 +6,21 @@ const isRecord = (value: unknown): value is RecordValue =>
 const readString = (value: unknown, fallback: string) =>
   typeof value === 'string' ? value : fallback;
 
+const sanitizeAssetReference = (value: unknown, fallback = '') => {
+  const next = readString(value, fallback).trim();
+  if (!next) return '';
+  if (
+    next.startsWith('/') ||
+    next.startsWith('http://') ||
+    next.startsWith('https://') ||
+    next.startsWith('data:') ||
+    next.startsWith('blob:')
+  ) {
+    return next;
+  }
+  return fallback.trim();
+};
+
 const readNumber = (value: unknown, fallback: number) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -234,7 +249,7 @@ export type StoredTemplateState = {
 export const createDefaultEditorSnapshot = (): EditorSnapshot => ({
   brandName: 'Практикума',
   logoSelected: '',
-  kvSelected: 'assets/3d/logos/40.webp',
+  kvSelected: '',
   title: 'Курс «Frontend-разработчик» от Практикума',
   subtitle: 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев',
   bgColor: '#1e1e1e',
@@ -282,7 +297,7 @@ export const createDefaultEditorSnapshot = (): EditorSnapshot => ({
       subtitle: 'Научитесь писать код для сайтов и веб-сервисов — с нуля за 10 месяцев',
       bgColor: '#1e1e1e',
       bgImageSelected: '',
-      kvSelected: 'assets/3d/logos/40.webp'
+      kvSelected: ''
     }
   ],
   activePairIndex: 0
@@ -297,18 +312,20 @@ export const normalizeEditorSnapshot = (value: RecordValue | null | undefined): 
   const title = String(hasOwnField('title') ? value?.title : (activePair.title || fallback.title));
   const subtitle = String(hasOwnField('subtitle') ? value?.subtitle : (activePair.subtitle || fallback.subtitle));
   const bgColor = String(hasOwnField('bgColor') ? value?.bgColor : (activePair.bgColor || fallback.bgColor));
-  const bgImageSelected = String(
+  const bgImageSelected = sanitizeAssetReference(
     hasOwnField('bgImageSelected')
       ? value?.bgImageSelected
       : (activePair.bgImageSelected || value?.bgImage || '')
   );
-  const kvSelected = String(hasOwnField('kvSelected') ? value?.kvSelected : (activePair.kvSelected || fallback.kvSelected));
+  const kvSelected = sanitizeAssetReference(
+    hasOwnField('kvSelected') ? value?.kvSelected : (activePair.kvSelected || fallback.kvSelected)
+  );
 
   return {
     ...fallback,
     ...(value || {}),
     brandName: String(value?.brandName || fallback.brandName),
-    logoSelected: String(value?.logoSelected || fallback.logoSelected),
+    logoSelected: sanitizeAssetReference(value?.logoSelected || fallback.logoSelected),
     kvSelected,
     title,
     subtitle,
@@ -542,9 +559,9 @@ export const normalizeProjectDocument = (value: RecordValue | null | undefined):
       subheadline: readString(content.subheadline, fallback.content.subheadline)
     },
     assets: {
-      logo: readString(assets.logo, fallback.assets.logo || ''),
-      background: readString(assets.background, fallback.assets.background || ''),
-      kv: readString(assets.kv, fallback.assets.kv || '')
+      logo: sanitizeAssetReference(assets.logo, fallback.assets.logo || ''),
+      background: sanitizeAssetReference(assets.background, fallback.assets.background || ''),
+      kv: sanitizeAssetReference(assets.kv, fallback.assets.kv || '')
     },
     theme: {
       id: readString(theme.id, fallback.theme.id),

@@ -1,0 +1,12 @@
+.git
+.github
+.next
+node_modules
+output
+test-results
+coverage
+.turbo
+*.log
+.DS_Store
+apps/web/.next
+apps/web/node_modules

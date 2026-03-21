@@ -169,4 +169,31 @@ describe('editor-model', () => {
     expect(legacy.definition.document.brand.name).toBe('Legacy brand');
     expect(legacy.legacySnapshot.title).toBe('Legacy title');
   });
+
+  it('drops legacy relative asset paths from old snapshots and templates', () => {
+    const document = normalizeProjectDocument({
+      assets: {
+        logo: 'logo/white/ru/main.svg',
+        background: 'assets/3d/logos/40.webp',
+        kv: 'assets/3d/logos/40.webp'
+      }
+    });
+
+    expect(document.assets).toEqual({
+      logo: '',
+      background: '',
+      kv: ''
+    });
+
+    const legacy = normalizeStoredTemplateState({
+      title: 'Legacy title',
+      logoSelected: 'logo/white/ru/main.svg',
+      kvSelected: 'assets/3d/logos/40.webp',
+      bgImageSelected: 'assets/3d/logos/40.webp'
+    }, 'Legacy');
+
+    expect(legacy.legacySnapshot.logoSelected).toBe('');
+    expect(legacy.legacySnapshot.kvSelected).toBe('');
+    expect(legacy.legacySnapshot.bgImageSelected).toBe('');
+  });
 });

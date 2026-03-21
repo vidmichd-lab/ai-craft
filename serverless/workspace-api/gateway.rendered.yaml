@@ -204,6 +204,18 @@ paths:
       responses:
         '200':
           description: Current user
+  /account/profile:
+    post:
+      operationId: accountProfileUpdate
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eplnv6a7oc7vt3a7f9
+        tag: latest
+        service_account_id: ajevjks4798q2g39abck
+        payload_format_version: '2.0'
+      responses:
+        '200':
+          description: Profile updated
   /teams/current:
     get:
       operationId: currentTeam

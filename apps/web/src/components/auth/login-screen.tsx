@@ -1,13 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { FormEvent, useMemo, useState } from 'react';
 import { Banner, Button, Input } from '@ai-craft/ui';
 import styles from './login-screen.module.css';
 
 export function LoginScreen() {
-  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +37,7 @@ export function LoginScreen() {
         throw new Error(payload?.error || 'Не удалось войти');
       }
 
-      router.refresh();
+      window.location.assign('/');
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Не удалось войти');
     } finally {
@@ -64,10 +63,10 @@ export function LoginScreen() {
                 <Input
                   className={styles.input}
                   type="email"
+                  aria-label="Email"
                   placeholder="Почта"
                   autoComplete="username"
                   value={email}
-                  style={{ minHeight: 36, padding: '8px 12px', borderColor: 'transparent' }}
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </div>
@@ -75,10 +74,10 @@ export function LoginScreen() {
                 <Input
                   className={`${styles.input} ${styles.passwordInput}`}
                   type={showPassword ? 'text' : 'password'}
+                  aria-label="Пароль"
                   placeholder="Пароль"
                   autoComplete="current-password"
                   value={password}
-                  style={{ minHeight: 36, padding: '8px 12px', borderColor: 'transparent' }}
                   onChange={(event) => setPassword(event.target.value)}
                 />
                 <button
@@ -87,7 +86,14 @@ export function LoginScreen() {
                   aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                   onClick={() => setShowPassword((value) => !value)}
                 >
-                  {showPassword ? '◉' : '◌'}
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                    <path
+                      d="M2.2 9C3.78 6.26 6.11 4.88 9 4.88C11.89 4.88 14.22 6.26 15.8 9C14.22 11.74 11.89 13.12 9 13.12C6.11 13.12 3.78 11.74 2.2 9Z"
+                      stroke="currentColor"
+                      strokeWidth="1.35"
+                    />
+                    <circle cx="9" cy="9" r="2.1" fill="currentColor" opacity={showPassword ? 1 : 0.4} />
+                  </svg>
                 </button>
               </div>
               {error ? (
@@ -100,11 +106,16 @@ export function LoginScreen() {
                 size="sm"
                 type="submit"
                 disabled={!canSubmit || pending}
-                style={{ borderColor: 'rgba(255, 255, 255, 0.04)' }}
               >
                 {pending ? 'Входим...' : 'Войти'}
               </Button>
             </form>
+            <div className={styles.secondaryActions}>
+              <div className={styles.secondaryText}>Нужен только визуальный редактор без логина?</div>
+              <Link className={styles.editorLink} href="/editor">
+                Открыть editor без логина
+              </Link>
+            </div>
           </div>
           <div className={styles.footer}>
             Вайб-код от <strong>@vidmich</strong>

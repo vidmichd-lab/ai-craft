@@ -10,12 +10,32 @@ FUNCTION_TAG="${FUNCTION_TAG:-latest}"
 GATEWAY_NAME="${GATEWAY_NAME:-ai-craft-workspace-gateway}"
 ENTRYPOINT="${ENTRYPOINT:-index.handler}"
 RUNTIME="${RUNTIME:-nodejs22}"
+NODE_ENV="${NODE_ENV:-production}"
 MEMORY="${MEMORY:-256m}"
 TIMEOUT="${TIMEOUT:-10s}"
 SERVICE_ACCOUNT_ID="${SERVICE_ACCOUNT_ID:-}"
 GATEWAY_SERVICE_ACCOUNT_ID="${GATEWAY_SERVICE_ACCOUNT_ID:-$SERVICE_ACCOUNT_ID}"
 PACKAGE_BUCKET_NAME="${PACKAGE_BUCKET_NAME:-}"
 PACKAGE_OBJECT_PREFIX="${PACKAGE_OBJECT_PREFIX:-workspace-api}"
+WORKSPACE_BOOTSTRAP_DEFAULTS_JSON_VALUE="${WORKSPACE_BOOTSTRAP_DEFAULTS_JSON:-}"
+WORKSPACE_BOOTSTRAP_MEDIA_SOURCES_JSON_VALUE="${WORKSPACE_BOOTSTRAP_MEDIA_SOURCES_JSON:-}"
+WORKSPACE_STORAGE_VALUE="${WORKSPACE_STORAGE:-}"
+
+if [ -z "$WORKSPACE_BOOTSTRAP_DEFAULTS_JSON_VALUE" ]; then
+  WORKSPACE_BOOTSTRAP_DEFAULTS_JSON_VALUE='{}'
+fi
+
+if [ -z "$WORKSPACE_BOOTSTRAP_MEDIA_SOURCES_JSON_VALUE" ]; then
+  WORKSPACE_BOOTSTRAP_MEDIA_SOURCES_JSON_VALUE='{}'
+fi
+
+if [ -z "$WORKSPACE_STORAGE_VALUE" ]; then
+  if [ -n "${YDB_ENDPOINT:-}" ] && [ -n "${YDB_DATABASE:-}" ]; then
+    WORKSPACE_STORAGE_VALUE="ydb"
+  else
+    WORKSPACE_STORAGE_VALUE="memory"
+  fi
+fi
 
 if ! command -v yc >/dev/null 2>&1; then
   echo "yc CLI is required" >&2
@@ -48,6 +68,9 @@ cleanup() {
 trap cleanup EXIT
 
 cp index.js index.mjs package.json "$BUILD_DIR/"
+if [ -f runtime-security.mjs ]; then
+  cp runtime-security.mjs "$BUILD_DIR/"
+fi
 if [ -f package-lock.json ]; then
   cp package-lock.json "$BUILD_DIR/"
 fi
@@ -68,10 +91,11 @@ CREATE_ARGS=(
   --memory "$MEMORY"
   --execution-timeout "$TIMEOUT"
   --tags "$FUNCTION_TAG"
+  --environment NODE_ENV="${NODE_ENV}"
   --environment YC_FOLDER_ID="${YC_FOLDER_ID}"
-  --environment WORKSPACE_STORAGE="${WORKSPACE_STORAGE:-memory}"
+  --environment WORKSPACE_STORAGE="${WORKSPACE_STORAGE_VALUE}"
   --environment WORKSPACE_JWT_SECRET="${WORKSPACE_JWT_SECRET:-change-me}"
-  --environment WORKSPACE_ALLOWED_ORIGINS="${WORKSPACE_ALLOWED_ORIGINS:-https://ai-craft.website.yandexcloud.net,http://localhost:8000}"
+  --environment WORKSPACE_ALLOWED_ORIGINS="${WORKSPACE_ALLOWED_ORIGINS:-https://aicrafter.ru,https://www.aicrafter.ru,https://ai-craft.website.yandexcloud.net,https://bbatcmo4t42t8vmcrqka.containers.yandexcloud.net,http://localhost:8000,http://localhost:8001}"
   --environment WORKSPACE_SUPERADMIN_EMAILS="${WORKSPACE_SUPERADMIN_EMAILS:-vidmichd@ya.ru}"
   --environment WORKSPACE_COOKIE_SECURE="${WORKSPACE_COOKIE_SECURE:-true}"
   --environment WORKSPACE_COOKIE_SAME_SITE="${WORKSPACE_COOKIE_SAME_SITE:-none}"
@@ -84,8 +108,8 @@ CREATE_ARGS=(
   --environment WORKSPACE_BOOTSTRAP_ADMIN_EMAIL="${WORKSPACE_BOOTSTRAP_ADMIN_EMAIL:-}"
   --environment WORKSPACE_BOOTSTRAP_ADMIN_PASSWORD="${WORKSPACE_BOOTSTRAP_ADMIN_PASSWORD:-}"
   --environment WORKSPACE_BOOTSTRAP_ADMIN_NAME="${WORKSPACE_BOOTSTRAP_ADMIN_NAME:-}"
-  --environment WORKSPACE_BOOTSTRAP_DEFAULTS_JSON="${WORKSPACE_BOOTSTRAP_DEFAULTS_JSON:-{}}"
-  --environment WORKSPACE_BOOTSTRAP_MEDIA_SOURCES_JSON="${WORKSPACE_BOOTSTRAP_MEDIA_SOURCES_JSON:-{}}"
+  --environment WORKSPACE_BOOTSTRAP_DEFAULTS_JSON="${WORKSPACE_BOOTSTRAP_DEFAULTS_JSON_VALUE}"
+  --environment WORKSPACE_BOOTSTRAP_MEDIA_SOURCES_JSON="${WORKSPACE_BOOTSTRAP_MEDIA_SOURCES_JSON_VALUE}"
 )
 
 if [ -n "$SERVICE_ACCOUNT_ID" ]; then

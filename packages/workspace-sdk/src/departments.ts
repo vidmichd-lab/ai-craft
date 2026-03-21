@@ -100,7 +100,7 @@ export const upsertDepartment = (
   const name = sanitizeName(input.name, 'Новый отдел');
   const slug = sanitizeSlug(input.slug, 'department');
 
-  if (!normalizedId || normalizedId === GENERAL_DEPARTMENT_ID) {
+  if (normalizedId === GENERAL_DEPARTMENT_ID) {
     departments.general = {
       id: GENERAL_DEPARTMENT_ID,
       name,
@@ -109,7 +109,7 @@ export const upsertDepartment = (
     return embedDepartmentCollection(defaultsPayload, departments);
   }
 
-  const existing = departments.items.find((item) => item.id === normalizedId);
+  const existing = normalizedId ? departments.items.find((item) => item.id === normalizedId) : null;
   if (existing) {
     existing.name = name;
     existing.slug = slug;

@@ -8,9 +8,13 @@ const rootDir = process.cwd();
 
 const sources = {
   colorDark:
-    process.env.SDS_DARK_TOKENS_PATH || '/Users/vidmich/Downloads/Color/SDS Dark.tokens.json',
+    process.env.SDS_DARK_TOKENS_PATH ||
+    path.join(rootDir, 'design/tokens/AI-Craft-Dark.tokens.json') ||
+    '/Users/vidmich/Downloads/Color/SDS Dark.tokens.json',
   colorLight:
-    process.env.SDS_LIGHT_TOKENS_PATH || '/Users/vidmich/Downloads/Color/SDS Light.tokens.json',
+    process.env.SDS_LIGHT_TOKENS_PATH ||
+    path.join(rootDir, 'design/tokens/AI-Craft-Light.tokens.json') ||
+    '/Users/vidmich/Downloads/Color/SDS Light.tokens.json',
   colorPrimitivesZip:
     process.env.SDS_COLOR_PRIMITIVES_ZIP || '/Users/vidmich/Downloads/Color Primitives.zip',
   sizeZip: process.env.SDS_SIZE_ZIP || '/Users/vidmich/Downloads/Size.zip',

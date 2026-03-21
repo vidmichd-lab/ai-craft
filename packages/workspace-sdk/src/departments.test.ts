@@ -24,4 +24,18 @@ describe('workspace-sdk departments', () => {
     const withoutDepartment = removeDepartment(withDepartment, customEntry?.id || '');
     expect(listDepartmentEntries(withoutDepartment)).toHaveLength(1);
   });
+
+  it('creates a custom department when id is omitted', () => {
+    const withDepartment = upsertDepartment({}, { name: 'Studio', slug: 'studio' });
+    const entries = listDepartmentEntries(withDepartment);
+
+    expect(entries).toHaveLength(2);
+    expect(entries.find((entry) => entry.isGeneral)?.name).toBe('Общий');
+    expect(entries.find((entry) => !entry.isGeneral)).toMatchObject({
+      id: 'department-studio',
+      name: 'Studio',
+      slug: 'studio',
+      isGeneral: false
+    });
+  });
 });

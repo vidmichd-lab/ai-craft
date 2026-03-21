@@ -11,8 +11,39 @@ const {
   getCredentialsFromEnv
 } = YdbSdk;
 
+const INSECURE_DEFAULT_JWT_SECRET = 'change-me';
+const INSECURE_DEFAULT_BOOTSTRAP_PASSWORD = 'change-me-now';
+
+const insecureWorkspaceDefaults = {
+  jwtSecret: INSECURE_DEFAULT_JWT_SECRET,
+  bootstrapAdminPassword: INSECURE_DEFAULT_BOOTSTRAP_PASSWORD
+};
+
+const ensureWorkspaceRuntimeSecurity = ({
+  nodeEnv = 'development',
+  jwtSecret = '',
+  bootstrapAdminEmail = '',
+  bootstrapAdminPassword = ''
+} = {}) => {
+  if (nodeEnv !== 'production') return;
+
+  if (!jwtSecret || jwtSecret === INSECURE_DEFAULT_JWT_SECRET) {
+    throw new Error('WORKSPACE_JWT_SECRET must be configured in production');
+  }
+
+  if (
+    bootstrapAdminEmail &&
+    (!bootstrapAdminPassword || bootstrapAdminPassword === INSECURE_DEFAULT_BOOTSTRAP_PASSWORD)
+  ) {
+    throw new Error('WORKSPACE_BOOTSTRAP_ADMIN_PASSWORD must not use the default value in production');
+  }
+};
+
 const DEFAULT_ALLOWED_ORIGINS = [
+  'https://aicrafter.ru',
+  'https://www.aicrafter.ru',
   'https://ai-craft.website.yandexcloud.net',
+  'https://bbatcmo4t42t8vmcrqka.containers.yandexcloud.net',
   'http://localhost:8000',
   'http://localhost:8001'
 ];
@@ -52,7 +83,7 @@ const IDENTITY_QUERY_SETTINGS = new ExecuteQuerySettings().withIdempotent(true);
 
 const config = {
   storage: STORAGE_MODE,
-  jwtSecret: getEnv('WORKSPACE_JWT_SECRET', 'change-me'),
+  jwtSecret: getEnv('WORKSPACE_JWT_SECRET', insecureWorkspaceDefaults.jwtSecret),
   allowedOrigins: splitCsv(getEnv('WORKSPACE_ALLOWED_ORIGINS'), DEFAULT_ALLOWED_ORIGINS),
   superAdminEmails: splitCsv(getEnv('WORKSPACE_SUPERADMIN_EMAILS', 'vidmichd@ya.ru')).map((item) => item.toLowerCase()),
   cookieDomain: getEnv('WORKSPACE_COOKIE_DOMAIN', ''),
@@ -64,7 +95,10 @@ const config = {
   bootstrapTeamSlug: getEnv('WORKSPACE_BOOTSTRAP_TEAM_SLUG', 'practicum'),
   bootstrapTeamName: getEnv('WORKSPACE_BOOTSTRAP_TEAM_NAME', 'Яндекс Практикум'),
   bootstrapAdminEmail: getEnv('WORKSPACE_BOOTSTRAP_ADMIN_EMAIL', STORAGE_MODE === 'memory' ? 'admin@example.com' : '').toLowerCase(),
-  bootstrapAdminPassword: getEnv('WORKSPACE_BOOTSTRAP_ADMIN_PASSWORD', STORAGE_MODE === 'memory' ? 'change-me-now' : ''),
+  bootstrapAdminPassword: getEnv(
+    'WORKSPACE_BOOTSTRAP_ADMIN_PASSWORD',
+    STORAGE_MODE === 'memory' ? insecureWorkspaceDefaults.bootstrapAdminPassword : ''
+  ),
   bootstrapAdminName: getEnv('WORKSPACE_BOOTSTRAP_ADMIN_NAME', 'Workspace Admin'),
   bootstrapDefaultsJson: safeParseJson(getEnv('WORKSPACE_BOOTSTRAP_DEFAULTS_JSON', '{}'), {}),
   bootstrapMediaSourcesJson: safeParseJson(getEnv('WORKSPACE_BOOTSTRAP_MEDIA_SOURCES_JSON', '{}'), {}),
@@ -72,6 +106,15 @@ const config = {
   ydbDatabase: getEnv('YDB_DATABASE', ''),
   ydbAuthToken: getEnv('YDB_AUTH_TOKEN', ''),
   debugEvent: getEnv('WORKSPACE_DEBUG_EVENT', 'false').toLowerCase() === 'true'
+};
+
+const ensureSecureRuntimeConfig = () => {
+  ensureWorkspaceRuntimeSecurity({
+    nodeEnv: getEnv('NODE_ENV', 'development'),
+    jwtSecret: config.jwtSecret,
+    bootstrapAdminEmail: config.bootstrapAdminEmail,
+    bootstrapAdminPassword: config.bootstrapAdminPassword
+  });
 };
 
 const inferOrigin = (event) => {
@@ -305,9 +348,10 @@ const requireRole = (session, allowedRoles) => {
 
 const requireSuperAdmin = (session) => !!session?.isSuperadmin;
 
-const buildPublicUser = (user) => ({
+const buildPublicUser = (user, role = '') => ({
   id: user.id,
   email: user.email,
+  role,
   displayName: user.displayName,
   status: user.status,
   isSuperadmin: isSuperAdminEmail(user.email)
@@ -418,7 +462,7 @@ const optionalUtf8 = (value) => (value === null || value === undefined || value 
   : TypedValues.utf8(String(value));
 
 const optionalTimestamp = (value) => value
-  ? TypedValues.timestamp(new Date(value))
+  ? TypedValues.optional(TypedValues.timestamp(new Date(value)))
   : TypedValues.optionalNull(Types.TIMESTAMP);
 
 const jsonDocumentValue = (value) => TypedValues.jsonDocument(JSON.stringify(value || {}));
@@ -2057,6 +2101,55 @@ const createYdbStorage = () => ({
 
 const storage = config.storage === 'ydb' ? createYdbStorage() : createMemoryStorage();
 
+const isBootstrapAdminCredentials = (email, password) =>
+  !!config.bootstrapAdminEmail
+  && !!config.bootstrapAdminPassword
+  && email === config.bootstrapAdminEmail
+  && password === config.bootstrapAdminPassword;
+
+const ensureBootstrapAdminAccess = async () => {
+  if (!config.bootstrapAdminEmail || !config.bootstrapAdminPassword) return;
+
+  let team = await storage.getTeamBySlug({ teamSlug: config.bootstrapTeamSlug });
+  if (!team && typeof storage.createTeam === 'function') {
+    team = await storage.createTeam({
+      slug: config.bootstrapTeamSlug,
+      name: config.bootstrapTeamName
+    });
+  }
+  if (!team) return;
+
+  let user = await storage.getUserByEmail({ email: config.bootstrapAdminEmail });
+  if (!user && typeof storage.createUser === 'function') {
+    user = await storage.createUser({
+      email: config.bootstrapAdminEmail,
+      password: config.bootstrapAdminPassword,
+      displayName: config.bootstrapAdminName || config.bootstrapAdminEmail
+    });
+  }
+  if (!user) return;
+
+  if (!verifyPassword(config.bootstrapAdminPassword, user.passwordHash) && typeof storage.updateUserPassword === 'function') {
+    user = await storage.updateUserPassword({
+      userId: user.id,
+      passwordHash: hashPassword(config.bootstrapAdminPassword)
+    }) || user;
+  }
+
+  const loginContext = await storage.findLoginContext({
+    email: config.bootstrapAdminEmail,
+    teamSlug: config.bootstrapTeamSlug
+  });
+
+  if (!loginContext?.membership && typeof storage.createMembership === 'function') {
+    await storage.createMembership({
+      teamId: team.id,
+      userId: user.id,
+      role: resolveBootstrapRole(config.bootstrapAdminEmail)
+    });
+  }
+};
+
 const withStorageErrors = async (origin, handler) => {
   try {
     return await handler();
@@ -2106,7 +2199,7 @@ const createAuthSuccessResponse = async ({ user, team, membership, origin }) => 
   const token = signToken(accessPayload);
   return json(200, {
     ok: true,
-    user: buildPublicUser(user),
+    user: buildPublicUser(user, membership.role),
     team: buildPublicTeam(team),
     membership: {
       role: membership.role,
@@ -2590,6 +2683,10 @@ const handleLogin = async (event, origin) => withStorageErrors(origin, async () 
     return json(400, toError('email and password are required'), origin);
   }
 
+  if (isBootstrapAdminCredentials(email, password)) {
+    await ensureBootstrapAdminAccess();
+  }
+
   const loginContext = await storage.findLoginContext({ email, teamSlug });
   const passwordMatches = !!(loginContext && verifyPassword(password, loginContext.user.passwordHash));
   if (!loginContext || !passwordMatches) {
@@ -2969,6 +3066,8 @@ export const handler = async (event) => {
   }
 
   try {
+    ensureSecureRuntimeConfig();
+
     if (method === 'GET' && path.endsWith('/workspace/health')) {
       return handleHealth(origin);
     }
@@ -3072,6 +3171,7 @@ export const __private__ = {
   buildSessionCookie,
   clearSessionCookie,
   createAccessPayload,
+  ensureSecureRuntimeConfig,
   hashPassword,
   parseCookies,
   signToken,

@@ -1,11 +1,15 @@
 'use client';
 
 import { legacySnapshotAdapter, type EditorDocument } from '@ai-craft/editor-model';
-import { DEFAULT_PREVIEW_SURFACES, renderEditorSnapshotToSurfaces, type PreviewSurface } from '@ai-craft/editor-renderer';
+import {
+  DEFAULT_PREVIEW_SURFACES,
+  renderEditorSnapshotToSurfaces,
+  type PreviewSurface
+} from '@ai-craft/editor-renderer';
 import { useEffect, useMemo, useState } from 'react';
 import styles from './workspace-shell.module.css';
 
-const RENDERER_ASSET_BASE = process.env.NEXT_PUBLIC_LEGACY_ASSET_BASE_URL || 'https://ai-craft.website.yandexcloud.net';
+const RENDERER_ASSET_BASE = process.env.NEXT_PUBLIC_LEGACY_ASSET_BASE_URL || 'https://aicrafter.ru';
 
 type Props = {
   state: EditorDocument;
@@ -21,8 +25,12 @@ export function EditorPreview({ state }: Props) {
     []
   );
   const [error, setError] = useState('');
+  const [activeSurfaceKey, setActiveSurfaceKey] = useState<PreviewSurface['key']>(DEFAULT_PREVIEW_SURFACES[0].key);
 
-  const downloadCanvas = (surfaceKey: string, filename: string) => {
+  const activeSurface =
+    DEFAULT_PREVIEW_SURFACES.find((surface) => surface.key === activeSurfaceKey) || DEFAULT_PREVIEW_SURFACES[0];
+
+  const downloadCanvas = (surfaceKey: PreviewSurface['key'], filename: string) => {
     const canvas = canvasRefs[surfaceKey as keyof typeof canvasRefs].current;
     if (!canvas) return;
     const href = canvas.toDataURL('image/png');
@@ -32,14 +40,19 @@ export function EditorPreview({ state }: Props) {
     link.click();
   };
 
+  const buildFilename = (surface: PreviewSurface) => {
+    const safeBrand = String(state.brand.name || 'layout')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9_-]+/gi, '');
+
+    return `${safeBrand || 'layout'}-${surface.width}x${surface.height}.png`;
+  };
+
   const downloadAll = () => {
-    DEFAULT_PREVIEW_SURFACES.forEach((surface: PreviewSurface) => {
-      const safeBrand = String(state.brand.name || 'layout')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9_-]+/gi, '');
-      downloadCanvas(surface.key, `${safeBrand || 'layout'}-${surface.width}x${surface.height}.png`);
+    DEFAULT_PREVIEW_SURFACES.forEach((surface) => {
+      downloadCanvas(surface.key, buildFilename(surface));
     });
   };
 
@@ -78,37 +91,89 @@ export function EditorPreview({ state }: Props) {
   return (
     <div className={styles.previewStack}>
       {error ? <div className={styles.error}>{error}</div> : null}
-      <div className={styles.actionsRow}>
-        <button className={styles.button} type="button" onClick={downloadAll}>
-          Скачать все PNG
-        </button>
+      <div className={styles.workspaceTabs}>
+        {DEFAULT_PREVIEW_SURFACES.map((surface) => (
+          <button
+            key={surface.key}
+            className={`${styles.workspaceTab} ${activeSurface.key === surface.key ? styles.workspaceTabActive : ''}`}
+            type="button"
+            onClick={() => setActiveSurfaceKey(surface.key)}
+          >
+            {surface.label}
+          </button>
+        ))}
       </div>
-      <div className={styles.canvasGrid}>
-        {DEFAULT_PREVIEW_SURFACES.map((surface: PreviewSurface) => (
-          <section className={styles.canvasCard} key={surface.key}>
-            <div className={styles.canvasMeta}>
-              <span>{surface.label}</span>
-              <span>{surface.width / surface.height > 1 ? 'Горизонталь' : surface.width === surface.height ? 'Квадрат' : 'Вертикаль'}</span>
-            </div>
-            <div className={styles.canvasViewport}>
+      <div className={styles.previewGrid}>
+        <section className={styles.canvasCard}>
+          <div className={styles.canvasMeta}>
+            <span>{activeSurface.label}</span>
+            <span>
+              {activeSurface.width}×{activeSurface.height}
+            </span>
+          </div>
+          <div className={styles.canvasViewport}>
+            {DEFAULT_PREVIEW_SURFACES.map((surface) => (
               <canvas
+                key={surface.key}
                 ref={(node) => {
                   canvasRefs[surface.key as keyof typeof canvasRefs].current = node;
                 }}
                 className={styles.previewCanvas}
+                style={{ display: activeSurface.key === surface.key ? 'block' : 'none' }}
               />
-            </div>
+            ))}
+          </div>
+        </section>
+
+        <div className={styles.stack}>
+          <section className={styles.subPanel}>
+            <div className={styles.sectionLabel}>Экспорт</div>
             <div className={styles.actionsRow}>
               <button
                 className={styles.button}
                 type="button"
-                onClick={() => downloadCanvas(surface.key, `${state.brand.name || 'layout'}-${surface.width}x${surface.height}.png`)}
+                onClick={() => downloadCanvas(activeSurface.key, buildFilename(activeSurface))}
               >
                 Скачать PNG
               </button>
+              <button className={styles.button} type="button" onClick={downloadAll}>
+                Скачать все PNG
+              </button>
+            </div>
+            <div className={styles.description}>
+              Активный размер: {activeSurface.width}×{activeSurface.height}. Можно переключать форматы выше без смены
+              рабочего состояния.
             </div>
           </section>
-        ))}
+          <section className={styles.subPanel}>
+            <div className={styles.sectionLabel}>Быстрый обзор</div>
+            <div className={styles.canvasGrid}>
+              {DEFAULT_PREVIEW_SURFACES.filter((surface) => surface.key !== activeSurface.key).map((surface) => (
+                <button
+                  key={surface.key}
+                  className={styles.canvasCard}
+                  type="button"
+                  onClick={() => setActiveSurfaceKey(surface.key)}
+                >
+                  <div className={styles.canvasMeta}>
+                    <span>{surface.label}</span>
+                    <span>
+                      {surface.width}×{surface.height}
+                    </span>
+                  </div>
+                  <div className={styles.canvasViewport}>
+                    <canvas
+                      ref={(node) => {
+                        canvasRefs[surface.key as keyof typeof canvasRefs].current = node;
+                      }}
+                      className={styles.previewCanvas}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );
